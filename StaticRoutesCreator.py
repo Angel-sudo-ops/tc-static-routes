@@ -11,7 +11,7 @@ def create_routes_xml(project, lgv_list, base_ip, file_path, is_tc3):
     # Extract the base part of the IP address and the starting offset
     base_ip_parts = base_ip.rsplit('.', 1)
     base_ip_prefix = base_ip_parts[0]
-    ip_offset = abs(int(base_ip_parts[1])-lgv_list[0])
+    ip_offset = int(base_ip_parts[1])-lgv_list[0]
 
     # Create the root element
     config = ET.Element("TcConfig")
