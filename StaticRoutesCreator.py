@@ -4,7 +4,7 @@ import tkinter as tk
 from tkinter import messagebox, filedialog
 import xml.etree.ElementTree as ET
 
-default_file_path = os.path.join(r'C:\TwinCAT\3.1\Target', 'StaticRoutesTest.xml')
+default_file_path = os.path.join(r'C:\TwinCAT\3.1\Target', 'StaticRoutes.xml')
 
 # Function to create routes.xml with dynamic parameters
 def create_routes_xml(project, lgv_list, base_ip, file_path, is_tc3):
@@ -125,6 +125,21 @@ def toggle_file_path_selection():
         entry_file_path.insert(0, default_file_path)
         entry_file_path.config(state='disabled')
 
+def create_placeholder(entry, placeholder_text):
+    entry.insert(0, placeholder_text)
+    entry.bind("<FocusIn>", lambda event: on_focus_in(entry, placeholder_text))
+    entry.bind("<FocusOut>", lambda event: on_focus_out(entry, placeholder_text))
+
+def on_focus_in(entry, placeholder_text):
+    if entry.get() == placeholder_text:
+        entry.delete(0, tk.END)
+        entry.config(fg='black')
+
+def on_focus_out(entry, placeholder_text):
+    if not entry.get():
+        entry.insert(0, placeholder_text)
+        entry.config(fg='grey')
+
 # Function to validate the inputs and create XML
 def validate_and_create_xml():
     try:
@@ -193,12 +208,14 @@ radio2 = tk.Radiobutton(root, text="TC3", variable=optionTC, value="TC3")
 radio2.grid(row=0, column=1, padx=50, pady=5, sticky='w')
 
 tk.Label(root, text="Project number CC:").grid(row=1, column=0, padx=10, pady=5)
-entry_project = tk.Entry(root)
+entry_project = tk.Entry(root, fg="grey")
+create_placeholder(entry_project, "1234")
 entry_project.grid(row=1, column=1, padx=10, pady=5)
 entry_project.bind("<KeyRelease>", validate_project)
 
 tk.Label(root, text="LGV numbers:").grid(row=2, column=0, padx=10, pady=5)
-entry_lgv_range = tk.Entry(root)
+entry_lgv_range = tk.Entry(root, fg="grey")
+create_placeholder(entry_lgv_range, "1-5,11-17,20-25")
 entry_lgv_range.grid(row=2, column=1, padx=10, pady=5)
 # entry_lgv_range.bind("<KeyRelease>", validate_limit)
 
@@ -207,8 +224,9 @@ entry_lgv_range.grid(row=2, column=1, padx=10, pady=5)
 # entry_offsetLGV.grid(row=3, column=1, padx=10, pady=5)
 # entry_offsetLGV.bind("<KeyRelease>", validate_offset_lgv)
 
-tk.Label(root, text="First IP (e.g., 172.20.3.10):").grid(row=4, column=0, padx=10, pady=5)
-entry_base_ip = tk.Entry(root)
+tk.Label(root, text="First IP: ").grid(row=4, column=0, padx=10, pady=5)
+entry_base_ip = tk.Entry(root, fg="grey")
+create_placeholder(entry_base_ip, "172.20.3.10")
 entry_base_ip.grid(row=4, column=1, padx=10, pady=5)
 entry_base_ip.bind("<KeyRelease>", validate_base_ip)
 
@@ -234,3 +252,6 @@ button_select_path.config(state='disabled')
 tk.Button(root, text="Create XML", command=validate_and_create_xml).grid(row=8, columnspan=2, pady=10)
 
 root.mainloop()
+
+
+#PLACEHOLDERS
