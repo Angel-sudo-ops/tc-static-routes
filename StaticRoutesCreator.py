@@ -7,11 +7,11 @@ import xml.etree.ElementTree as ET
 default_file_path = os.path.join(r'C:\TwinCAT\3.1\Target', 'StaticRoutesTest.xml')
 
 # Function to create routes.xml with dynamic parameters
-def create_routes_xml(project, limit, offset_lgv, base_ip, file_path, is_tc3):
+def create_routes_xml(project, lgv_list, base_ip, file_path, is_tc3):
     # Extract the base part of the IP address and the starting offset
     base_ip_parts = base_ip.rsplit('.', 1)
     base_ip_prefix = base_ip_parts[0]
-    ip_offset = int(base_ip_parts[1])
+    ip_offset = abs(int(base_ip_parts[1])-lgv_list[0])
 
     # Create the root element
     config = ET.Element("TcConfig")
@@ -20,15 +20,15 @@ def create_routes_xml(project, limit, offset_lgv, base_ip, file_path, is_tc3):
     routes = ET.SubElement(config,"RemoteConnections")
 
     # Create route elements dynamically
-    for i in range(limit):
-        current_offset = ip_offset + i
+    for i in range(len(lgv_list)):
+        current_offset = ip_offset + lgv_list[i]
         route_element = ET.SubElement(routes, "Route")
         
         name = ET.SubElement(route_element, "Name")
-        if offset_lgv + i > 0 and offset_lgv + i < 10:
-            name.text = f"CC{project}_LGV0{offset_lgv + i}"
+        if lgv_list[i] > 0 and lgv_list[i] < 10:
+            name.text = f"CC{project}_LGV0{lgv_list[i]}"
         else:
-            name.text = f"CC{project}_LGV{offset_lgv + i}"
+            name.text = f"CC{project}_LGV{lgv_list[i]}"
         
         address = ET.SubElement(route_element, "Address")
         address.text = f"{base_ip_prefix}.{current_offset}"  # Increment IP offset
@@ -78,19 +78,19 @@ def validate_project(*args):
     else:
         entry_project.config(bg='yellow')
 
-def validate_limit(*args):
-    limit = entry_limit.get().strip()
-    if limit.isdigit() and int(limit) > 0:
-        entry_limit.config(bg='white')
-    else:
-        entry_limit.config(bg='yellow')
+# def validate_limit(*args):
+#     limit = entry_limit.get().strip()
+#     if limit.isdigit() and int(limit) > 0:
+#         entry_limit.config(bg='white')
+#     else:
+#         entry_limit.config(bg='yellow')
 
-def validate_offset_lgv(*args):
-    offset_lgv = entry_offsetLGV.get().strip()
-    if offset_lgv.isdigit() and int(offset_lgv) > 0:
-        entry_offsetLGV.config(bg='white')
-    else:
-        entry_offsetLGV.config(bg='yellow')
+# def validate_offset_lgv(*args):
+#     offset_lgv = entry_offsetLGV.get().strip()
+#     if offset_lgv.isdigit() and int(offset_lgv) > 0:
+#         entry_offsetLGV.config(bg='white')
+#     else:
+#         entry_offsetLGV.config(bg='yellow')
 
 def validate_base_ip(*args):
     base_ip = entry_base_ip.get().strip()
@@ -134,20 +134,22 @@ def validate_and_create_xml():
     except ValueError as e:
         messagebox.showerror("Invalid input", str(e))
         return
-    try:
-        limit = int(entry_limit.get())
-        if limit <= 0:
-            raise ValueError("The number of routes must be a positive integer.")
-    except ValueError as e:
-        messagebox.showerror("Invalid input", str(e))
-        return
-    try:
-        offset_lgv = int(entry_offsetLGV.get())
-        if offset_lgv <= 0:
-            raise ValueError("Must be a positive integer.")
-    except ValueError as e:
-        messagebox.showerror("Invalid input", str(e))
-        return
+    
+    
+    # try:
+    #     limit = int(entry_lgv_range.get())
+    #     if limit <= 0:
+    #         raise ValueError("The number of routes must be a positive integer.")
+    # except ValueError as e:
+    #     messagebox.showerror("Invalid input", str(e))
+    #     return
+    # try:
+    #     offset_lgv = int(entry_offsetLGV.get())
+    #     if offset_lgv <= 0:
+    #         raise ValueError("Must be a positive integer.")
+    # except ValueError as e:
+    #     messagebox.showerror("Invalid input", str(e))
+    #     return
 
     base_ip = entry_base_ip.get().strip()
     if not validate_ip(base_ip):
@@ -160,8 +162,22 @@ def validate_and_create_xml():
         return
     
     is_tc3 = optionTC.get() == "TC3"
+
+    lgv_list = []
+    range_input = entry_lgv_range.get()
+
+    if not range_input:
+        return None
+    else:
+        ranges = range_input.split(',')
+        for r in ranges:
+            if '-' in r:
+                start, end = map(int, r.split('-'))
+                lgv_list.extend(range(start, end + 1))
+            else:
+                lgv_list.append(r)
     
-    create_routes_xml(project, limit, offset_lgv, base_ip, file_path, is_tc3)
+    create_routes_xml(project, lgv_list, base_ip, file_path, is_tc3)
 
 # Set up the GUI
 root = tk.Tk()
@@ -181,17 +197,17 @@ entry_project = tk.Entry(root)
 entry_project.grid(row=1, column=1, padx=10, pady=5)
 entry_project.bind("<KeyRelease>", validate_project)
 
-tk.Label(root, text="Number of LGVs:").grid(row=2, column=0, padx=10, pady=5)
-entry_limit = tk.Entry(root)
-entry_limit.grid(row=2, column=1, padx=10, pady=5)
-entry_limit.bind("<KeyRelease>", validate_limit)
+tk.Label(root, text="LGV numbers:").grid(row=2, column=0, padx=10, pady=5)
+entry_lgv_range = tk.Entry(root)
+entry_lgv_range.grid(row=2, column=1, padx=10, pady=5)
+# entry_lgv_range.bind("<KeyRelease>", validate_limit)
 
-tk.Label(root, text="Starting LGV:").grid(row=3, column=0, padx=10, pady=5)
-entry_offsetLGV = tk.Entry(root)
-entry_offsetLGV.grid(row=3, column=1, padx=10, pady=5)
-entry_offsetLGV.bind("<KeyRelease>", validate_offset_lgv)
+# tk.Label(root, text="Starting LGV:").grid(row=3, column=0, padx=10, pady=5)
+# entry_offsetLGV = tk.Entry(root)
+# entry_offsetLGV.grid(row=3, column=1, padx=10, pady=5)
+# entry_offsetLGV.bind("<KeyRelease>", validate_offset_lgv)
 
-tk.Label(root, text="Base IP Address (e.g., 172.20.3.10):").grid(row=4, column=0, padx=10, pady=5)
+tk.Label(root, text="First IP (e.g., 172.20.3.10):").grid(row=4, column=0, padx=10, pady=5)
 entry_base_ip = tk.Entry(root)
 entry_base_ip.grid(row=4, column=1, padx=10, pady=5)
 entry_base_ip.bind("<KeyRelease>", validate_base_ip)
