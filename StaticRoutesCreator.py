@@ -7,7 +7,7 @@ import xml.etree.ElementTree as ET
 default_file_path = os.path.join(r'C:\TwinCAT\3.1\Target', 'StaticRoutesTest.xml')
 
 # Function to create routes.xml with dynamic parameters
-def create_routes_xml(project, limit, offset_lgv, base_ip, file_path):
+def create_routes_xml(project, limit, offset_lgv, base_ip, file_path, is_tc3):
     # Extract the base part of the IP address and the starting offset
     base_ip_parts = base_ip.rsplit('.', 1)
     base_ip_prefix = base_ip_parts[0]
@@ -35,13 +35,15 @@ def create_routes_xml(project, limit, offset_lgv, base_ip, file_path):
         
         netid = ET.SubElement(route_element, "NetId")
         netid.text = f"{base_ip_prefix}.{current_offset}.1.1"  # Increment NetId offset
-        netid.set("RemoteNetId", "192.168.11.2.1.1")
+        if is_tc3:
+            netid.set("RemoteNetId", "192.168.11.2.1.1")
 
         type_ = ET.SubElement(route_element, "Type")
         type_.text = "TCP_IP"
         
-        timeout = ET.SubElement(route_element, "Flags")
-        timeout.text = "32"
+        if is_tc3:
+            timeout = ET.SubElement(route_element, "Flags")
+            timeout.text = "32"
 
     # Create a tree from the root element and write it to a file in the pretty version
     # tree = ET.ElementTree(config)
@@ -156,27 +158,10 @@ def validate_and_create_xml():
     if not file_path:
         messagebox.showerror("Invalid input", "Please select a file path to save the XML.")
         return
-    # if not validate_ip(base_ip):
-    #      messagebox.showerror("Invalid input", "Please enter a valid base IP address in the format 'xxx.xxx.xxx'")
-    #      return
     
-
-    # type_value = entry_type.get().strip()
-    # if not type_value:
-    #     messagebox.showerror("Invalid input", "Type value cannot be empty.")
-    #     return
-
-    # timeout_value = entry_timeout.get().strip()
-    # if not timeout_value.isdigit():
-    #     messagebox.showerror("Invalid input", "Please enter a valid timeout value.")
-    #     return
-
-    # Construct file path dynamically using current user's home directory
-    # username = os.getlogin()  # Get the current user's login name
-    # file_name = "StaticRoutes.xml"
-    # file_path = os.path.join(os.path.expanduser('~'), 'Desktop', file_name)  # Adjust folder as needed (e.g., 'Documents')
-
-    create_routes_xml(project, limit, offset_lgv, base_ip, file_path)
+    is_tc3 = optionTC.get() == "TC3"
+    
+    create_routes_xml(project, limit, offset_lgv, base_ip, file_path, is_tc3)
 
 # Set up the GUI
 root = tk.Tk()
@@ -185,59 +170,51 @@ root.title("Static Routes XML Creator")
 #Disable resizing
 root.resizable(False, False)
 
-tk.Label(root, text="Project number CC:").grid(row=0, column=0, padx=10, pady=5)
+optionTC = tk.StringVar(value="TC3")
+radio1 = tk.Radiobutton(root, text="TC2", variable=optionTC, value="TC2")
+radio1.grid(row=0, column=1, padx=5, pady=5, sticky='w')
+radio2 = tk.Radiobutton(root, text="TC3", variable=optionTC, value="TC3")
+radio2.grid(row=0, column=1, padx=50, pady=5, sticky='w')
+
+tk.Label(root, text="Project number CC:").grid(row=1, column=0, padx=10, pady=5)
 entry_project = tk.Entry(root)
-entry_project.grid(row=0, column=1, padx=10, pady=5)
+entry_project.grid(row=1, column=1, padx=10, pady=5)
 entry_project.bind("<KeyRelease>", validate_project)
 
-tk.Label(root, text="Number of LGVs:").grid(row=1, column=0, padx=10, pady=5)
+tk.Label(root, text="Number of LGVs:").grid(row=2, column=0, padx=10, pady=5)
 entry_limit = tk.Entry(root)
-entry_limit.grid(row=1, column=1, padx=10, pady=5)
+entry_limit.grid(row=2, column=1, padx=10, pady=5)
 entry_limit.bind("<KeyRelease>", validate_limit)
 
-tk.Label(root, text="Starting LGV:").grid(row=2, column=0, padx=10, pady=5)
+tk.Label(root, text="Starting LGV:").grid(row=3, column=0, padx=10, pady=5)
 entry_offsetLGV = tk.Entry(root)
-entry_offsetLGV.grid(row=2, column=1, padx=10, pady=5)
+entry_offsetLGV.grid(row=3, column=1, padx=10, pady=5)
 entry_offsetLGV.bind("<KeyRelease>", validate_offset_lgv)
 
-tk.Label(root, text="Base IP Address (e.g., 172.20.3.10):").grid(row=3, column=0, padx=10, pady=5)
+tk.Label(root, text="Base IP Address (e.g., 172.20.3.10):").grid(row=4, column=0, padx=10, pady=5)
 entry_base_ip = tk.Entry(root)
-entry_base_ip.grid(row=3, column=1, padx=10, pady=5)
+entry_base_ip.grid(row=4, column=1, padx=10, pady=5)
 entry_base_ip.bind("<KeyRelease>", validate_base_ip)
 
-# Type entry will be disabled
-# tk.Label(root, text="Type:").grid(row=4, column=0, padx=10, pady=5)
-# entry_type = tk.Entry(root, state='normal')
-# entry_type.grid(row=4, column=1, padx=10, pady=5)
-# entry_type.insert(0, "TCP_IP")
-# entry_type.config(state='disabled')
-
-# Flags entry will be disabled
-# tk.Label(root, text="Flags:").grid(row=5, column=0, padx=10, pady=5)
-# entry_flags = tk.Entry(root, state='normal')
-# entry_flags.grid(row=5, column=1, padx=10, pady=5)
-# entry_flags.insert(0, "32")
-# entry_flags.config(state='disabled')
-
 # File Path entry will be disabled and set dynamically
-tk.Label(root, text="File Path:").grid(row=6, column=0, padx=10, pady=5)
+tk.Label(root, text="File Path:").grid(row=5, column=0, padx=10, pady=5)
 #file_path = os.path.join(os.path.expanduser('~'), 'Desktop', 'StaticRoutes.xml')  # Adjust folder as needed (e.g., 'Documents')
 entry_file_path = tk.Entry(root, state='normal')
-entry_file_path.grid(row=6, column=1, padx=10, pady=5)
+entry_file_path.grid(row=5, column=1, padx=10, pady=5)
 entry_file_path.insert(0, default_file_path)
 entry_file_path.config(state='disabled')
 
 # Checkbox to toggle file path selection
 select_path_var = tk.BooleanVar()
 check_select_path = tk.Checkbutton(root, text="Select File Path", variable=select_path_var, command=toggle_file_path_selection)
-check_select_path.grid(row=7, columnspan=2, pady=5)
+check_select_path.grid(row=6, column=1, columnspan=2, pady=5)
 
 # Button to select file path
 button_select_path = tk.Button(root, text="Browse...", command=select_file_path)
-button_select_path.grid(row=8, column=1, padx=10, pady=5)
+button_select_path.grid(row=7, column=1, padx=10, pady=5)
 button_select_path.config(state='disabled')
 
 # Button to create XML
-tk.Button(root, text="Create XML", command=validate_and_create_xml).grid(row=9, columnspan=2, pady=10)
+tk.Button(root, text="Create XML", command=validate_and_create_xml).grid(row=8, columnspan=2, pady=10)
 
 root.mainloop()
