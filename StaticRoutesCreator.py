@@ -252,6 +252,3 @@ button_select_path.config(state='disabled')
 tk.Button(root, text="Create XML", command=validate_and_create_xml).grid(row=8, columnspan=2, pady=10)
 
 root.mainloop()
-
-
-#PLACEHOLDERS
