@@ -150,22 +150,6 @@ def validate_and_create_xml():
         messagebox.showerror("Invalid input", str(e))
         return
     
-    
-    # try:
-    #     limit = int(entry_lgv_range.get())
-    #     if limit <= 0:
-    #         raise ValueError("The number of routes must be a positive integer.")
-    # except ValueError as e:
-    #     messagebox.showerror("Invalid input", str(e))
-    #     return
-    # try:
-    #     offset_lgv = int(entry_offsetLGV.get())
-    #     if offset_lgv <= 0:
-    #         raise ValueError("Must be a positive integer.")
-    # except ValueError as e:
-    #     messagebox.showerror("Invalid input", str(e))
-    #     return
-
     base_ip = entry_base_ip.get().strip()
     if not validate_ip(base_ip):
         messagebox.showerror("Invalid input", "Please enter a valid base IP address in the format 'xxx.xxx.xxx.xxx'")
@@ -209,13 +193,13 @@ radio2.grid(row=0, column=1, padx=50, pady=5, sticky='w')
 
 tk.Label(root, text="Project number CC:").grid(row=1, column=0, padx=10, pady=5)
 entry_project = tk.Entry(root, fg="grey")
-create_placeholder(entry_project, "1234")
+create_placeholder(entry_project, "e.g., 1584")
 entry_project.grid(row=1, column=1, padx=10, pady=5)
 entry_project.bind("<KeyRelease>", validate_project)
 
 tk.Label(root, text="LGV numbers:").grid(row=2, column=0, padx=10, pady=5)
 entry_lgv_range = tk.Entry(root, fg="grey")
-create_placeholder(entry_lgv_range, "1-5,11-17,20-25")
+create_placeholder(entry_lgv_range, "e.g., 1-5,11-17,20-25")
 entry_lgv_range.grid(row=2, column=1, padx=10, pady=5)
 # entry_lgv_range.bind("<KeyRelease>", validate_limit)
 
@@ -226,7 +210,7 @@ entry_lgv_range.grid(row=2, column=1, padx=10, pady=5)
 
 tk.Label(root, text="First IP: ").grid(row=4, column=0, padx=10, pady=5)
 entry_base_ip = tk.Entry(root, fg="grey")
-create_placeholder(entry_base_ip, "172.20.3.10")
+create_placeholder(entry_base_ip, "e.g., 172.20.3.10")
 entry_base_ip.grid(row=4, column=1, padx=10, pady=5)
 entry_base_ip.bind("<KeyRelease>", validate_base_ip)
 
