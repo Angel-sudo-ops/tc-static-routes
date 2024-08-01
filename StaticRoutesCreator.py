@@ -7,6 +7,7 @@ from xml.dom import minidom
 
 default_file_path = os.path.join(r'C:\TwinCAT\3.1\Target', 'StaticRoutes.xml')
 
+enableCC = False
 # Function to create routes.xml with dynamic parameters
 def create_routes_xml(project, lgv_list, base_ip, file_path, is_tc3):
     # Extract the base part of the IP address and the starting offset
@@ -57,6 +58,9 @@ def create_routes_xml(project, lgv_list, base_ip, file_path, is_tc3):
 
     messagebox.showinfo("Success", "XML file has been created successfully!")
 
+    global enableCC
+    enableCC = True
+
 def convert_static_to_cc(static_routes_file, CC_file):
     # Parse the StaticRoutes.xml file
     tree = ET.parse(static_routes_file)
@@ -99,9 +103,13 @@ def convert_static_to_cc(static_routes_file, CC_file):
 def validate_and_create_cc():
     static_file_path = entry_file_path.get().strip()
     path_to_save_file = filedialog.asksaveasfilename(
+        initialfile="ControlCenter",
         defaultextension=".xml", 
         filetypes=[("XML files", "*.xml"), ("All files", "*.*")]
     )
+    if path_to_save_file is None:
+        messagebox.showerror("Input Error", "Please provide path to save the file.")
+        return
     convert_static_to_cc(static_file_path, path_to_save_file)
 
 # Function to validate IP address format
@@ -147,6 +155,7 @@ def validate_base_ip(*args):
 # Function to select the file save location
 def select_file_path():
     file_path = filedialog.asksaveasfilename(
+        initialfile="StaticRoutes",
         defaultextension=".xml", 
         filetypes=[("XML files", "*.xml"), ("All files", "*.*")]
     )
@@ -172,7 +181,10 @@ def toggle_file_path_selection():
 
 def toggle_cc():
     if optionTC.get() == "TC3":
-        create_cc.config(state='normal')
+        if enableCC:
+            create_cc.config(state='normal')
+        else:
+            create_cc.config(state='disabled')
     else:
         create_cc.config(state='disabled')
 
@@ -228,6 +240,7 @@ def validate_and_create_xml():
                 lgv_list.append(r)
     
     create_routes_xml(project, lgv_list, base_ip, file_path, is_tc3)
+    toggle_cc()
 
 # Set up the GUI
 root = tk.Tk()
