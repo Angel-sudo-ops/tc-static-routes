@@ -3,9 +3,11 @@ import re
 import tkinter as tk
 from tkinter import messagebox, filedialog
 import xml.etree.ElementTree as ET
+from xml.dom import minidom
 
 default_file_path = os.path.join(r'C:\TwinCAT\3.1\Target', 'StaticRoutes.xml')
 
+enableCC = False
 # Function to create routes.xml with dynamic parameters
 def create_routes_xml(project, lgv_list, base_ip, file_path, is_tc3):
     # Extract the base part of the IP address and the starting offset
@@ -49,15 +51,66 @@ def create_routes_xml(project, lgv_list, base_ip, file_path, is_tc3):
     # tree = ET.ElementTree(config)
     # tree.write(file_path, encoding="utf-8", xml_declaration=True)
 
-    # Pretty-print the XML
-    from xml.dom import minidom
-
     xmlstr = minidom.parseString(ET.tostring(config)).toprettyxml(indent="   ")
     #pretty_file_path = os.path.splitext(file_path)[0] + "_pretty.xml"
     with open(file_path, "w") as f:
         f.write(xmlstr)
 
     messagebox.showinfo("Success", "XML file has been created successfully!")
+
+    global enableCC
+    enableCC = True
+
+def convert_static_to_cc(static_routes_file, CC_file):
+    # Parse the StaticRoutes.xml file
+    tree = ET.parse(static_routes_file)
+    root = tree.getroot()
+    
+    # Create the root for cc.xml
+    CC_root = ET.Element("Fleet")
+    
+    # Iterate through each route in the static routes file
+    for route in root.find("RemoteConnections").findall("Route"):
+        lgv = ET.SubElement(CC_root, "LGV")
+        
+        # Convert Name to Number (assumes last two digits are the number)
+        name = route.find("Name").text
+        number = name[-2:]
+        ET.SubElement(lgv, "Number").text = str(int(number))  # Convert to int to remove leading zeroes
+        
+        # Add Type (fixed as "ELE" based on the example)
+        ET.SubElement(lgv, "Type").text = "undefined"
+        
+        # Address to IP
+        address = route.find("Address").text
+        ET.SubElement(lgv, "IP").text = address
+        
+        # Netid to AMS
+        netid = route.find("NetId").text
+        ET.SubElement(lgv, "AMS").text = netid
+    
+    # Pretty print the XML
+    raw_string = ET.tostring(CC_root, 'utf-8')
+    reparsed = minidom.parseString(raw_string)
+    pretty_xml = reparsed.toprettyxml(indent="  ")
+    
+    # Write to the file
+    with open(CC_file, 'w', encoding='utf-8') as f:
+        f.write(pretty_xml)
+    
+    messagebox.showinfo("Success", "ControlCenter file has been created successfully!")
+
+def validate_and_create_cc():
+    static_file_path = entry_file_path.get().strip()
+    path_to_save_file = filedialog.asksaveasfilename(
+        initialfile="ControlCenter",
+        defaultextension=".xml", 
+        filetypes=[("XML files", "*.xml"), ("All files", "*.*")]
+    )
+    if path_to_save_file is None:
+        messagebox.showerror("Input Error", "Please provide path to save the file.")
+        return
+    convert_static_to_cc(static_file_path, path_to_save_file)
 
 # Function to validate IP address format
 def validate_ip(ip):
@@ -102,6 +155,7 @@ def validate_base_ip(*args):
 # Function to select the file save location
 def select_file_path():
     file_path = filedialog.asksaveasfilename(
+        initialfile="StaticRoutes",
         defaultextension=".xml", 
         filetypes=[("XML files", "*.xml"), ("All files", "*.*")]
     )
@@ -124,6 +178,15 @@ def toggle_file_path_selection():
         entry_file_path.delete(0, tk.END)
         entry_file_path.insert(0, default_file_path)
         entry_file_path.config(state='disabled')
+
+def toggle_cc():
+    if optionTC.get() == "TC3":
+        if enableCC:
+            create_cc.config(state='normal')
+        else:
+            create_cc.config(state='disabled')
+    else:
+        create_cc.config(state='disabled')
 
 def create_placeholder(entry, placeholder_text):
     entry.insert(0, placeholder_text)
@@ -177,6 +240,7 @@ def validate_and_create_xml():
                 lgv_list.append(r)
     
     create_routes_xml(project, lgv_list, base_ip, file_path, is_tc3)
+    toggle_cc()
 
 # Set up the GUI
 root = tk.Tk()
@@ -186,9 +250,9 @@ root.title("Static Routes XML Creator")
 root.resizable(False, False)
 
 optionTC = tk.StringVar(value="TC3")
-radio1 = tk.Radiobutton(root, text="TC2", variable=optionTC, value="TC2")
+radio1 = tk.Radiobutton(root, text="TC2", variable=optionTC, value="TC2", command=toggle_cc)
 radio1.grid(row=0, column=1, padx=5, pady=5, sticky='w')
-radio2 = tk.Radiobutton(root, text="TC3", variable=optionTC, value="TC3")
+radio2 = tk.Radiobutton(root, text="TC3", variable=optionTC, value="TC3", command=toggle_cc)
 radio2.grid(row=0, column=1, padx=50, pady=5, sticky='w')
 
 tk.Label(root, text="Project number CC:").grid(row=1, column=0, padx=10, pady=5)
@@ -232,7 +296,19 @@ button_select_path = tk.Button(root, text="Browse...", command=select_file_path)
 button_select_path.grid(row=7, column=1, padx=10, pady=5)
 button_select_path.config(state='disabled')
 
+# Button to create Control Center XML
+create_cc = tk.Button(root, text="Create CC XML", command=validate_and_create_cc)
+create_cc.grid(row=7, column=0, pady=10)
+create_cc.config(state='disable')
+
 # Button to create XML
-tk.Button(root, text="Create XML", command=validate_and_create_xml).grid(row=8, columnspan=2, pady=10)
+create_xml = tk.Button(root, text="Create XML", command=validate_and_create_xml)
+create_xml.grid(row=8, columnspan=2, pady=10)
 
 root.mainloop()
+
+# hacer que solo pueda crear las rutas de CC cespués de haber hecho las rutas del StaticRoutes.xml - Done
+
+# hacer que hagas todas las selecciones primero, rutas de TC2, rutas de TC3, cargadores, luego ya al final hacer el archivo
+
+# ver si una vez que se crea el archivo, ver si se pueden ir agregando rutas al archivo existente
