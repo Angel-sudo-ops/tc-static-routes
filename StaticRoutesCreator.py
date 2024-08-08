@@ -302,8 +302,13 @@ create_cc.grid(row=7, column=0, pady=10)
 create_cc.config(state='disable')
 
 # Button to create XML
-create_xml = tk.Button(root, text="Create XML", command=validate_and_create_xml).grid(row=8, columnspan=2, pady=10)
+create_xml = tk.Button(root, text="Create XML", command=validate_and_create_xml)
+create_xml.grid(row=8, columnspan=2, pady=10)
 
 root.mainloop()
 
-# hacer que solo pueda crear las rutas de CC cespués de haber hecho las rutas del StaticRoutes.xml
+# hacer que solo pueda crear las rutas de CC cespués de haber hecho las rutas del StaticRoutes.xml - Done
+
+# hacer que hagas todas las selecciones primero, rutas de TC2, rutas de TC3, cargadores, luego ya al final hacer el archivo
+
+# ver si una vez que se crea el archivo, ver si se pueden ir agregando rutas al archivo existente
