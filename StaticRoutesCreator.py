@@ -493,41 +493,63 @@ def save_xml():
 ######################################## Modify data directly on table ############################################3
 
 def on_double_click(event):
-    # Identify the column and item row that was clicked
     region = treeview.identify("region", event.x, event.y)
     if region == "cell":
         column = treeview.identify_column(event.x)
         row = treeview.identify_row(event.y)
-
-        # Convert the column identifier like "#1" to 0-based index
         col_index = int(column.replace("#", "")) - 1
-
         current_value = treeview.item(row, 'values')[col_index]
 
-        entry_edit = tk.Entry(treeview)
-        entry_edit.insert(0, current_value)
         bbox = treeview.bbox(row, column)
-        if bbox:
-            # Create and place the Entry widget for editing
+        if bbox is None:
+            return
+
+        if col_index == 3:  # Assuming the "Type" column is the fourth column (index 3)
+            # Combobox for "Type" selection
+            combo_edit = ttk.Combobox(treeview, values=["TC2", "TC3"], state="readonly")
+            # combo_edit.set(current_value)
+            # combo_edit.place(x=bbox[0], y=bbox[1], width=bbox[2], height=bbox[3])
+            x, y, width, height = treeview.bbox(row, column)
+            combo_edit.place(x=x, y=y, width=width, height=height)
+
+            def on_select(event):
+                treeview.set(row, column=column, value=combo_edit.get())
+                combo_edit.destroy()
+            
+            # def on_focus_out_combo(event):
+            #     # Check if the focus is still within the Combobox
+            #     if not combo_edit.winfo_containing(event.x_root, event.y_root):
+            #         combo_edit.destroy()
+            
+            def check_focus(event):
+                # Destroy the Combobox if it is not the focus
+                if event.widget != combo_edit:
+                    combo_edit.destroy()
+            
+            # Delay focus assignment to avoid immediate focus loss
+            # combo_edit.after(1000, lambda: combo_edit.focus())
+
+            combo_edit.bind("<<ComboboxSelected>>", on_select)
+            root.bind("<Button-1>", check_focus, add="+")  # Use "+" to add to existing bindings
+            combo_edit.focus()
+            # combo_edit.bind("<FocusOut>", lambda e: on_focus_out_combo)
+            # combo_edit.after(100, combo_edit.focus)
+
+        else:
+            # Entry widget for other columns with validation
+            entry_edit = tk.Entry(treeview)
+            entry_edit.insert(0, current_value)
             entry_edit.place(x=bbox[0], y=bbox[1], width=bbox[2], height=bbox[3])
+            entry_edit.focus()
+            entry_edit.select_range(0, tk.END)
 
             def save_edit(event):
                 new_value = entry_edit.get()
-                if col_index == 1:  # Assuming the IP address is in the second column (index 1)
-                    if validate_ip(new_value):
-                        treeview.set(row, column=column, value=new_value)
-                    else:
-                        messagebox.showerror("Invalid Input", "Please enter a valid IP address.")
-                elif col_index == 2:  # Assuming the AMS Net Id address is in the third column (index 2)
-                    if validate_ams_net_id(new_value):
-                        treeview.set(row, column=column, value=new_value)
-                    else:
-                        messagebox.showerror("Invalid Input", "Please enter a valid AMS NetId address.")
-                elif col_index == 3:
-                    if new_value == 'TC2' or new_value == 'TC3':
-                        treeview.set(row, column=column, value=new_value)
-                    else:
-                        messagebox.showerror("Invalid Input", "Please enter either TC2 or TC3.")
+                # IP address validation
+                if col_index == 1 and not validate_ip(new_value):  # IP column
+                    messagebox.showerror("Invalid Input", "Please enter a valid IP address.")
+                elif col_index == 2 and not validate_ams_net_id(new_value):  # AMS Net ID column
+                    messagebox.showerror("Invalid Input", "AMS Net ID must be a valid IP and end with .1.1")
                 else:
                     treeview.set(row, column=column, value=new_value)
                 entry_edit.destroy()
@@ -538,9 +560,6 @@ def on_double_click(event):
             entry_edit.bind("<Return>", save_edit)
             entry_edit.bind("<Escape>", cancel_edit)
             entry_edit.bind("<FocusOut>", lambda e: cancel_edit())
-
-            entry_edit.focus()
-            entry_edit.select_range(0, tk.END)
 
 ################################### Button design ##########################################
 def on_enter(e):
