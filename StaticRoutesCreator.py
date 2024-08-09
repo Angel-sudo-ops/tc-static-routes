@@ -125,6 +125,15 @@ def validate_ip(ip):
         return all(0 <= int(num) <= 255 for num in parts)
     return False
 
+def validate_ams_net_id(ams_net_id):
+    # Regular expression that checks for the general IP format and ends with .1.1
+    pattern = re.compile(r'^(\d{1,3}\.){3}\d{1,3}\.1\.1$')
+    if pattern.match(ams_net_id):
+        parts = ams_net_id.split('.')
+        # Ensure each segment before .1.1 is an integer between 0 and 255
+        return all(0 <= int(num) <= 255 for num in parts[:-2])
+    return False
+
 # Real-time validation functions
 def validate_project(*args):
     project = entry_project.get().strip()
@@ -225,10 +234,10 @@ def validate_and_create_xml():
         messagebox.showerror("Invalid input", "Please enter a valid base IP address in the format 'xxx.xxx.xxx.xxx'")
         return
     
-    file_path = entry_file_path.get().strip()
-    if not file_path:
-        messagebox.showerror("Invalid input", "Please select a file path to save the XML.")
-        return
+    # file_path = entry_file_path.get().strip()
+    # if not file_path:
+    #     messagebox.showerror("Invalid input", "Please select a file path to save the XML.")
+    #     return
     
     is_tc3 = optionTC.get() == "TC3"
 
@@ -481,6 +490,8 @@ def save_xml():
     if file_path:
         create_xml_from_table(file_path)
 
+######################################## Modify data directly on table ############################################3
+
 def on_double_click(event):
     # Identify the column and item row that was clicked
     region = treeview.identify("region", event.x, event.y)
@@ -491,26 +502,45 @@ def on_double_click(event):
         # Convert the column identifier like "#1" to 0-based index
         col_index = int(column.replace("#", "")) - 1
 
-        value = treeview.item(row, 'values')[col_index]
+        current_value = treeview.item(row, 'values')[col_index]
 
-        # Create an entry widget to edit the value
-        entry_edit = tk.Entry(treeview, bd=0)
-        entry_edit.insert(0, value)
-        # Place the entry widget over the cell
-        entry_edit.place(x=event.x, y=event.y, width=treeview.column(column, "width"))
+        entry_edit = tk.Entry(treeview)
+        entry_edit.insert(0, current_value)
+        bbox = treeview.bbox(row, column)
+        if bbox:
+            # Create and place the Entry widget for editing
+            entry_edit.place(x=bbox[0], y=bbox[1], width=bbox[2], height=bbox[3])
 
-        def save_edit(event):
-            new_value = entry_edit.get()
-            treeview.set(row, column=column, value=new_value)
-            entry_edit.destroy()
+            def save_edit(event):
+                new_value = entry_edit.get()
+                if col_index == 1:  # Assuming the IP address is in the second column (index 1)
+                    if validate_ip(new_value):
+                        treeview.set(row, column=column, value=new_value)
+                    else:
+                        messagebox.showerror("Invalid Input", "Please enter a valid IP address.")
+                elif col_index == 2:  # Assuming the AMS Net Id address is in the third column (index 2)
+                    if validate_ams_net_id(new_value):
+                        treeview.set(row, column=column, value=new_value)
+                    else:
+                        messagebox.showerror("Invalid Input", "Please enter a valid AMS NetId address.")
+                elif col_index == 3:
+                    if new_value == 'TC2' or new_value == 'TC3':
+                        treeview.set(row, column=column, value=new_value)
+                    else:
+                        messagebox.showerror("Invalid Input", "Please enter either TC2 or TC3.")
+                else:
+                    treeview.set(row, column=column, value=new_value)
+                entry_edit.destroy()
 
-        def cancel_edit(event):
-            entry_edit.destroy()
+            def cancel_edit(event=None):
+                entry_edit.destroy()
 
-        entry_edit.bind("<Return>", save_edit)
-        entry_edit.bind("<Escape>", cancel_edit)
-        entry_edit.focus()
-        entry_edit.select_range(0, tk.END)
+            entry_edit.bind("<Return>", save_edit)
+            entry_edit.bind("<Escape>", cancel_edit)
+            entry_edit.bind("<FocusOut>", lambda e: cancel_edit())
+
+            entry_edit.focus()
+            entry_edit.select_range(0, tk.END)
 
 ################################### Button design ##########################################
 def on_enter(e):
