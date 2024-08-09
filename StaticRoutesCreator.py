@@ -285,7 +285,8 @@ def populate_table_from_inputs():
     lgv_range = entry_lgv_range.get()
     base_ip = entry_base_ip.get()
     is_tc3 = optionTC.get() == "TC3"
-    is_lgv = optionLGV.get() == "LGV"
+    # is_lgv = optionLGV.get() == "LGV"
+    lgvs = parse_range(lgv_range)
 
     try:
         if len(project) != 4:
@@ -302,49 +303,37 @@ def populate_table_from_inputs():
         messagebox.showerror("Invalid input", "Please enter a valid range")
         return
 
-    # Parse LGV range
-    lgv_list = []
-    for part in lgv_range.split(','):
-        if '-' in part:
-            start, end = map(int, part.split('-'))
-            lgv_list.extend(range(start, end + 1))
-        else:
-            lgv_list.append(int(part))
+    # Parse the IPs based on the given base IP and LGV list
+    ip_list = parse_ip(base_ip, lgvs)
 
     # Clear existing table data
     # for i in treeview.get_children():
     #     treeview.delete(i)
 
-    base_ip_parts = base_ip.rsplit('.', 1)
-    base_ip_prefix = base_ip_parts[0]
-    ip_offset = int(base_ip_parts[1]) - lgv_list[0] #substract the first element of the lgv list to use first IP of first LGV
+    # Loop through the parsed IPs and add to the table
+    for i, current_ip in enumerate(ip_list):
+        net_id = f"{current_ip}.1.1"
+        route_name = f"CC{project}_{optionLGV.get()}{str(lgvs[i]).zfill(2)}"
+        
+        # Check if the record already exists in the table, ignoring the TC type and name
+        record_exists = False
+        for row in treeview.get_children():
+            existing_values = treeview.item(row)["values"]
+            if (existing_values[1] == current_ip and 
+                existing_values[2] == net_id):
+                record_exists = True
+                messagebox.showwarning("Duplicate Entry", f"The IP {current_ip} already exists.")
 
-    # Populate the table with the new data
-    for i in lgv_list:
-        current_offset = ip_offset + i
-        if is_lgv:
-            route_name = f"CC{project}_LGV{str(i).zfill(2)}"
-        else:
-            route_name = f"CC{project}_CB{str(i).zfill(2)}"
+                break
 
-        address = f"{base_ip_prefix}.{current_offset}"
-        netid = f"{address}.1.1"
-        type_tc = "TC3" if is_tc3 else "TC2"
-
-        if not is_duplicate(route_name, address, netid, type_tc):
-            treeview.insert("", "end", values=(route_name, address, netid, type_tc))
-        # else:
-            # messagebox.showwarning("Duplicate Entry", f"The route {route_name} already exists and will not be added again.")
-
-
-############################### Delete selected record ####################################
-
-def delete_selected():
-    selected_item = treeview.selection()
-    if selected_item:
-        treeview.delete(selected_item)
-    else:
-        messagebox.showwarning("Selection Error", "Please select a record to delete.")
+        # Only add the record if it doesn't already exist
+        if not record_exists:
+            treeview.insert("", "end", values=(
+                route_name,
+                current_ip,
+                net_id,
+                "TC3" if is_tc3 else "TC2"
+            ))
 
 ##################### Function to check for duplicates in the Treeview ######################
 
@@ -354,7 +343,59 @@ def is_duplicate(name, address, netid, type_tc):
         if (name, address, netid, type_tc) == existing_values:
             return True
     return False
+
+############################### Get IPs ###################################################
+def parse_ip(base_ip, lgv_list):
+    base_ip_prefix, start_ip = base_ip.rsplit('.', 1)
+    start_ip = int(start_ip) - lgv_list[0]
     
+    ip_list = []
+    for lgv in lgv_list:
+        current_ip = f"{base_ip_prefix}.{start_ip + lgv}"
+        ip_list.append(current_ip)
+    
+    return ip_list
+
+############################ Get range ##################################################
+def parse_range(range_str):
+    lgv_list = []
+    for part in range_str.split(','):
+        if '-' in part:
+            start, end = map(int, part.split('-'))
+            lgv_list.extend(range(start, end + 1))
+        else:
+            lgv_list.append(int(part))
+    return lgv_list
+
+############################### Delete selected record ####################################
+# With a button
+def delete_selected():
+    selected_item = treeview.selection()
+    if selected_item:
+        treeview.delete(selected_item)
+    else:
+        messagebox.showwarning("Selection Error", "Please select a record to delete.")
+
+# With right click
+def delete_selected_record_from_menu():
+    selected_item = treeview.selection()
+    if selected_item:
+        treeview.delete(selected_item)
+
+# Function to show the context menu
+def show_context_menu(event):
+    # Check if a record is selected
+    selected_item = treeview.identify_row(event.y)
+    if selected_item:
+        treeview.selection_set(selected_item)
+        context_menu.post(event.x_root, event.y_root)
+
+# With DEL key
+def delete_selected_record(event):
+    selected_item = treeview.selection()
+    if selected_item:
+        treeview.delete(selected_item)
+
 ################################### Button design ##########################################
 def on_enter(e):
     if e.widget['state']== "normal":
@@ -469,6 +510,8 @@ treeview.column("Address", width=120)
 treeview.column("NetId", width=120)
 treeview.column("Type", width=50)
 
+treeview.bind('<Delete>', delete_selected_record)
+
 
 # Add a button to trigger the XML file selection and table population
 button_load_xml = tk.Button(root, text="Load XML and Populate Table", command=populate_table)
@@ -485,11 +528,18 @@ button_populate_table.bind("<Leave>", on_leave)
 button_populate_table.bind("<Button-1>", on_enter)
 
 # Add a button to delete the selected row
-button_delete_selected = tk.Button(root, text="Delete Selected", command=delete_selected)
-button_delete_selected.grid(row=13, column=1, pady=10)
-button_delete_selected.bind("<Enter>", on_enter)
-button_delete_selected.bind("<Leave>", on_leave)
-button_delete_selected.bind("<Button-1>", on_enter)
+# button_delete_selected = tk.Button(root, text="Delete Selected", command=delete_selected)
+# button_delete_selected.grid(row=13, column=1, pady=10)
+# button_delete_selected.bind("<Enter>", on_enter)
+# button_delete_selected.bind("<Leave>", on_leave)
+# button_delete_selected.bind("<Button-1>", on_enter)
+
+# Create the context menu
+context_menu = tk.Menu(treeview, tearoff=0)
+context_menu.add_command(label="Delete", command=delete_selected_record_from_menu)
+
+# Bind right-click to show the context menu
+treeview.bind("<Button-3>", show_context_menu)
 
 root.mainloop()
 
