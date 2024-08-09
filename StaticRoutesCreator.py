@@ -356,7 +356,7 @@ def populate_table_from_inputs():
             if (existing_values[1] == current_ip and 
                 existing_values[2] == net_id):
                 record_exists = True
-                messagebox.showwarning("Duplicate Entry", f"The IP {current_ip} already exists.")
+                # messagebox.showwarning("Duplicate Entry", f"The IP {current_ip} already exists.")
 
                 break
 
@@ -454,9 +454,8 @@ def get_table_data():
         rows.append(treeview.item(item)["values"])
     return rows
 
-def create_xml_from_table(file_path):
+def create_routes_xml_from_table(file_path):
     data = get_table_data()
-
     # Create the root element
     config = ET.Element("TcConfig")
     config.set("xmlns:xsi", "http://www.w3.org/2001/XMLSchema-instance")
@@ -483,23 +482,68 @@ def create_xml_from_table(file_path):
             ET.SubElement(route_element, "Flags").text = "32"
 
     # Convert to a pretty XML string
-    xmlstr = minidom.parseString(ET.tostring(config)).toprettyxml(indent="   ")
+    xmlstr = minidom.parseString(ET.tostring(config, 'utf-8')).toprettyxml(indent="   ")
 
     # Write to a file
-    with open(file_path, "w") as f:
+    with open(file_path, "w", encoding='utf-8') as f:
         f.write(xmlstr)
 
     messagebox.showinfo("Success", "XML file has been created successfully!")
 
-def save_xml():
+def save_routes_xml():
+    if get_table_data() == []:
+        messagebox.showerror("Attention", "Routes table is empty!")
+        return
     file_path = filedialog.asksaveasfilename(defaultextension=".xml",
                                              initialdir="C:\\TwinCAT\\3.1\\Target",
                                              initialfile="StaticRoutes.xml",
                                              filetypes=[("XML files", "*.xml")])
     if file_path:
-        create_xml_from_table(file_path)
+        create_routes_xml_from_table(file_path)
 
-######################################## Modify data directly on table ############################################3
+######################################## Create Control Center xml file from table ################################
+def create_cc_xml_from_table(file_path):
+    data = get_table_data()
+
+    # Create the root element
+    fleet = ET.Element("Fleet")
+
+    # Iterate over the data to create the Route elements
+    for row in data:
+        name, address, netid, tc_type = row
+        if tc_type == 'TC3':
+            lgv = ET.SubElement(fleet, "LGV")
+
+            number = name[-2:]
+            ET.SubElement(lgv, "Number").text = str(int(number))  # Convert to int to remove leading zeroes
+
+            ET.SubElement(lgv, "Type").text = "undef"
+
+            ip_element = ET.SubElement(lgv, "IP")
+            ip_element.text = address
+
+            netid_element = ET.SubElement(lgv, "AMS")
+            netid_element.text = netid
+
+    # Convert to a pretty XML string
+    xmlstr = minidom.parseString(ET.tostring(fleet, 'utf-8')).toprettyxml(indent="   ")
+
+    # Write to a file
+    with open(file_path, "w", encoding='utf-8') as f:
+        f.write(xmlstr)
+
+    messagebox.showinfo("Success", "XML file has been created successfully!")
+
+def save_cc_xml():
+    if get_table_data() == []:
+        messagebox.showerror("Attention", "Routes table is empty!")
+        return
+    file_path = filedialog.asksaveasfilename(defaultextension=".xml",
+                                             initialfile="ControlCenter.xml",
+                                             filetypes=[("XML files", "*.xml")])
+    if file_path:
+        create_cc_xml_from_table(file_path)
+######################################## Modify data directly on table ############################################
 
 def on_double_click(event):
     region = treeview.identify("region", event.x, event.y)
@@ -510,12 +554,12 @@ def on_double_click(event):
         current_value = treeview.item(row, 'values')[col_index]
 
         if col_index == 3:  # Assuming column 3 is the Type column
-            create_combobox_for_type(column, row, current_value)
+            create_combobox_for_type(column, row)
         else:
             create_entry_for_editing(column, row, col_index, current_value)
 
 
-def create_combobox_for_type(column, row, current_value):
+def create_combobox_for_type(column, row):
     bbox = treeview.bbox(row, column)
     if not bbox:
         return
@@ -697,13 +741,13 @@ entry_base_ip.bind("<KeyRelease>", validate_base_ip)
 # button_select_path.config(state='disabled')
 
 # Button to create Control Center XML
-create_cc = tk.Button(root, text="Create CC XML", command=validate_and_create_cc)
-create_cc.grid(row=7, column=0, pady=10)
-create_cc.bind("<Enter>", on_enter)
-create_cc.bind("<Leave>", on_leave)
-create_cc.bind("<Button-1>", on_enter)
-create_cc.config(state='disable')
-button_design(create_cc)
+# create_cc = tk.Button(root, text="Create CC XML", command=validate_and_create_cc)
+# create_cc.grid(row=7, column=0, pady=10)
+# create_cc.bind("<Enter>", on_enter)
+# create_cc.bind("<Leave>", on_leave)
+# create_cc.bind("<Button-1>", on_enter)
+# create_cc.config(state='disable')
+# button_design(create_cc)
 
 # # Button to create XML
 # create_xml = tk.Button(root, text="Create XML", command=validate_and_create_xml)
@@ -753,14 +797,19 @@ button_populate_table = tk.Button(root, text="Populate Table", command=populate_
 button_populate_table.grid(row=12, columnspan=2, pady=10)
 button_design(button_populate_table)
 
-# Button to save the XML
-save_button = tk.Button(root, text="Save XML from table", command=save_xml)
+# Button to save the StaticRoutes.xml file
+save_button = tk.Button(root, text="Save StaticRoutes.xml from table", command=save_routes_xml)
 save_button.grid(row=13, columnspan=2, pady=10)
 button_design(save_button)
 
-# Button to save the XML
+# Button to save the ControlCenter.xml file
+create_cc_button = tk.Button(root, text="Save ControlCenter file from table", command=save_cc_xml)
+create_cc_button.grid(row=14, columnspan=2, pady=10)
+button_design(create_cc_button)
+
+# Button to delete the XML
 delete_table_button = tk.Button(root, text="Delete whole table", command=delete_whole_table)
-delete_table_button.grid(row=14, columnspan=2, pady=10)
+delete_table_button.grid(row=15, columnspan=2, pady=10)
 button_design(delete_table_button)
 
 # Add a button to delete the selected row
