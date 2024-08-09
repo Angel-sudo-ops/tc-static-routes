@@ -299,7 +299,7 @@ def populate_table_from_xml():
         # Populate the Treeview with the data
         for item in routes_data:
             treeview.insert("", "end", values=item)
-        messagebox.showinfo("Success", "Data loaded successfully from the XML file.")
+        # messagebox.showinfo("Success", "Data loaded successfully from the XML file.")
 
 ############################# Populate table based on inputs ##############################
 
@@ -481,6 +481,37 @@ def save_xml():
     if file_path:
         create_xml_from_table(file_path)
 
+def on_double_click(event):
+    # Identify the column and item row that was clicked
+    region = treeview.identify("region", event.x, event.y)
+    if region == "cell":
+        column = treeview.identify_column(event.x)
+        row = treeview.identify_row(event.y)
+
+        # Convert the column identifier like "#1" to 0-based index
+        col_index = int(column.replace("#", "")) - 1
+
+        value = treeview.item(row, 'values')[col_index]
+
+        # Create an entry widget to edit the value
+        entry_edit = tk.Entry(treeview, bd=0)
+        entry_edit.insert(0, value)
+        # Place the entry widget over the cell
+        entry_edit.place(x=event.x, y=event.y, width=treeview.column(column, "width"))
+
+        def save_edit(event):
+            new_value = entry_edit.get()
+            treeview.set(row, column=column, value=new_value)
+            entry_edit.destroy()
+
+        def cancel_edit(event):
+            entry_edit.destroy()
+
+        entry_edit.bind("<Return>", save_edit)
+        entry_edit.bind("<Escape>", cancel_edit)
+        entry_edit.focus()
+        entry_edit.select_range(0, tk.END)
+
 ################################### Button design ##########################################
 def on_enter(e):
     if e.widget['state']== "normal":
@@ -598,6 +629,7 @@ treeview.column("NetId", width=120)
 treeview.column("Type", width=50)
 
 treeview.bind('<Delete>', delete_selected_record)
+treeview.bind('<Double-1>', on_double_click)
 
 
 # Add a button to trigger the XML file selection and table population
