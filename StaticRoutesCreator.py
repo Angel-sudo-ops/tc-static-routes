@@ -396,6 +396,65 @@ def delete_selected_record(event):
     if selected_item:
         treeview.delete(selected_item)
 
+################################### Delete whole table ########################################
+
+def delete_whole_table():
+    for i in treeview.get_children():
+        treeview.delete(i)
+
+################################## Create StaticRoutes.xml from table ##########################
+
+def get_table_data():
+    rows = []
+    for item in treeview.get_children():
+        rows.append(treeview.item(item)["values"])
+    return rows
+
+def create_xml_from_table(file_path):
+    data = get_table_data()
+
+    # Create the root element
+    config = ET.Element("TcConfig")
+    config.set("xmlns:xsi", "http://www.w3.org/2001/XMLSchema-instance")
+
+    # Create the RemoteConnections element
+    routes = ET.SubElement(config, "RemoteConnections")
+
+    # Iterate over the data to create the Route elements
+    for row in data:
+        name, address, netid, tc_type = row
+
+        route_element = ET.SubElement(routes, "Route")
+
+        ET.SubElement(route_element, "Name").text = name
+        ET.SubElement(route_element, "Address").text = address
+        
+        netid_element = ET.SubElement(route_element, "NetId")
+        netid_element.text = netid
+        
+        ET.SubElement(route_element, "Type").text = "TCP_IP"
+
+        if tc_type == "TC3":
+            netid_element.set("RemoteNetId", "192.168.11.2.1.1")
+            ET.SubElement(route_element, "Flags").text = "32"
+
+    # Convert to a pretty XML string
+    xmlstr = minidom.parseString(ET.tostring(config)).toprettyxml(indent="   ")
+
+    # Write to a file
+    with open(file_path, "w") as f:
+        f.write(xmlstr)
+
+    messagebox.showinfo("Success", "XML file has been created successfully!")
+
+def save_xml():
+    file_path = filedialog.asksaveasfilename(defaultextension=".xml",
+                                             initialdir="C:\\TwinCAT\\3.1\\Target",
+                                             initialfile="StaticRoutes.xml",
+                                             filetypes=[("XML files", "*.xml")])
+    if file_path:
+        create_xml_from_table(file_path)
+
 ################################### Button design ##########################################
 def on_enter(e):
     if e.widget['state']== "normal":
@@ -404,6 +463,11 @@ def on_enter(e):
 def on_leave(e):
     if e.widget['state'] == "normal":
         e.widget['background'] = 'ghost white'
+
+def button_design(entry):
+    entry.bind("<Enter>", on_enter)
+    entry.bind("<Leave>", on_leave)
+    entry.bind("<Button-1>", on_enter)
 
 
 ####################################### Set up the GUI ######################################
@@ -425,7 +489,7 @@ create_placeholder(entry_project, "e.g., 1584")
 entry_project.grid(row=1, column=1, padx=10, pady=5)
 entry_project.bind("<KeyRelease>", validate_project)
 
-label_lgv_range = tk.Label(root, text="numbers:")
+label_lgv_range = tk.Label(root, text="range:")
 # label_lgv_range.grid(row=2, column=0, padx=10, pady=5)
 label_lgv_range.place(x=100, y=72)
 entry_lgv_range = tk.Entry(root, fg="grey")
@@ -462,9 +526,7 @@ check_select_path.grid(row=6, column=1, columnspan=2, pady=5)
 # Button to select file path
 button_select_path = tk.Button(root, text="Browse...", command=select_file_path)
 button_select_path.grid(row=7, column=1, padx=10, pady=5)
-button_select_path.bind("<Enter>", on_enter)
-button_select_path.bind("<Leave>", on_leave)
-button_select_path.bind("<Button-1>", on_enter)
+button_design(button_select_path)
 button_select_path.config(state='disabled')
 
 # Button to create Control Center XML
@@ -474,13 +536,12 @@ create_cc.bind("<Enter>", on_enter)
 create_cc.bind("<Leave>", on_leave)
 create_cc.bind("<Button-1>", on_enter)
 create_cc.config(state='disable')
+button_design(create_cc)
 
 # Button to create XML
 create_xml = tk.Button(root, text="Create XML", command=validate_and_create_xml)
 create_xml.grid(row=8, columnspan=2, pady=10)
-create_xml.bind("<Enter>", on_enter)
-create_xml.bind("<Leave>", on_leave)
-create_xml.bind("<Button-1>", on_enter)
+button_design(create_xml)
 
 
 # Add a frame to hold the Treeview and the scrollbar
@@ -516,16 +577,22 @@ treeview.bind('<Delete>', delete_selected_record)
 # Add a button to trigger the XML file selection and table population
 button_load_xml = tk.Button(root, text="Load XML and Populate Table", command=populate_table)
 button_load_xml.grid(row=11, columnspan=2, pady=10)
-button_load_xml.bind("<Enter>", on_enter)
-button_load_xml.bind("<Leave>", on_leave)
-button_load_xml.bind("<Button-1>", on_enter)
+button_design(button_load_xml)
 
 # Add a button to trigger table population
 button_populate_table = tk.Button(root, text="Populate Table", command=populate_table_from_inputs)
 button_populate_table.grid(row=12, columnspan=2, pady=10)
-button_populate_table.bind("<Enter>", on_enter)
-button_populate_table.bind("<Leave>", on_leave)
-button_populate_table.bind("<Button-1>", on_enter)
+button_design(button_populate_table)
+
+# Button to save the XML
+save_button = tk.Button(root, text="Save XML from table", command=save_xml)
+save_button.grid(row=13, columnspan=2, pady=10)
+button_design(save_button)
+
+# Button to save the XML
+delete_table_button = tk.Button(root, text="Delete whole table", command=delete_whole_table)
+delete_table_button.grid(row=14, columnspan=2, pady=10)
+button_design(delete_table_button)
 
 # Add a button to delete the selected row
 # button_delete_selected = tk.Button(root, text="Delete Selected", command=delete_selected)
