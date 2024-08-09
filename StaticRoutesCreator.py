@@ -191,10 +191,14 @@ def toggle_cc():
     else:
         create_cc.config(state='disabled')
 
+######################################## placeholders #######################################33
+placeholders = {}
+
 def create_placeholder(entry, placeholder_text):
     entry.insert(0, placeholder_text)
     entry.bind("<FocusIn>", lambda event: on_focus_in(entry, placeholder_text))
     entry.bind("<FocusOut>", lambda event: on_focus_out(entry, placeholder_text))
+    placeholders[entry] = placeholder_text
 
 def on_focus_in(entry, placeholder_text):
     if entry.get() == placeholder_text:
@@ -247,7 +251,7 @@ def validate_and_create_xml():
 
 ################################### Get StaticRoutes.xml and create table #########################
 
-def populate_table():
+def populate_table_from_xml():
     # Ask the user to select an XML file
     file_path = filedialog.askopenfilename(title="Select StaticRoutes file", 
                                             initialdir= "C:\\TwinCAT\\3.1\\Target",
@@ -263,7 +267,7 @@ def populate_table():
         
         # Initialize an empty list to hold the data
         routes_data = []
-
+        
         # Iterate through each <Route> element in the XML
         for route in root.find('RemoteConnections').findall('Route'):
             name = route.find('Name').text
@@ -286,22 +290,24 @@ def populate_table_from_inputs():
     base_ip = entry_base_ip.get()
     is_tc3 = optionTC.get() == "TC3"
     # is_lgv = optionLGV.get() == "LGV"
-    lgvs = parse_range(lgv_range)
 
     try:
-        if len(project) != 4:
+        if len(project) != 4 or project == placeholders[entry_project]:
             raise ValueError("Project number must be a 4 digit number")
+        
     except ValueError as e:
         messagebox.showerror("Invalid input", str(e))
         return
-
-    if not validate_ip(base_ip):
+    
+    if lgv_range is None or lgv_range == placeholders[entry_lgv_range]:
+        messagebox.showerror("Invalid input", "Please enter a valid range")
+        return
+    
+    if not validate_ip(base_ip) or base_ip == placeholders[entry_base_ip]:
         messagebox.showerror("Invalid input", "Please enter a valid base IP address in the format 'xxx.xxx.xxx.xxx'")
         return
     
-    if lgv_range is None:
-        messagebox.showerror("Invalid input", "Please enter a valid range")
-        return
+    lgvs = parse_range(lgv_range)
 
     # Parse the IPs based on the given base IP and LGV list
     ip_list = parse_ip(base_ip, lgvs)
@@ -358,6 +364,7 @@ def parse_ip(base_ip, lgv_list):
 
 ############################ Get range ##################################################
 def parse_range(range_str):
+    print(range_str)
     lgv_list = []
     for part in range_str.split(','):
         if '-' in part:
@@ -510,24 +517,24 @@ create_placeholder(entry_base_ip, "e.g., 172.20.3.10")
 entry_base_ip.grid(row=4, column=1, padx=10, pady=5)
 entry_base_ip.bind("<KeyRelease>", validate_base_ip)
 
-# File Path entry will be disabled and set dynamically
-tk.Label(root, text="File Path:").grid(row=5, column=0, padx=10, pady=5)
-#file_path = os.path.join(os.path.expanduser('~'), 'Desktop', 'StaticRoutes.xml')  # Adjust folder as needed (e.g., 'Documents')
-entry_file_path = tk.Entry(root, state='normal', width=40)
-entry_file_path.grid(row=5, column=1, padx=10, pady=5)
-entry_file_path.insert(0, default_file_path)
-entry_file_path.config(state='disabled')
+# # File Path entry will be disabled and set dynamically
+# tk.Label(root, text="File Path:").grid(row=5, column=0, padx=10, pady=5)
+# #file_path = os.path.join(os.path.expanduser('~'), 'Desktop', 'StaticRoutes.xml')  # Adjust folder as needed (e.g., 'Documents')
+# entry_file_path = tk.Entry(root, state='normal', width=40)
+# entry_file_path.grid(row=5, column=1, padx=10, pady=5)
+# entry_file_path.insert(0, default_file_path)
+# entry_file_path.config(state='disabled')
 
-# Checkbox to toggle file path selection
-select_path_var = tk.BooleanVar()
-check_select_path = tk.Checkbutton(root, text="Select File Path", variable=select_path_var, command=toggle_file_path_selection)
-check_select_path.grid(row=6, column=1, columnspan=2, pady=5)
+# # Checkbox to toggle file path selection
+# select_path_var = tk.BooleanVar()
+# check_select_path = tk.Checkbutton(root, text="Select File Path", variable=select_path_var, command=toggle_file_path_selection)
+# check_select_path.grid(row=6, column=1, columnspan=2, pady=5)
 
-# Button to select file path
-button_select_path = tk.Button(root, text="Browse...", command=select_file_path)
-button_select_path.grid(row=7, column=1, padx=10, pady=5)
-button_design(button_select_path)
-button_select_path.config(state='disabled')
+# # Button to select file path
+# button_select_path = tk.Button(root, text="Browse...", command=select_file_path)
+# button_select_path.grid(row=7, column=1, padx=10, pady=5)
+# button_design(button_select_path)
+# button_select_path.config(state='disabled')
 
 # Button to create Control Center XML
 create_cc = tk.Button(root, text="Create CC XML", command=validate_and_create_cc)
@@ -538,10 +545,10 @@ create_cc.bind("<Button-1>", on_enter)
 create_cc.config(state='disable')
 button_design(create_cc)
 
-# Button to create XML
-create_xml = tk.Button(root, text="Create XML", command=validate_and_create_xml)
-create_xml.grid(row=8, columnspan=2, pady=10)
-button_design(create_xml)
+# # Button to create XML
+# create_xml = tk.Button(root, text="Create XML", command=validate_and_create_xml)
+# create_xml.grid(row=8, columnspan=2, pady=10)
+# button_design(create_xml)
 
 
 # Add a frame to hold the Treeview and the scrollbar
@@ -575,7 +582,7 @@ treeview.bind('<Delete>', delete_selected_record)
 
 
 # Add a button to trigger the XML file selection and table population
-button_load_xml = tk.Button(root, text="Load XML and Populate Table", command=populate_table)
+button_load_xml = tk.Button(root, text="Load XML and Populate Table", command=populate_table_from_xml)
 button_load_xml.grid(row=11, columnspan=2, pady=10)
 button_design(button_load_xml)
 
