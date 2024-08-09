@@ -580,17 +580,33 @@ def create_entry_for_editing(column, row, col_index, current_value):
 
 ################################## Sorting ################################################
 def treeview_sort_column(tv, col, reverse):
+    # Retrieve all data from the treeview
     l = [(tv.set(k, col), k) for k in tv.get_children('')]
-    l.sort(reverse=reverse)
+    
+    # Sort the data
+    l.sort(reverse=reverse, key=lambda t: natural_keys(t[0]))
 
     # Rearrange items in sorted positions
     for index, (val, k) in enumerate(l):
         tv.move(k, '', index)
 
-    # Reverse the sort next time
-    tv.heading(col, command=lambda: treeview_sort_column(tv, col, not reverse))
+    # Change the heading so it shows the sort direction
+    for column in tv['columns']:
+        if column == col:
+            heading_text = col + (' ↓' if reverse else ' ↑')
+        else:
+            heading_text = column  # Remove direction indicator from other columns
+        tv.heading(column, text=heading_text, command=lambda _col=column: treeview_sort_column(tv, _col, not reverse))
+
+def natural_keys(text):
+    """
+    Alphanumeric (natural) sort to handle numbers within strings correctly
+    """
+    import re
+    return [int(c) if c.isdigit() else c for c in re.split('(\d+)', text)]
 
 def setup_treeview():
+    # Initialize the headings with the sorting disabled indicator
     for col in treeview['columns']:
         treeview.heading(col, text=col, command=lambda _col=col: treeview_sort_column(treeview, _col, False))
 
