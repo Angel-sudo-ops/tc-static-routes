@@ -277,6 +277,83 @@ def populate_table():
         # Populate the Treeview with the data
         for item in routes_data:
             treeview.insert("", "end", values=item)
+
+############################# Populate table based on inputs ##############################
+
+def populate_table_from_inputs():
+    project = entry_project.get()
+    lgv_range = entry_lgv_range.get()
+    base_ip = entry_base_ip.get()
+    is_tc3 = optionTC.get() == "TC3"
+    is_lgv = optionLGV.get() == "LGV"
+
+    try:
+        if len(project) != 4:
+            raise ValueError("Project number must be a 4 digit number")
+    except ValueError as e:
+        messagebox.showerror("Invalid input", str(e))
+        return
+
+    if not validate_ip(base_ip):
+        messagebox.showerror("Invalid input", "Please enter a valid base IP address in the format 'xxx.xxx.xxx.xxx'")
+        return
+    
+    if lgv_range is None:
+        messagebox.showerror("Invalid input", "Please enter a valid range")
+        return
+
+    # Parse LGV range
+    lgv_list = []
+    for part in lgv_range.split(','):
+        if '-' in part:
+            start, end = map(int, part.split('-'))
+            lgv_list.extend(range(start, end + 1))
+        else:
+            lgv_list.append(int(part))
+
+    # Clear existing table data
+    # for i in treeview.get_children():
+    #     treeview.delete(i)
+
+    base_ip_parts = base_ip.rsplit('.', 1)
+    base_ip_prefix = base_ip_parts[0]
+    ip_offset = int(base_ip_parts[1]) - lgv_list[0] #substract the first element of the lgv list to use first IP of first LGV
+
+    # Populate the table with the new data
+    for i in lgv_list:
+        current_offset = ip_offset + i
+        if is_lgv:
+            route_name = f"CC{project}_LGV{str(i).zfill(2)}"
+        else:
+            route_name = f"CC{project}_CB{str(i).zfill(2)}"
+
+        address = f"{base_ip_prefix}.{current_offset}"
+        netid = f"{address}.1.1"
+        type_tc = "TC3" if is_tc3 else "TC2"
+
+        if not is_duplicate(route_name, address, netid, type_tc):
+            treeview.insert("", "end", values=(route_name, address, netid, type_tc))
+        # else:
+            # messagebox.showwarning("Duplicate Entry", f"The route {route_name} already exists and will not be added again.")
+
+
+############################### Delete selected record ####################################
+
+def delete_selected():
+    selected_item = treeview.selection()
+    if selected_item:
+        treeview.delete(selected_item)
+    else:
+        messagebox.showwarning("Selection Error", "Please select a record to delete.")
+
+##################### Function to check for duplicates in the Treeview ######################
+
+def is_duplicate(name, address, netid, type_tc):
+    for item in treeview.get_children():
+        existing_values = treeview.item(item, 'values')
+        if (name, address, netid, type_tc) == existing_values:
+            return True
+    return False
     
 ################################### Button design ##########################################
 def on_enter(e):
@@ -307,12 +384,20 @@ create_placeholder(entry_project, "e.g., 1584")
 entry_project.grid(row=1, column=1, padx=10, pady=5)
 entry_project.bind("<KeyRelease>", validate_project)
 
-tk.Label(root, text="LGV numbers:").grid(row=2, column=0, padx=10, pady=5)
+label_lgv_range = tk.Label(root, text="numbers:")
+# label_lgv_range.grid(row=2, column=0, padx=10, pady=5)
+label_lgv_range.place(x=100, y=72)
 entry_lgv_range = tk.Entry(root, fg="grey")
 create_placeholder(entry_lgv_range, "e.g., 1-5,11-17,20-25")
 entry_lgv_range.grid(row=2, column=1, padx=10, pady=5)
 # entry_lgv_range.bind("<KeyRelease>", validate_limit)
 
+# Radio buttons for LGV/CB selection
+optionLGV = tk.StringVar(value="LGV")
+radio3 = tk.Radiobutton(root, text="LGV", variable=optionLGV, value="LGV")
+radio3.grid(row=2, column=0, padx=5, pady=5, sticky='w')
+radio4 = tk.Radiobutton(root, text="CB", variable=optionLGV, value="CB")
+radio4.grid(row=2, column=0, padx=50, pady=5, sticky='w')
 
 tk.Label(root, text="First IP: ").grid(row=4, column=0, padx=10, pady=5)
 entry_base_ip = tk.Entry(root, fg="grey")
@@ -323,7 +408,7 @@ entry_base_ip.bind("<KeyRelease>", validate_base_ip)
 # File Path entry will be disabled and set dynamically
 tk.Label(root, text="File Path:").grid(row=5, column=0, padx=10, pady=5)
 #file_path = os.path.join(os.path.expanduser('~'), 'Desktop', 'StaticRoutes.xml')  # Adjust folder as needed (e.g., 'Documents')
-entry_file_path = tk.Entry(root, state='normal')
+entry_file_path = tk.Entry(root, state='normal', width=40)
 entry_file_path.grid(row=5, column=1, padx=10, pady=5)
 entry_file_path.insert(0, default_file_path)
 entry_file_path.config(state='disabled')
@@ -384,23 +469,27 @@ treeview.column("Address", width=120)
 treeview.column("NetId", width=120)
 treeview.column("Type", width=50)
 
-# Add sample data to the table
-# default_data = [
-#     ("CC1527_LGV01", "172.20.2.51", "172.20.2.51.1.1", "TC2"),
-#     ("CC1527_LGV02", "172.20.2.52", "172.20.2.52.1.1", "TC2"),
-#     ("CC1527_LGV03", "172.20.2.53", "172.20.2.53.1.1", "TC2"),
-#     ("CC1527_LGV04", "172.20.2.54", "172.20.2.54.1.1", "TC2"),
-#     ("CC1527_LGV05", "172.20.2.55", "172.20.2.55.1.1", "TC2"),
-#     ("CC1527_LGV06", "172.20.2.56", "172.20.2.56.1.1", "TC3"),
-#     ("CC1527_LGV07", "172.20.2.57", "172.20.2.57.1.1", "TC3"),
-#     ("CC1527_LGV08", "172.20.2.58", "172.20.2.58.1.1", "TC3"),
-#     ("CC1527_LGV09", "172.20.2.59", "172.20.2.59.1.1", "TC3"),
-#     ("CC1527_LGV10", "172.20.2.60", "172.20.2.60.1.1", "TC3")
-# ]
 
 # Add a button to trigger the XML file selection and table population
 button_load_xml = tk.Button(root, text="Load XML and Populate Table", command=populate_table)
 button_load_xml.grid(row=11, columnspan=2, pady=10)
+button_load_xml.bind("<Enter>", on_enter)
+button_load_xml.bind("<Leave>", on_leave)
+button_load_xml.bind("<Button-1>", on_enter)
+
+# Add a button to trigger table population
+button_populate_table = tk.Button(root, text="Populate Table", command=populate_table_from_inputs)
+button_populate_table.grid(row=12, columnspan=2, pady=10)
+button_populate_table.bind("<Enter>", on_enter)
+button_populate_table.bind("<Leave>", on_leave)
+button_populate_table.bind("<Button-1>", on_enter)
+
+# Add a button to delete the selected row
+button_delete_selected = tk.Button(root, text="Delete Selected", command=delete_selected)
+button_delete_selected.grid(row=13, column=1, pady=10)
+button_delete_selected.bind("<Enter>", on_enter)
+button_delete_selected.bind("<Leave>", on_leave)
+button_delete_selected.bind("<Button-1>", on_enter)
 
 root.mainloop()
 
