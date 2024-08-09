@@ -1,7 +1,7 @@
 import os
 import re
 import tkinter as tk
-from tkinter import messagebox, filedialog
+from tkinter import messagebox, filedialog, ttk
 import xml.etree.ElementTree as ET
 from xml.dom import minidom
 
@@ -102,7 +102,9 @@ def convert_static_to_cc(static_routes_file, CC_file):
 
 def validate_and_create_cc():
     static_file_path = entry_file_path.get().strip()
+
     path_to_save_file = filedialog.asksaveasfilename(
+        initialdir= os.path.join(os.path.expanduser("~"), "Documents"),
         initialfile="ControlCenter",
         defaultextension=".xml", 
         filetypes=[("XML files", "*.xml"), ("All files", "*.*")]
@@ -155,6 +157,7 @@ def validate_base_ip(*args):
 # Function to select the file save location
 def select_file_path():
     file_path = filedialog.asksaveasfilename(
+        initialdir= "C:\\TwinCAT\\3.1\\Target",
         initialfile="StaticRoutes",
         defaultextension=".xml", 
         filetypes=[("XML files", "*.xml"), ("All files", "*.*")]
@@ -242,7 +245,50 @@ def validate_and_create_xml():
     create_routes_xml(project, lgv_list, base_ip, file_path, is_tc3)
     toggle_cc()
 
-# Set up the GUI
+################################### Get StaticRoutes.xml and create table #########################
+
+def populate_table():
+    # Ask the user to select an XML file
+    file_path = filedialog.askopenfilename(title="Select StaticRoutes file", 
+                                            initialdir= "C:\\TwinCAT\\3.1\\Target",
+                                            filetypes=[("XML files", "*.xml")])
+    
+    if file_path:
+        tree = ET.parse(file_path)
+        root = tree.getroot()
+        
+        # Clear the existing table data
+        for i in treeview.get_children():
+            treeview.delete(i)
+        
+        # Initialize an empty list to hold the data
+        routes_data = []
+
+        # Iterate through each <Route> element in the XML
+        for route in root.find('RemoteConnections').findall('Route'):
+            name = route.find('Name').text
+            address = route.find('Address').text
+            net_id = route.find('NetId').text
+            type_tc = "TC3" if route.find('Flags') is not None else "TC2"
+            
+            # Append the tuple to the list
+            routes_data.append((name, address, net_id, type_tc))
+        
+        # Populate the Treeview with the data
+        for item in routes_data:
+            treeview.insert("", "end", values=item)
+    
+################################### Button design ##########################################
+def on_enter(e):
+    if e.widget['state']== "normal":
+        e.widget['background'] = 'LightSkyBlue1'
+
+def on_leave(e):
+    if e.widget['state'] == "normal":
+        e.widget['background'] = 'ghost white'
+
+
+####################################### Set up the GUI ######################################
 root = tk.Tk()
 root.title("Static Routes XML Creator")
 
@@ -267,10 +313,6 @@ create_placeholder(entry_lgv_range, "e.g., 1-5,11-17,20-25")
 entry_lgv_range.grid(row=2, column=1, padx=10, pady=5)
 # entry_lgv_range.bind("<KeyRelease>", validate_limit)
 
-# tk.Label(root, text="Starting LGV:").grid(row=3, column=0, padx=10, pady=5)
-# entry_offsetLGV = tk.Entry(root)
-# entry_offsetLGV.grid(row=3, column=1, padx=10, pady=5)
-# entry_offsetLGV.bind("<KeyRelease>", validate_offset_lgv)
 
 tk.Label(root, text="First IP: ").grid(row=4, column=0, padx=10, pady=5)
 entry_base_ip = tk.Entry(root, fg="grey")
@@ -294,16 +336,71 @@ check_select_path.grid(row=6, column=1, columnspan=2, pady=5)
 # Button to select file path
 button_select_path = tk.Button(root, text="Browse...", command=select_file_path)
 button_select_path.grid(row=7, column=1, padx=10, pady=5)
+button_select_path.bind("<Enter>", on_enter)
+button_select_path.bind("<Leave>", on_leave)
+button_select_path.bind("<Button-1>", on_enter)
 button_select_path.config(state='disabled')
 
 # Button to create Control Center XML
 create_cc = tk.Button(root, text="Create CC XML", command=validate_and_create_cc)
 create_cc.grid(row=7, column=0, pady=10)
+create_cc.bind("<Enter>", on_enter)
+create_cc.bind("<Leave>", on_leave)
+create_cc.bind("<Button-1>", on_enter)
 create_cc.config(state='disable')
 
 # Button to create XML
 create_xml = tk.Button(root, text="Create XML", command=validate_and_create_xml)
 create_xml.grid(row=8, columnspan=2, pady=10)
+create_xml.bind("<Enter>", on_enter)
+create_xml.bind("<Leave>", on_leave)
+create_xml.bind("<Button-1>", on_enter)
+
+
+# Add a frame to hold the Treeview and the scrollbar
+frame = tk.Frame(root)
+frame.grid(row=10, columnspan=2, padx=10, pady=10)
+
+# Add a Treeview to display the data
+treeview = ttk.Treeview(frame, columns=("Name", "Address", "NetId", "Type"), show="headings", height=10)
+treeview.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
+# Add a vertical scrollbar to the Treeview
+vsb = ttk.Scrollbar(frame, orient="vertical", command=treeview.yview)
+vsb.pack(side=tk.RIGHT, fill=tk.Y)
+
+# Configure the Treeview to use the scrollbar
+treeview.configure(yscrollcommand=vsb.set)
+
+# Define the column headings
+treeview.heading("Name", text="Route Name")
+treeview.heading("Address", text="IP Address")
+treeview.heading("NetId", text="AMS Net Id")
+treeview.heading("Type", text="Type")
+
+# Define the column widths
+treeview.column("Name", width=120)
+treeview.column("Address", width=120)
+treeview.column("NetId", width=120)
+treeview.column("Type", width=50)
+
+# Add sample data to the table
+# default_data = [
+#     ("CC1527_LGV01", "172.20.2.51", "172.20.2.51.1.1", "TC2"),
+#     ("CC1527_LGV02", "172.20.2.52", "172.20.2.52.1.1", "TC2"),
+#     ("CC1527_LGV03", "172.20.2.53", "172.20.2.53.1.1", "TC2"),
+#     ("CC1527_LGV04", "172.20.2.54", "172.20.2.54.1.1", "TC2"),
+#     ("CC1527_LGV05", "172.20.2.55", "172.20.2.55.1.1", "TC2"),
+#     ("CC1527_LGV06", "172.20.2.56", "172.20.2.56.1.1", "TC3"),
+#     ("CC1527_LGV07", "172.20.2.57", "172.20.2.57.1.1", "TC3"),
+#     ("CC1527_LGV08", "172.20.2.58", "172.20.2.58.1.1", "TC3"),
+#     ("CC1527_LGV09", "172.20.2.59", "172.20.2.59.1.1", "TC3"),
+#     ("CC1527_LGV10", "172.20.2.60", "172.20.2.60.1.1", "TC3")
+# ]
+
+# Add a button to trigger the XML file selection and table population
+button_load_xml = tk.Button(root, text="Load XML and Populate Table", command=populate_table)
+button_load_xml.grid(row=11, columnspan=2, pady=10)
 
 root.mainloop()
 
