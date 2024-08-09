@@ -254,12 +254,22 @@ def validate_and_create_xml():
 def populate_table_from_xml():
     # Ask the user to select an XML file
     file_path = filedialog.askopenfilename(title="Select StaticRoutes file", 
-                                            initialdir= "C:\\TwinCAT\\3.1\\Target",
-                                            filetypes=[("XML files", "*.xml")])
+                                           initialdir="C:\\TwinCAT\\3.1\\Target",
+                                           filetypes=[("XML files", "*.xml")])
     
     if file_path:
-        tree = ET.parse(file_path)
-        root = tree.getroot()
+        try:
+            tree = ET.parse(file_path)
+            root = tree.getroot()
+        except ET.ParseError:
+            messagebox.showerror("Error", "The selected file is not a valid XML file.")
+            return
+
+        # Check for the expected root elements
+        remote_connections = root.find('RemoteConnections')
+        if remote_connections is None:
+            messagebox.showerror("Error", "XML file does not contain the expected 'RemoteConnections' structure.")
+            return
         
         # Clear the existing table data
         for i in treeview.get_children():
@@ -269,10 +279,18 @@ def populate_table_from_xml():
         routes_data = []
         
         # Iterate through each <Route> element in the XML
-        for route in root.find('RemoteConnections').findall('Route'):
-            name = route.find('Name').text
-            address = route.find('Address').text
-            net_id = route.find('NetId').text
+        for route in remote_connections.findall('Route'):
+            name = route.find('Name')
+            address = route.find('Address')
+            net_id = route.find('NetId')
+
+            if None in (name, address, net_id):
+                messagebox.showwarning("Warning", "One or more routes are missing required fields (Name, Address, NetId).")
+                continue  # Skip this route and move to the next
+
+            name = name.text
+            address = address.text
+            net_id = net_id.text
             type_tc = "TC3" if route.find('Flags') is not None else "TC2"
             
             # Append the tuple to the list
@@ -281,6 +299,7 @@ def populate_table_from_xml():
         # Populate the Treeview with the data
         for item in routes_data:
             treeview.insert("", "end", values=item)
+        messagebox.showinfo("Success", "Data loaded successfully from the XML file.")
 
 ############################# Populate table based on inputs ##############################
 
