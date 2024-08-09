@@ -579,6 +579,18 @@ def create_entry_for_editing(column, row, col_index, current_value):
     entry_edit.bind("<FocusOut>", lambda e: cancel_edit())
 
 ################################## Sorting ################################################
+def setup_treeview():
+    # Initialize the headings with custom names
+    headings = {
+        'Name': 'Route Name',
+        'Address': 'IP Address',
+        'NetId': 'AMS Net Id',
+        'Type': 'Type'
+    }
+    
+    for col in treeview['columns']:
+        treeview.heading(col, text=headings[col], command=lambda _col=col: treeview_sort_column(treeview, _col, False))
+
 def treeview_sort_column(tv, col, reverse):
     # Retrieve all data from the treeview
     l = [(tv.set(k, col), k) for k in tv.get_children('')]
@@ -590,12 +602,17 @@ def treeview_sort_column(tv, col, reverse):
     for index, (val, k) in enumerate(l):
         tv.move(k, '', index)
 
-    # Change the heading so it shows the sort direction
+    # Dictionary to maintain custom headings
+    headings = {
+        'Name': 'Route Name',
+        'Address': 'IP Address',
+        'NetId': 'AMS Net Id',
+        'Type': 'Type'
+    }
+
+    # Change the heading to show the sort direction
     for column in tv['columns']:
-        if column == col:
-            heading_text = col + (' ↓' if reverse else ' ↑')
-        else:
-            heading_text = column  # Remove direction indicator from other columns
+        heading_text = headings[column] + (' ↓' if reverse and column == col else ' ↑' if not reverse and column == col else '')
         tv.heading(column, text=heading_text, command=lambda _col=column: treeview_sort_column(tv, _col, not reverse))
 
 def natural_keys(text):
@@ -604,11 +621,6 @@ def natural_keys(text):
     """
     import re
     return [int(c) if c.isdigit() else c for c in re.split('(\d+)', text)]
-
-def setup_treeview():
-    # Initialize the headings with the sorting disabled indicator
-    for col in treeview['columns']:
-        treeview.heading(col, text=col, command=lambda _col=col: treeview_sort_column(treeview, _col, False))
 
 ################################### Button design ##########################################
 def on_enter(e):
@@ -715,11 +727,11 @@ vsb.pack(side=tk.RIGHT, fill=tk.Y)
 # Configure the Treeview to use the scrollbar
 treeview.configure(yscrollcommand=vsb.set)
 
-# Define the column headings
-treeview.heading("Name", text="Route Name")
-treeview.heading("Address", text="IP Address")
-treeview.heading("NetId", text="AMS Net Id")
-treeview.heading("Type", text="Type")
+# # Define the column headings
+# treeview.heading("Name", text="Route Name")
+# treeview.heading("Address", text="IP Address")
+# treeview.heading("NetId", text="AMS Net Id")
+# treeview.heading("Type", text="Type")
 
 # Define the column widths
 treeview.column("Name", width=120)
