@@ -578,6 +578,22 @@ def create_entry_for_editing(column, row, col_index, current_value):
     entry_edit.bind("<Escape>", lambda e: cancel_edit())
     entry_edit.bind("<FocusOut>", lambda e: cancel_edit())
 
+################################## Sorting ################################################
+def treeview_sort_column(tv, col, reverse):
+    l = [(tv.set(k, col), k) for k in tv.get_children('')]
+    l.sort(reverse=reverse)
+
+    # Rearrange items in sorted positions
+    for index, (val, k) in enumerate(l):
+        tv.move(k, '', index)
+
+    # Reverse the sort next time
+    tv.heading(col, command=lambda: treeview_sort_column(tv, col, not reverse))
+
+def setup_treeview():
+    for col in treeview['columns']:
+        treeview.heading(col, text=col, command=lambda _col=col: treeview_sort_column(treeview, _col, False))
+
 ################################### Button design ##########################################
 def on_enter(e):
     if e.widget['state']== "normal":
@@ -674,6 +690,7 @@ frame.grid(row=10, columnspan=2, padx=10, pady=10)
 # Add a Treeview to display the data
 treeview = ttk.Treeview(frame, columns=("Name", "Address", "NetId", "Type"), show="headings", height=10)
 treeview.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+setup_treeview()
 
 # Add a vertical scrollbar to the Treeview
 vsb = ttk.Scrollbar(frame, orient="vertical", command=treeview.yview)
