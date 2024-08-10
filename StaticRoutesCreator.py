@@ -101,7 +101,8 @@ def convert_static_to_cc(static_routes_file, CC_file):
     messagebox.showinfo("Success", "ControlCenter file has been created successfully!")
 
 def validate_and_create_cc():
-    static_file_path = entry_file_path.get().strip()
+    # static_file_path = entry_file_path.get().strip()
+    static_file_path = default_file_path
 
     path_to_save_file = filedialog.asksaveasfilename(
         initialdir= os.path.join(os.path.expanduser("~"), "Documents"),
@@ -163,43 +164,6 @@ def validate_base_ip(*args):
     else:
         entry_base_ip.config(bg='yellow')
 
-# Function to select the file save location
-def select_file_path():
-    file_path = filedialog.asksaveasfilename(
-        initialdir= "C:\\TwinCAT\\3.1\\Target",
-        initialfile="StaticRoutes",
-        defaultextension=".xml", 
-        filetypes=[("XML files", "*.xml"), ("All files", "*.*")]
-    )
-    if file_path:
-        entry_file_path.config(state='normal')
-        entry_file_path.delete(0, tk.END)
-        entry_file_path.insert(0, file_path)
-        entry_file_path.config(state='disabled')
-
-# Function to toggle file path selection
-def toggle_file_path_selection():
-    if select_path_var.get():
-        button_select_path.config(state='normal')
-        entry_file_path.config(state='normal')
-        entry_file_path.delete(0, tk.END)
-        entry_file_path.config(state='disabled')
-    else:
-        button_select_path.config(state='disabled')
-        entry_file_path.config(state='normal')
-        entry_file_path.delete(0, tk.END)
-        entry_file_path.insert(0, default_file_path)
-        entry_file_path.config(state='disabled')
-
-def toggle_cc():
-    if optionTC.get() == "TC3":
-        if enableCC:
-            create_cc.config(state='normal')
-        else:
-            create_cc.config(state='disabled')
-    else:
-        create_cc.config(state='disabled')
-
 ######################################## placeholders #######################################33
 placeholders = {}
 
@@ -233,11 +197,6 @@ def validate_and_create_xml():
     if not validate_ip(base_ip):
         messagebox.showerror("Invalid input", "Please enter a valid base IP address in the format 'xxx.xxx.xxx.xxx'")
         return
-    
-    # file_path = entry_file_path.get().strip()
-    # if not file_path:
-    #     messagebox.showerror("Invalid input", "Please select a file path to save the XML.")
-    #     return
     
     is_tc3 = optionTC.get() == "TC3"
 
@@ -488,7 +447,7 @@ def create_routes_xml_from_table(file_path):
     with open(file_path, "w", encoding='utf-8') as f:
         f.write(xmlstr)
 
-    messagebox.showinfo("Success", "XML file has been created successfully!")
+    messagebox.showinfo("Success", "StaticRoutes file has been created successfully!")
 
 def save_routes_xml():
     if get_table_data() == []:
@@ -532,13 +491,14 @@ def create_cc_xml_from_table(file_path):
     with open(file_path, "w", encoding='utf-8') as f:
         f.write(xmlstr)
 
-    messagebox.showinfo("Success", "XML file has been created successfully!")
+    messagebox.showinfo("Success", "ControlCenter file has been created successfully!")
 
 def save_cc_xml():
     if get_table_data() == []:
         messagebox.showerror("Attention", "Routes table is empty!")
         return
     file_path = filedialog.asksaveasfilename(defaultextension=".xml",
+                                             initialdir= os.path.join(os.path.expanduser("~"), "Documents"),
                                              initialfile="ControlCenter.xml",
                                              filetypes=[("XML files", "*.xml")])
     if file_path:
@@ -689,9 +649,9 @@ root.title("Static Routes XML Creator")
 root.resizable(False, False)
 
 optionTC = tk.StringVar(value="TC3")
-radio1 = tk.Radiobutton(root, text="TC2", variable=optionTC, value="TC2", command=toggle_cc)
+radio1 = tk.Radiobutton(root, text="TC2", variable=optionTC, value="TC2")
 radio1.grid(row=0, column=1, padx=5, pady=5, sticky='w')
-radio2 = tk.Radiobutton(root, text="TC3", variable=optionTC, value="TC3", command=toggle_cc)
+radio2 = tk.Radiobutton(root, text="TC3", variable=optionTC, value="TC3")
 radio2.grid(row=0, column=1, padx=50, pady=5, sticky='w')
 
 tk.Label(root, text="Project number CC:").grid(row=1, column=0, padx=10, pady=5)
@@ -721,40 +681,6 @@ create_placeholder(entry_base_ip, "e.g., 172.20.3.10")
 entry_base_ip.grid(row=4, column=1, padx=10, pady=5)
 entry_base_ip.bind("<KeyRelease>", validate_base_ip)
 
-# # File Path entry will be disabled and set dynamically
-# tk.Label(root, text="File Path:").grid(row=5, column=0, padx=10, pady=5)
-# #file_path = os.path.join(os.path.expanduser('~'), 'Desktop', 'StaticRoutes.xml')  # Adjust folder as needed (e.g., 'Documents')
-# entry_file_path = tk.Entry(root, state='normal', width=40)
-# entry_file_path.grid(row=5, column=1, padx=10, pady=5)
-# entry_file_path.insert(0, default_file_path)
-# entry_file_path.config(state='disabled')
-
-# # Checkbox to toggle file path selection
-# select_path_var = tk.BooleanVar()
-# check_select_path = tk.Checkbutton(root, text="Select File Path", variable=select_path_var, command=toggle_file_path_selection)
-# check_select_path.grid(row=6, column=1, columnspan=2, pady=5)
-
-# # Button to select file path
-# button_select_path = tk.Button(root, text="Browse...", command=select_file_path)
-# button_select_path.grid(row=7, column=1, padx=10, pady=5)
-# button_design(button_select_path)
-# button_select_path.config(state='disabled')
-
-# Button to create Control Center XML
-# create_cc = tk.Button(root, text="Create CC XML", command=validate_and_create_cc)
-# create_cc.grid(row=7, column=0, pady=10)
-# create_cc.bind("<Enter>", on_enter)
-# create_cc.bind("<Leave>", on_leave)
-# create_cc.bind("<Button-1>", on_enter)
-# create_cc.config(state='disable')
-# button_design(create_cc)
-
-# # Button to create XML
-# create_xml = tk.Button(root, text="Create XML", command=validate_and_create_xml)
-# create_xml.grid(row=8, columnspan=2, pady=10)
-# button_design(create_xml)
-
-
 # Add a frame to hold the Treeview and the scrollbar
 frame = tk.Frame(root)
 frame.grid(row=10, columnspan=2, padx=10, pady=10)
@@ -771,12 +697,6 @@ vsb.pack(side=tk.RIGHT, fill=tk.Y)
 # Configure the Treeview to use the scrollbar
 treeview.configure(yscrollcommand=vsb.set)
 
-# # Define the column headings
-# treeview.heading("Name", text="Route Name")
-# treeview.heading("Address", text="IP Address")
-# treeview.heading("NetId", text="AMS Net Id")
-# treeview.heading("Type", text="Type")
-
 # Define the column widths
 treeview.column("Name", width=120)
 treeview.column("Address", width=120)
@@ -788,36 +708,39 @@ treeview.bind('<Double-1>', on_double_click)
 
 
 # Add a button to trigger the XML file selection and table population
-button_load_xml = tk.Button(root, text="Load XML and Populate Table", command=populate_table_from_xml)
+button_load_xml = tk.Button(root, text="Load XML and Populate Table", 
+                            bg="ghost white", 
+                            command=populate_table_from_xml)
 button_load_xml.grid(row=11, columnspan=2, pady=10)
 button_design(button_load_xml)
 
 # Add a button to trigger table population
-button_populate_table = tk.Button(root, text="Populate Table", command=populate_table_from_inputs)
+button_populate_table = tk.Button(root, text="Populate Table", 
+                                  bg="ghost white", 
+                                  command=populate_table_from_inputs)
 button_populate_table.grid(row=12, columnspan=2, pady=10)
 button_design(button_populate_table)
 
 # Button to save the StaticRoutes.xml file
-save_button = tk.Button(root, text="Save StaticRoutes.xml from table", command=save_routes_xml)
+save_button = tk.Button(root, text="Save StaticRoutes.xml from table", 
+                        bg="ghost white", 
+                        command=save_routes_xml)
 save_button.grid(row=13, columnspan=2, pady=10)
 button_design(save_button)
 
 # Button to save the ControlCenter.xml file
-create_cc_button = tk.Button(root, text="Save ControlCenter file from table", command=save_cc_xml)
+create_cc_button = tk.Button(root, text="Save ControlCenter file from table", 
+                             bg="ghost white", 
+                             command=save_cc_xml)
 create_cc_button.grid(row=14, columnspan=2, pady=10)
 button_design(create_cc_button)
 
 # Button to delete the XML
-delete_table_button = tk.Button(root, text="Delete whole table", command=delete_whole_table)
+delete_table_button = tk.Button(root, text="Delete whole table", 
+                                bg="ghost white", 
+                                command=delete_whole_table)
 delete_table_button.grid(row=15, columnspan=2, pady=10)
 button_design(delete_table_button)
-
-# Add a button to delete the selected row
-# button_delete_selected = tk.Button(root, text="Delete Selected", command=delete_selected)
-# button_delete_selected.grid(row=13, column=1, pady=10)
-# button_delete_selected.bind("<Enter>", on_enter)
-# button_delete_selected.bind("<Leave>", on_leave)
-# button_delete_selected.bind("<Button-1>", on_enter)
 
 # Create the context menu
 context_menu = tk.Menu(treeview, tearoff=0)
@@ -827,9 +750,3 @@ context_menu.add_command(label="Delete", command=delete_selected_record_from_men
 treeview.bind("<Button-3>", show_context_menu)
 
 root.mainloop()
-
-# hacer que solo pueda crear las rutas de CC cespués de haber hecho las rutas del StaticRoutes.xml - Done
-
-# hacer que hagas todas las selecciones primero, rutas de TC2, rutas de TC3, cargadores, luego ya al final hacer el archivo
-
-# ver si una vez que se crea el archivo, ver si se pueden ir agregando rutas al archivo existente
