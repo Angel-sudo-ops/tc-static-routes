@@ -647,51 +647,74 @@ root.title("Static Routes XML Creator")
 
 #Disable resizing
 root.resizable(False, False)
-
+frame_tc = tk.Frame(root)
+frame_tc.grid(row=0, column=1, padx=5, pady=5)
 optionTC = tk.StringVar(value="TC3")
-radio1 = tk.Radiobutton(root, text="TC2", variable=optionTC, value="TC2")
-radio1.grid(row=0, column=1, padx=5, pady=5, sticky='w')
-radio2 = tk.Radiobutton(root, text="TC3", variable=optionTC, value="TC3")
-radio2.grid(row=0, column=1, padx=50, pady=5, sticky='w')
+tc2_radio = tk.Radiobutton(frame_tc, text="TC2", variable=optionTC, value="TC2")
+tc2_radio.grid(row=0, column=0, padx=0, pady=0, sticky='w')
+tc3_radio = tk.Radiobutton(frame_tc, text="TC3", variable=optionTC, value="TC3")
+tc3_radio.grid(row=0, column=1, padx=0, pady=0, sticky='w')
 
-tk.Label(root, text="Project number CC:").grid(row=1, column=0, padx=10, pady=5)
-entry_project = tk.Entry(root, fg="grey")
+
+frame_project = tk.Frame(root)
+frame_project.grid(row=0, column=0, padx=5, pady=5, sticky='e')
+label_project = tk.Label(frame_project, text="Project number CC:")
+label_project.grid(row=0, column=0, padx=5, pady=5)
+
+entry_project = tk.Entry(frame_project, fg="grey")
+entry_project.grid(row=0, column=1, padx=5, pady=5)
 create_placeholder(entry_project, "e.g., 1584")
-entry_project.grid(row=1, column=1, padx=10, pady=5)
 entry_project.bind("<KeyRelease>", validate_project)
 
-label_lgv_range = tk.Label(root, text="range:")
-# label_lgv_range.grid(row=2, column=0, padx=10, pady=5)
-label_lgv_range.place(x=100, y=72)
-entry_lgv_range = tk.Entry(root, fg="grey")
-create_placeholder(entry_lgv_range, "e.g., 1-5,11-17,20-25")
-entry_lgv_range.grid(row=2, column=1, padx=10, pady=5)
-# entry_lgv_range.bind("<KeyRelease>", validate_limit)
-
-# Radio buttons for LGV/CB selection
+frame_range = tk.Frame(root)
+frame_range.grid(row=1, column=0, padx=5, pady=5, sticky='e')
+frame_lgv = tk.Frame(frame_range)
+frame_lgv.grid(row=0, column=0, padx=1, pady=1)
 optionLGV = tk.StringVar(value="LGV")
-radio3 = tk.Radiobutton(root, text="LGV", variable=optionLGV, value="LGV")
-radio3.grid(row=2, column=0, padx=5, pady=5, sticky='w')
-radio4 = tk.Radiobutton(root, text="CB", variable=optionLGV, value="CB")
-radio4.grid(row=2, column=0, padx=50, pady=5, sticky='w')
+cb_radio = tk.Radiobutton(frame_lgv, text="CB", variable=optionLGV, value="CB")
+cb_radio.grid(row=0, column=0, padx=1, pady=1, sticky='w')
+lgv_radio = tk.Radiobutton(frame_lgv, text="LGV: ", variable=optionLGV, value="LGV")
+lgv_radio.grid(row=0, column=1, padx=1, pady=1, sticky='w')
 
-tk.Label(root, text="First IP: ").grid(row=4, column=0, padx=10, pady=5)
-entry_base_ip = tk.Entry(root, fg="grey")
+entry_lgv_range = tk.Entry(frame_range, fg="grey")
+entry_lgv_range.grid(row=0, column=1, padx=5, pady=5)
+create_placeholder(entry_lgv_range, "e.g., 1-5,11-17,20-25")
+
+# Add a button to trigger table population
+button_populate_table = tk.Button(root, text="Update Table", 
+                                  bg="ghost white", 
+                                  command=populate_table_from_inputs)
+button_populate_table.grid(row=1, column=1, pady=10)
+button_design(button_populate_table)
+
+frame_ip = tk.Frame(root)
+frame_ip.grid(row=3, column=0, padx=5, pady=5, sticky='e')
+label_ip = tk.Label(frame_ip, text="First IP: ")
+label_ip.grid(row=0, column=0, padx=5, pady=5)
+
+entry_base_ip = tk.Entry(frame_ip, fg="grey")
 create_placeholder(entry_base_ip, "e.g., 172.20.3.10")
-entry_base_ip.grid(row=4, column=1, padx=10, pady=5)
+entry_base_ip.grid(row=0, column=1, padx=5, pady=5)
 entry_base_ip.bind("<KeyRelease>", validate_base_ip)
 
+# Button to delete the XML
+delete_table_button = tk.Button(root, text="Delete Table", 
+                                bg="ghost white", 
+                                command=delete_whole_table)
+delete_table_button.grid(row=3, column=1, pady=10)
+button_design(delete_table_button)
+
 # Add a frame to hold the Treeview and the scrollbar
-frame = tk.Frame(root)
-frame.grid(row=10, columnspan=2, padx=10, pady=10)
+frame_table = tk.Frame(root)
+frame_table.grid(row=4, columnspan=3, padx=15, pady=10)
 
 # Add a Treeview to display the data
-treeview = ttk.Treeview(frame, columns=("Name", "Address", "NetId", "Type"), show="headings", height=10)
+treeview = ttk.Treeview(frame_table, columns=("Name", "Address", "NetId", "Type"), show="headings", height=10)
 treeview.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 setup_treeview()
 
 # Add a vertical scrollbar to the Treeview
-vsb = ttk.Scrollbar(frame, orient="vertical", command=treeview.yview)
+vsb = ttk.Scrollbar(frame_table, orient="vertical", command=treeview.yview)
 vsb.pack(side=tk.RIGHT, fill=tk.Y)
 
 # Configure the Treeview to use the scrollbar
@@ -707,40 +730,30 @@ treeview.bind('<Delete>', delete_selected_record)
 treeview.bind('<Double-1>', on_double_click)
 
 
+frame_xml = tk.Frame(root)
+frame_xml.grid(row=5, column=0, columnspan=3, padx=5, pady=5)
 # Add a button to trigger the XML file selection and table population
-button_load_xml = tk.Button(root, text="Load XML and Populate Table", 
+button_load_xml = tk.Button(frame_xml, text="Load StaticRoutes.xml", 
                             bg="ghost white", 
                             command=populate_table_from_xml)
-button_load_xml.grid(row=11, columnspan=2, pady=10)
+button_load_xml.grid(row=0, column=0, padx=10, pady=10)
 button_design(button_load_xml)
 
-# Add a button to trigger table population
-button_populate_table = tk.Button(root, text="Populate Table", 
-                                  bg="ghost white", 
-                                  command=populate_table_from_inputs)
-button_populate_table.grid(row=12, columnspan=2, pady=10)
-button_design(button_populate_table)
-
 # Button to save the StaticRoutes.xml file
-save_button = tk.Button(root, text="Save StaticRoutes.xml from table", 
+save_button = tk.Button(frame_xml, text="Save StaticRoutes.xml", 
                         bg="ghost white", 
                         command=save_routes_xml)
-save_button.grid(row=13, columnspan=2, pady=10)
+save_button.grid(row=0, column=1, padx=10, pady=10)
 button_design(save_button)
 
 # Button to save the ControlCenter.xml file
-create_cc_button = tk.Button(root, text="Save ControlCenter file from table", 
+create_cc_button = tk.Button(frame_xml, text="Save ControlCenter file", 
                              bg="ghost white", 
                              command=save_cc_xml)
-create_cc_button.grid(row=14, columnspan=2, pady=10)
+create_cc_button.grid(row=0, column=2, padx=10, pady=10)
 button_design(create_cc_button)
 
-# Button to delete the XML
-delete_table_button = tk.Button(root, text="Delete whole table", 
-                                bg="ghost white", 
-                                command=delete_whole_table)
-delete_table_button.grid(row=15, columnspan=2, pady=10)
-button_design(delete_table_button)
+
 
 # Create the context menu
 context_menu = tk.Menu(treeview, tearoff=0)
