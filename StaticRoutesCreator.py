@@ -4,6 +4,7 @@ import tkinter as tk
 from tkinter import messagebox, filedialog, ttk
 import xml.etree.ElementTree as ET
 from xml.dom import minidom
+import sqlite3
 
 default_file_path = os.path.join(r'C:\TwinCAT\3.1\Target', 'StaticRoutes.xml')
 
@@ -708,6 +709,25 @@ def natural_keys(text):
     import re
     return [int(c) if c.isdigit() else c for c in re.split('(\d+)', text)]
 
+
+#################################### Read config.db3 #######################################
+def read_db3_file(db3_file_path, table_name):
+    conn = sqlite3.connect(db3_file_path)
+    cursor = conn.cursor()
+    cursor.execute(f"SELECT * FROM {table_name}")
+    rows = cursor.fetchall()
+    column_names = [description[0] for description in cursor.description]
+    conn.close()
+    print(column_names)
+    return column_names, rows
+
+def read_lgv_table():
+    table = "tbl_AGVs"
+    db3_path = filedialog.askopenfilename(title="Select config.db3 file", 
+                                          initialdir="C:\\Program Files (x86)\\Elettric80",
+                                          filetypes=[("DB3 files", "*.db3")])
+    read_db3_file(db3_path, table)
+
 ################################### Button design ##########################################
 def on_enter(e):
     if e.widget['state']== "normal":
@@ -821,12 +841,20 @@ treeview.bind('<Double-1>', on_double_click)
 
 frame_xml = tk.Frame(root)
 frame_xml.grid(row=5, column=0, columnspan=3, padx=5, pady=5)
+frame_load = tk.Frame(frame_xml)
+frame_load.grid(row=0, column=0, padx=10, pady=10)
 # Add a button to trigger the XML file selection and table population
-button_load_xml = tk.Button(frame_xml, text="Load StaticRoutes.xml", 
+button_load_xml = tk.Button(frame_load, text="Load StaticRoutes.xml", 
                             bg="ghost white", 
                             command=populate_table_from_xml)
-button_load_xml.grid(row=0, column=0, padx=10, pady=10)
+button_load_xml.grid(row=0, column=0, padx=5, pady=5)
 button_design(button_load_xml)
+
+button_load_db3 = tk.Button(frame_load, text="Load Config.db3", 
+                            bg="ghost white", 
+                            command=read_lgv_table)
+button_load_db3.grid(row=1, column=0, padx=5, pady=5)
+button_design(button_load_db3)
 
 # Button to save the StaticRoutes.xml file
 save_button = tk.Button(frame_xml, text="Save StaticRoutes.xml", 
