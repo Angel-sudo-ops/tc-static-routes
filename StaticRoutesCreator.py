@@ -7,7 +7,67 @@ from xml.dom import minidom
 
 default_file_path = os.path.join(r'C:\TwinCAT\3.1\Target', 'StaticRoutes.xml')
 
-enableCC = False
+class ToolTip:
+    def __init__(self, widget, text, delay=500, fade_duration=500):
+        self.widget = widget
+        self.text = text
+        self.delay = delay  # delay before showing tooltip in milliseconds
+        self.fade_duration = fade_duration  # duration of fade effect in milliseconds
+        self.tooltip_window = None
+        self.id = None
+        self.opacity = 0
+        self.widget.bind("<Enter>", self.schedule_tooltip)
+        self.widget.bind("<Leave>", self.hide_tooltip)
+    
+    def schedule_tooltip(self, event):
+        self.cancel_tooltip()
+        self.id = self.widget.after(self.delay, self.show_tooltip)
+
+    def show_tooltip(self):
+        if self.tooltip_window or not self.text:
+            return
+        x, y, _, _ = self.widget.bbox("insert")
+        x += self.widget.winfo_rootx() + 25
+        y += self.widget.winfo_rooty() + 25
+
+        self.tooltip_window = tw = tk.Toplevel(self.widget)
+        tw.wm_overrideredirect(True)
+        tw.wm_geometry(f"+{x}+{y}")
+
+        label = tk.Label(tw, text=self.text, justify='left',
+                         background="white", relief='solid', borderwidth=1,
+                         font=("helvetica", "8", "normal"))
+        label.pack(ipadx=1)
+
+        self.fade_in()
+    
+    def fade_in(self):
+        if self.opacity < 1.0:
+            self.opacity += 0.05
+            self.tooltip_window.attributes('-alpha', self.opacity)
+            self.tooltip_window.after(int(self.fade_duration / 20), self.fade_in)
+
+    def hide_tooltip(self, event=None):
+        self.cancel_tooltip()
+        if self.tooltip_window:
+            self.fade_out()
+    
+    def fade_out(self):
+        if self.opacity > 0:
+            self.opacity -= 0.05
+            self.tooltip_window.attributes('-alpha', self.opacity)
+            self.tooltip_window.after(int(self.fade_duration / 20), self.fade_out)
+        else:
+            if self.tooltip_window:
+                self.tooltip_window.destroy()
+                self.tooltip_window = None
+                self.opacity = 0  # Reset opacity for the next tooltip
+    
+    def cancel_tooltip(self):
+        if self.id:
+            self.widget.after_cancel(self.id)
+            self.id = None
+
 # Function to create routes.xml with dynamic parameters
 def create_routes_xml(project, lgv_list, base_ip, file_path, is_tc3):
     # Extract the base part of the IP address and the starting offset
@@ -58,8 +118,6 @@ def create_routes_xml(project, lgv_list, base_ip, file_path, is_tc3):
 
     messagebox.showinfo("Success", "XML file has been created successfully!")
 
-    global enableCC
-    enableCC = True
 
 def convert_static_to_cc(static_routes_file, CC_file):
     # Parse the StaticRoutes.xml file
@@ -689,13 +747,20 @@ button_design(button_populate_table)
 
 frame_ip = tk.Frame(root)
 frame_ip.grid(row=3, column=0, padx=5, pady=5, sticky='e')
+
+label_ip_help = tk.Label(frame_ip, text="?")
+label_ip_help.grid(row=0, column=0, padx=5, pady=5)
+
+ToolTip(label_ip_help, "The IP of the first element of the range")
+
 label_ip = tk.Label(frame_ip, text="First IP: ")
-label_ip.grid(row=0, column=0, padx=5, pady=5)
+label_ip.grid(row=0, column=1, padx=5, pady=5)
 
 entry_base_ip = tk.Entry(frame_ip, fg="grey")
 create_placeholder(entry_base_ip, "e.g., 172.20.3.10")
-entry_base_ip.grid(row=0, column=1, padx=5, pady=5)
+entry_base_ip.grid(row=0, column=2, padx=5, pady=5)
 entry_base_ip.bind("<KeyRelease>", validate_base_ip)
+
 
 # Button to delete the XML
 delete_table_button = tk.Button(root, text="Delete Table", 
