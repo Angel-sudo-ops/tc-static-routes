@@ -20,6 +20,7 @@ class ToolTip:
 
         self.widget.bind("<Enter>", self.schedule_tooltip)
         self.widget.bind("<Leave>", self.start_fade_out)
+        self.widget.bind("<Button-1>", self.on_click)
         self.widget.winfo_toplevel().bind("<Motion>", self.check_motion)
 
     def schedule_tooltip(self, event):
@@ -83,6 +84,13 @@ class ToolTip:
         widget_under_cursor = self.widget.winfo_containing(event.x_root, event.y_root)
         if widget_under_cursor != self.widget and self.tooltip_window and not self.is_fading_out:
             self.start_fade_out()
+    
+    def on_click(self, event):
+        # Reset the tooltip logic on click to ensure it can still appear
+        self.cancel_tooltip()
+        if self.tooltip_window:
+            self.start_fade_out()
+        self.schedule_tooltip(event)
 
 # Function to create routes.xml with dynamic parameters
 def create_routes_xml(project, lgv_list, base_ip, file_path, is_tc3):
@@ -844,3 +852,8 @@ context_menu.add_command(label="Delete", command=delete_selected_record_from_men
 treeview.bind("<Button-3>", show_context_menu)
 
 root.mainloop()
+
+# leer config.db3 y llenar tabla con eso
+# agregar rutas de ads
+
+# add local route by default
