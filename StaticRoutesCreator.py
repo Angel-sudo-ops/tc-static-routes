@@ -24,7 +24,8 @@ class ToolTip:
 
     def schedule_tooltip(self, event):
         self.cancel_tooltip()
-        self.id = self.widget.after(self.delay, self.show_tooltip)
+        if not self.is_fading_out:
+            self.id = self.widget.after(self.delay, self.show_tooltip)
 
     def show_tooltip(self):
         if self.tooltip_window or not self.text:
@@ -43,23 +44,22 @@ class ToolTip:
                          font=("helvetica", "8", "normal"))
         label.pack(ipadx=1)
 
+        self.is_fading_out = False
         self.fade_in()
 
     def fade_in(self):
-        if self.opacity < 1.0:
+        if self.opacity < 1.0 and not self.is_fading_out:
             self.opacity += 0.05
             self.tooltip_window.attributes('-alpha', self.opacity)
             self.tooltip_window.after(int(self.fade_duration / 20), self.fade_in)
-    
+        else:
+            if self.opacity >= 1.0:
+                self.opacity = 1.0
+
     def start_fade_out(self, event=None):
-        if not self.is_fading_out:
+        if self.tooltip_window and not self.is_fading_out:
             self.is_fading_out = True
             self.fade_out()
-
-    # def hide_tooltip(self, event=None):
-    #     self.cancel_tooltip()
-    #     if self.tooltip_window:
-    #         self.fade_out()
 
     def fade_out(self):
         if self.opacity > 0:
@@ -78,7 +78,7 @@ class ToolTip:
         if self.id:
             self.widget.after_cancel(self.id)
             self.id = None
-    
+
     def check_motion(self, event):
         widget_under_cursor = self.widget.winfo_containing(event.x_root, event.y_root)
         if widget_under_cursor != self.widget and self.tooltip_window and not self.is_fading_out:
@@ -717,7 +717,7 @@ def button_design(entry):
 
 ####################################### Set up the GUI ######################################
 root = tk.Tk()
-root.title("Static Routes XML Creator")
+root.title("Static Routes XML Creator 1.3")
 
 #Disable resizing
 root.resizable(False, False)
@@ -764,7 +764,7 @@ button_design(button_populate_table)
 frame_ip = tk.Frame(root)
 frame_ip.grid(row=3, column=0, padx=5, pady=5, sticky='e')
 
-label_ip_help = tk.Label(frame_ip, text="?", bd=1, relief='solid')
+label_ip_help = tk.Label(frame_ip, text=" ? ", bd=2, relief='raised')
 label_ip_help.grid(row=0, column=0, padx=5, pady=5)
 
 ToolTip(label_ip_help, "The IP of the first element of the range")
