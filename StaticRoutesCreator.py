@@ -793,6 +793,8 @@ def populate_table_from_db3():
             # if route['Dbf_Comm_Library']>20 or 
             if route['LayoutCopy_Protocol']=="SFTP":
                 type_tc = "TC3" 
+            elif route['LayoutCopy_Protocol']=="FTP" or route['LayoutCopy_Protocol']=="NETFOLDER":
+                type_tc = "TC2" 
             else:
                 type_tc = default_type_tc 
         
@@ -957,7 +959,7 @@ treeview.bind("<Button-3>", show_context_menu)
 
 root.mainloop()
 
-# leer config.db3 y llenar tabla con eso
+# leer config.db3 y llenar tabla con eso - DONE
 
 # agregar rutas de ads
 
