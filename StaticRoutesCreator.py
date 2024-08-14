@@ -712,21 +712,86 @@ def natural_keys(text):
 
 #################################### Read config.db3 #######################################
 def read_db3_file(db3_file_path, table_name):
-    conn = sqlite3.connect(db3_file_path)
-    cursor = conn.cursor()
-    cursor.execute(f"SELECT * FROM {table_name}")
-    rows = cursor.fetchall()
-    column_names = [description[0] for description in cursor.description]
-    conn.close()
-    print(column_names)
-    return column_names, rows
+    try:
+        # Connect to the .db3 file
+        conn = sqlite3.connect(db3_file_path)
+        cursor = conn.cursor()
 
-def read_lgv_table():
+        # Check if the table exists
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name=?", (table_name,))
+        if not cursor.fetchone():
+            messagebox.showerror("Error", f"Table '{table_name}' does not exist in the database.")
+            conn.close()
+            return None, None
+
+        # Query to get all rows from the specified table
+        cursor.execute(f"SELECT * FROM {table_name}")
+        
+        # Fetch all rows
+        rows = cursor.fetchall()
+
+        # Get column names
+        column_names = [description[0] for description in cursor.description]
+
+        # Close the connection
+        conn.close()
+
+        return column_names, rows
+    except Exception as e:
+        messagebox.showerror("Error", f"An error occurred: {e}")
+        return None, None
+
+def populate_table_from_db3():
+    project = entry_project.get()
+    try:
+        if len(project) != 4 or project == placeholders[entry_project]:
+            raise ValueError("Add project number")
+        
+    except ValueError as e:
+        messagebox.showerror("Attention", str(e))
+        return
+    
     table = "tbl_AGVs"
     db3_path = filedialog.askopenfilename(title="Select config.db3 file", 
                                           initialdir="C:\\Program Files (x86)\\Elettric80",
                                           filetypes=[("DB3 files", "*.db3")])
-    read_db3_file(db3_path, table)
+    
+    columns, rows = read_db3_file(db3_path, table)
+
+    table_agv_types = "tbl_AGV_Types"
+    columns_types, rows_types = read_db3_file(db3_path, table_agv_types)
+    
+    # print(columns, rows)
+    for row in rows:
+        if row[5]:
+            print(row[0])
+
+    # Clear the existing table data
+    for i in treeview.get_children():
+        treeview.delete(i)
+    
+    # Initialize an empty list to hold the data
+    routes_data = []
+    
+    # Iterate through each <Route> element in the XML
+    for route in rows:
+        if route[5]: 
+        # if None in (name, address, net_id):
+        #     messagebox.showwarning("Warning", "One or more routes are missing required fields (Name, Address, NetId).")
+        #     continue  # Skip this route and move to the next
+
+            name = f"CC{project}_LGV{str(route[0]).zfill(2)}"
+            address = route[7]
+            net_id = f"{address}.1.1"
+            type_tc = "TC3" if route[8]>20 or (((row_types[3]>20) and (row_types[1]==route[2])) for row_types in rows_types) else "TC2" 
+        
+            # Append the tuple to the list
+            routes_data.append((name, address, net_id, type_tc))
+    
+    # Populate the Treeview with the data
+    for item in routes_data:
+        treeview.insert("", "end", values=item)
+
 
 ################################### Button design ##########################################
 def on_enter(e):
@@ -850,9 +915,9 @@ button_load_xml = tk.Button(frame_load, text="Load StaticRoutes.xml",
 button_load_xml.grid(row=0, column=0, padx=5, pady=5)
 button_design(button_load_xml)
 
-button_load_db3 = tk.Button(frame_load, text="Load Config.db3", 
+button_load_db3 = tk.Button(frame_load, text="     Load Config.db3     ", 
                             bg="ghost white", 
-                            command=read_lgv_table)
+                            command=populate_table_from_db3)
 button_load_db3.grid(row=1, column=0, padx=5, pady=5)
 button_design(button_load_db3)
 
