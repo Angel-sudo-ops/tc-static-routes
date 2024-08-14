@@ -759,19 +759,34 @@ def populate_table_from_db3():
 
     table_agv_types = "tbl_AGV_Types"
     rows_agv_types = read_db3_file(db3_path, table_agv_types)
+
+    table_param = "tbl_Parameter"
+    rows_param = read_db3_file(db3_path, table_param)
+    for row_param in rows_param:
+        if row_param['dbf_Name'] == "agvlayoutloadmethod":
+            if row_param['dbf_Value'] == "SFTP":
+                print(row_param['dbf_Name'], row_param['dbf_Value'])
+            else:
+                print("NO GENERAL SFTP FOUND")
+
     
-    # print(columns, rows)
-    for row in rows_agvs:
-        if row['dbf_Enabled']:
-            print(f"LGV{str(row['dbf_ID']).zfill(2)}")
+    # # print(columns, rows)
+    # for row in rows_agvs:
+    #     if row['dbf_Enabled']:
+    #         print(f"LGV{str(row['dbf_ID']).zfill(2)}")
 
     # Clear the existing table data
     for i in treeview.get_children():
         treeview.delete(i)
     
+    # Default type_tc based on the transfer mode
+    default_type_tc = "TC2"  # Assume TC2 unless specified otherwise
+    for row_param in rows_param:
+        if row_param['dbf_Name'] == "agvlayoutloadmethod" and row_param['dbf_Value'] == "SFTP":
+            default_type_tc = "TC3" # If SFTP, set all to TC3
+
     # Initialize an empty list to hold the data
     routes_data = []
-    
     # Iterate through each <Route> element in the XML
     for route in rows_agvs:
         if route['dbf_Enabled']: 
@@ -782,7 +797,12 @@ def populate_table_from_db3():
             name = f"CC{project}_LGV{str(route['dbf_ID']).zfill(2)}"
             address = route['dbf_IP']
             net_id = f"{address}.1.1"
-            type_tc = "TC3" if route['Dbf_Comm_Library']>20 else "TC2" 
+            
+            # if route['Dbf_Comm_Library']>20 or 
+            if route['LayoutCopy_Protocol']=="SFTP":
+                type_tc = "TC3" 
+            else:
+                type_tc = default_type_tc 
         
             # Append the tuple to the list
             routes_data.append((name, address, net_id, type_tc))
