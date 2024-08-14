@@ -733,38 +733,37 @@ def read_db3_file(db3_file_path, table_name):
         # Get column names
         column_names = [description[0] for description in cursor.description]
 
+        # Convert the rows into a list of dictionaries
+        dict_rows = [dict(zip(column_names, row)) for row in rows]
+
         # Close the connection
         conn.close()
 
-        return column_names, rows
+        return dict_rows
     except Exception as e:
         messagebox.showerror("Error", f"An error occurred: {e}")
-        return None, None
+        return None
 
 def populate_table_from_db3():
     project = entry_project.get()
-    try:
-        if len(project) != 4 or project == placeholders[entry_project]:
-            raise ValueError("Add project number")
-        
-    except ValueError as e:
-        messagebox.showerror("Attention", str(e))
+    if len(project) != 4 or project == placeholders[entry_project]:
+        messagebox.showinfo("Attention", "Add project number")
         return
     
-    table = "tbl_AGVs"
+    table_agvs = "tbl_AGVs"
     db3_path = filedialog.askopenfilename(title="Select config.db3 file", 
                                           initialdir="C:\\Program Files (x86)\\Elettric80",
                                           filetypes=[("DB3 files", "*.db3")])
     
-    columns, rows = read_db3_file(db3_path, table)
+    rows_agvs = read_db3_file(db3_path, table_agvs)
 
     table_agv_types = "tbl_AGV_Types"
-    columns_types, rows_types = read_db3_file(db3_path, table_agv_types)
+    rows_agv_types = read_db3_file(db3_path, table_agv_types)
     
     # print(columns, rows)
-    for row in rows:
-        if row[5]:
-            print(row[0])
+    for row in rows_agvs:
+        if row['dbf_Enabled']:
+            print(f"LGV{str(row['dbf_ID']).zfill(2)}")
 
     # Clear the existing table data
     for i in treeview.get_children():
@@ -774,16 +773,16 @@ def populate_table_from_db3():
     routes_data = []
     
     # Iterate through each <Route> element in the XML
-    for route in rows:
-        if route[5]: 
+    for route in rows_agvs:
+        if route['dbf_Enabled']: 
         # if None in (name, address, net_id):
         #     messagebox.showwarning("Warning", "One or more routes are missing required fields (Name, Address, NetId).")
         #     continue  # Skip this route and move to the next
 
-            name = f"CC{project}_LGV{str(route[0]).zfill(2)}"
-            address = route[7]
+            name = f"CC{project}_LGV{str(route['dbf_ID']).zfill(2)}"
+            address = route['dbf_IP']
             net_id = f"{address}.1.1"
-            type_tc = "TC3" if route[8]>20 or (((row_types[3]>20) and (row_types[1]==route[2])) for row_types in rows_types) else "TC2" 
+            type_tc = "TC3" if route['Dbf_Comm_Library']>20 else "TC2" 
         
             # Append the tuple to the list
             routes_data.append((name, address, net_id, type_tc))
@@ -810,7 +809,7 @@ def button_design(entry):
 
 ####################################### Set up the GUI ######################################
 root = tk.Tk()
-root.title("Static Routes XML Creator 1.3")
+root.title("Static Routes XML Creator 1.4")
 
 #Disable resizing
 root.resizable(False, False)
