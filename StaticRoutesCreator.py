@@ -445,13 +445,16 @@ def parse_ip(base_ip, lgv_list):
 def parse_range(range_str):
     print(range_str)
     lgv_list = []
-    for part in range_str.split(','):
-        if '-' in part:
-            start, end = map(int, part.split('-'))
-            lgv_list.extend(range(start, end + 1))
-        else:
-            lgv_list.append(int(part))
-    return lgv_list
+    try:
+        for part in range_str.split(','):
+            if '-' in part:
+                start, end = map(int, part.split('-'))
+                lgv_list.extend(range(start, end + 1))
+            else:
+                lgv_list.append(int(part))
+        return lgv_list
+    except ValueError:
+        messagebox.showerror("Invalid Input", "Please enter a valid integer")
 
 ############################### Delete selected record ####################################
 # With a button
@@ -750,25 +753,14 @@ def populate_table_from_db3():
         messagebox.showinfo("Attention", "Add project number")
         return
     
-    table_agvs = "tbl_AGVs"
     db3_path = filedialog.askopenfilename(title="Select config.db3 file", 
                                           initialdir="C:\\Program Files (x86)\\Elettric80",
                                           filetypes=[("DB3 files", "*.db3")])
-    
+    table_agvs = "tbl_AGVs"
     rows_agvs = read_db3_file(db3_path, table_agvs)
-
-    table_agv_types = "tbl_AGV_Types"
-    rows_agv_types = read_db3_file(db3_path, table_agv_types)
 
     table_param = "tbl_Parameter"
     rows_param = read_db3_file(db3_path, table_param)
-    for row_param in rows_param:
-        if row_param['dbf_Name'] == "agvlayoutloadmethod":
-            if row_param['dbf_Value'] == "SFTP":
-                print(row_param['dbf_Name'], row_param['dbf_Value'])
-            else:
-                print("NO GENERAL SFTP FOUND")
-
     
     # # print(columns, rows)
     # for row in rows_agvs:
@@ -966,6 +958,7 @@ treeview.bind("<Button-3>", show_context_menu)
 root.mainloop()
 
 # leer config.db3 y llenar tabla con eso
+
 # agregar rutas de ads
 
 # add local route by default
