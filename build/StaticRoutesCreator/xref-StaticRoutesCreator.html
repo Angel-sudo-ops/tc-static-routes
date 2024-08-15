@@ -167,6 +167,7 @@ imports:
  &#8226;   <a href="#re._constants">re._constants</a>
  &#8226;   <a href="#re._parser">re._parser</a>
  &#8226;   <a href="#reprlib">reprlib</a>
+ &#8226;   <a href="#sqlite3">sqlite3</a>
  &#8226;   <a href="#sre_compile">sre_compile</a>
  &#8226;   <a href="#sre_constants">sre_constants</a>
  &#8226;   <a href="#sre_parse">sre_parse</a>
@@ -174,6 +175,7 @@ imports:
  &#8226;   <a href="#tkinter">tkinter</a>
  &#8226;   <a href="#tkinter.filedialog">tkinter.filedialog</a>
  &#8226;   <a href="#tkinter.messagebox">tkinter.messagebox</a>
+ &#8226;   <a href="#tkinter.ttk">tkinter.ttk</a>
  &#8226;   <a href="#traceback">traceback</a>
  &#8226;   <a href="#types">types</a>
  &#8226;   <a href="#warnings">warnings</a>
@@ -814,6 +816,16 @@ imported by:
   <tt>_socket</tt> <span class="moduletype"><tt>C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\DLLs\_socket.pyd</tt></span>  <div class="import">
 imported by:
     <a href="#socket">socket</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="_sqlite3"></a>
+  <tt>_sqlite3</tt> <span class="moduletype"><tt>C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\DLLs\_sqlite3.pyd</tt></span>  <div class="import">
+imported by:
+    <a href="#sqlite3.dbapi2">sqlite3.dbapi2</a>
 
   </div>
 
@@ -1493,6 +1505,7 @@ imported by:
  &#8226;   <a href="#inspect">inspect</a>
  &#8226;   <a href="#logging">logging</a>
  &#8226;   <a href="#selectors">selectors</a>
+ &#8226;   <a href="#sqlite3.dbapi2">sqlite3.dbapi2</a>
  &#8226;   <a href="#traceback">traceback</a>
  &#8226;   <a href="#tracemalloc">tracemalloc</a>
  &#8226;   <a href="#typing">typing</a>
@@ -1665,6 +1678,7 @@ imported by:
  &#8226;   <a href="#calendar">calendar</a>
  &#8226;   <a href="#email.utils">email.utils</a>
  &#8226;   <a href="#http.cookiejar">http.cookiejar</a>
+ &#8226;   <a href="#sqlite3.dbapi2">sqlite3.dbapi2</a>
 
   </div>
 
@@ -5129,7 +5143,6 @@ imports:
  &#8226;   <a href="#importlib">importlib</a>
  &#8226;   <a href="#importlib._bootstrap">importlib._bootstrap</a>
  &#8226;   <a href="#importlib._bootstrap_external">importlib._bootstrap_external</a>
- &#8226;   <a href="#importlib.machinery">importlib.machinery</a>
  &#8226;   <a href="#sys">sys</a>
  &#8226;   <a href="#warnings">warnings</a>
 
@@ -5260,8 +5273,7 @@ imports:
   </div>
   <div class="import">
 imported by:
-    <a href="#importlib">importlib</a>
- &#8226;   <a href="#importlib.abc">importlib.abc</a>
+    <a href="#importlib.abc">importlib.abc</a>
  &#8226;   <a href="#inspect">inspect</a>
  &#8226;   <a href="#py_compile">py_compile</a>
 
@@ -6759,6 +6771,65 @@ imported by:
 </div>
 
 <div class="node">
+  <a name="sqlite3"></a>
+  <a target="code" href="///C:/Program%20Files/WindowsApps/PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0/Lib/sqlite3/__init__.py" type="text/plain"><tt>sqlite3</tt></a>
+<span class="moduletype">Package</span>  <div class="import">
+imports:
+    <a href="#sqlite3">sqlite3</a>
+ &#8226;   <a href="#sqlite3.dbapi2">sqlite3.dbapi2</a>
+ &#8226;   <a href="#sqlite3.dump">sqlite3.dump</a>
+ &#8226;   <a href="#warnings">warnings</a>
+
+  </div>
+  <div class="import">
+imported by:
+    <a href="#StaticRoutesCreator.py">StaticRoutesCreator.py</a>
+ &#8226;   <a href="#sqlite3">sqlite3</a>
+ &#8226;   <a href="#sqlite3.dbapi2">sqlite3.dbapi2</a>
+ &#8226;   <a href="#sqlite3.dump">sqlite3.dump</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="sqlite3.dbapi2"></a>
+  <a target="code" href="///C:/Program%20Files/WindowsApps/PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0/Lib/sqlite3/dbapi2.py" type="text/plain"><tt>sqlite3.dbapi2</tt></a>
+<span class="moduletype">SourceModule</span>  <div class="import">
+imports:
+    <a href="#_sqlite3">_sqlite3</a>
+ &#8226;   <a href="#collections.abc">collections.abc</a>
+ &#8226;   <a href="#datetime">datetime</a>
+ &#8226;   <a href="#sqlite3">sqlite3</a>
+ &#8226;   <a href="#time">time</a>
+ &#8226;   <a href="#warnings">warnings</a>
+
+  </div>
+  <div class="import">
+imported by:
+    <a href="#sqlite3">sqlite3</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="sqlite3.dump"></a>
+  <a target="code" href="///C:/Program%20Files/WindowsApps/PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0/Lib/sqlite3/dump.py" type="text/plain"><tt>sqlite3.dump</tt></a>
+<span class="moduletype">SourceModule</span>  <div class="import">
+imports:
+    <a href="#sqlite3">sqlite3</a>
+
+  </div>
+  <div class="import">
+imported by:
+    <a href="#sqlite3">sqlite3</a>
+
+  </div>
+
+</div>
+
+<div class="node">
   <a name="sre_compile"></a>
   <a target="code" href="///C:/Program%20Files/WindowsApps/PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0/Lib/sre_compile.py" type="text/plain"><tt>sre_compile</tt></a>
 <span class="moduletype">SourceModule</span>  <div class="import">
@@ -7220,6 +7291,7 @@ imported by:
  &#8226;   <a href="#logging">logging</a>
  &#8226;   <a href="#pprint">pprint</a>
  &#8226;   <a href="#random">random</a>
+ &#8226;   <a href="#sqlite3.dbapi2">sqlite3.dbapi2</a>
  &#8226;   <a href="#ssl">ssl</a>
  &#8226;   <a href="#subprocess">subprocess</a>
  &#8226;   <a href="#tarfile">tarfile</a>
@@ -7245,6 +7317,7 @@ imports:
  &#8226;   <a href="#tkinter.constants">tkinter.constants</a>
  &#8226;   <a href="#tkinter.filedialog">tkinter.filedialog</a>
  &#8226;   <a href="#tkinter.messagebox">tkinter.messagebox</a>
+ &#8226;   <a href="#tkinter.ttk">tkinter.ttk</a>
  &#8226;   <a href="#traceback">traceback</a>
  &#8226;   <a href="#types">types</a>
 
@@ -7258,6 +7331,7 @@ imported by:
  &#8226;   <a href="#tkinter.filedialog">tkinter.filedialog</a>
  &#8226;   <a href="#tkinter.messagebox">tkinter.messagebox</a>
  &#8226;   <a href="#tkinter.simpledialog">tkinter.simpledialog</a>
+ &#8226;   <a href="#tkinter.ttk">tkinter.ttk</a>
 
   </div>
 
@@ -7367,6 +7441,23 @@ imports:
   <div class="import">
 imported by:
     <a href="#tkinter.filedialog">tkinter.filedialog</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="tkinter.ttk"></a>
+  <a target="code" href="///C:/Program%20Files/WindowsApps/PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0/Lib/tkinter/ttk.py" type="text/plain"><tt>tkinter.ttk</tt></a>
+<span class="moduletype">SourceModule</span>  <div class="import">
+imports:
+    <a href="#tkinter">tkinter</a>
+
+  </div>
+  <div class="import">
+imported by:
+    <a href="#StaticRoutesCreator.py">StaticRoutesCreator.py</a>
+ &#8226;   <a href="#tkinter">tkinter</a>
 
   </div>
 
@@ -7722,6 +7813,8 @@ imported by:
  &#8226;   <a href="#re">re</a>
  &#8226;   <a href="#re._parser">re._parser</a>
  &#8226;   <a href="#shlex">shlex</a>
+ &#8226;   <a href="#sqlite3">sqlite3</a>
+ &#8226;   <a href="#sqlite3.dbapi2">sqlite3.dbapi2</a>
  &#8226;   <a href="#sre_compile">sre_compile</a>
  &#8226;   <a href="#sre_constants">sre_constants</a>
  &#8226;   <a href="#sre_parse">sre_parse</a>
