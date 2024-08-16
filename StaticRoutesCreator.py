@@ -4,6 +4,7 @@ import tkinter as tk
 from tkinter import messagebox, filedialog, ttk
 import xml.etree.ElementTree as ET
 from xml.dom import minidom
+import sqlite3
 
 default_file_path = os.path.join(r'C:\TwinCAT\3.1\Target', 'StaticRoutes.xml')
 
@@ -444,13 +445,16 @@ def parse_ip(base_ip, lgv_list):
 def parse_range(range_str):
     print(range_str)
     lgv_list = []
-    for part in range_str.split(','):
-        if '-' in part:
-            start, end = map(int, part.split('-'))
-            lgv_list.extend(range(start, end + 1))
-        else:
-            lgv_list.append(int(part))
-    return lgv_list
+    try:
+        for part in range_str.split(','):
+            if '-' in part:
+                start, end = map(int, part.split('-'))
+                lgv_list.extend(range(start, end + 1))
+            else:
+                lgv_list.append(int(part))
+        return lgv_list
+    except ValueError:
+        messagebox.showerror("Invalid Input", "Please enter a valid integer")
 
 ############################### Delete selected record ####################################
 # With a button
@@ -708,6 +712,100 @@ def natural_keys(text):
     import re
     return [int(c) if c.isdigit() else c for c in re.split('(\d+)', text)]
 
+
+#################################### Read config.db3 #######################################
+def read_db3_file(db3_file_path, table_name):
+    try:
+        # Connect to the .db3 file
+        conn = sqlite3.connect(db3_file_path)
+        cursor = conn.cursor()
+
+        # Check if the table exists
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name=?", (table_name,))
+        if not cursor.fetchone():
+            messagebox.showerror("Error", f"Table '{table_name}' does not exist in the database.")
+            conn.close()
+            return None, None
+
+        # Query to get all rows from the specified table
+        cursor.execute(f"SELECT * FROM {table_name}")
+        
+        # Fetch all rows
+        rows = cursor.fetchall()
+
+        # Get column names
+        column_names = [description[0] for description in cursor.description]
+
+        # Convert the rows into a list of dictionaries
+        dict_rows = [dict(zip(column_names, row)) for row in rows]
+
+        # Close the connection
+        conn.close()
+
+        return dict_rows
+    except Exception as e:
+        messagebox.showerror("Error", f"An error occurred: {e}")
+        return None
+
+def populate_table_from_db3():
+    project = entry_project.get()
+    if len(project) != 4 or project == placeholders[entry_project]:
+        messagebox.showinfo("Attention", "Add project number")
+        return
+    
+    db3_path = filedialog.askopenfilename(title="Select config.db3 file", 
+                                          initialdir="C:\\Program Files (x86)\\Elettric80",
+                                          filetypes=[("DB3 files", "*.db3")])
+    table_agvs = "tbl_AGVs"
+    rows_agvs = read_db3_file(db3_path, table_agvs)
+
+    table_param = "tbl_Parameter"
+    rows_param = read_db3_file(db3_path, table_param)
+    
+    # # print(columns, rows)
+    # for row in rows_agvs:
+    #     if row['dbf_Enabled']:
+    #         print(f"LGV{str(row['dbf_ID']).zfill(2)}")
+
+    # Clear the existing table data
+    for i in treeview.get_children():
+        treeview.delete(i)
+    
+    # Default type_tc based on the transfer mode
+    default_type_tc = "TC2"  # Assume TC2 unless specified otherwise
+    for row_param in rows_param:
+        if row_param['dbf_Name'] == "agvlayoutloadmethod" and row_param['dbf_Value'] == "SFTP":
+            default_type_tc = "TC3" # If SFTP, set all to TC3
+
+    # Initialize an empty list to hold the data
+    routes_data = []
+    # Iterate through each <Route> element in the XML
+    for route in rows_agvs:
+        if route['dbf_Enabled']: 
+        # if None in (name, address, net_id):
+        #     messagebox.showwarning("Warning", "One or more routes are missing required fields (Name, Address, NetId).")
+        #     continue  # Skip this route and move to the next
+
+            name = f"CC{project}_LGV{str(route['dbf_ID']).zfill(2)}"
+            address = route['dbf_IP']
+            net_id = f"{address}.1.1"
+            
+            # if route['Dbf_Comm_Library']>20 or 
+            if route['LayoutCopy_Protocol']=="SFTP":
+                type_tc = "TC3" 
+            elif route['LayoutCopy_Protocol']=="FTP" or route['LayoutCopy_Protocol']=="NETFOLDER":
+                type_tc = "TC2" 
+            else:
+                type_tc = default_type_tc 
+        
+            # Append the tuple to the list
+            routes_data.append((name, address, net_id, type_tc))
+    
+    # Populate the Treeview with the data
+    for item in routes_data:
+        treeview.insert("", "end", values=item)
+
+
 ################################### Button design ##########################################
 def on_enter(e):
     if e.widget['state']== "normal":
@@ -725,7 +823,7 @@ def button_design(entry):
 
 ####################################### Set up the GUI ######################################
 root = tk.Tk()
-root.title("Static Routes XML Creator 1.3")
+root.title("Static Routes XML Creator 1.4")
 
 #Disable resizing
 root.resizable(False, False)
@@ -821,12 +919,20 @@ treeview.bind('<Double-1>', on_double_click)
 
 frame_xml = tk.Frame(root)
 frame_xml.grid(row=5, column=0, columnspan=3, padx=5, pady=5)
+frame_load = tk.Frame(frame_xml)
+frame_load.grid(row=0, column=0, padx=10, pady=10)
 # Add a button to trigger the XML file selection and table population
-button_load_xml = tk.Button(frame_xml, text="Load StaticRoutes.xml", 
+button_load_xml = tk.Button(frame_load, text="Load StaticRoutes.xml", 
                             bg="ghost white", 
                             command=populate_table_from_xml)
-button_load_xml.grid(row=0, column=0, padx=10, pady=10)
+button_load_xml.grid(row=0, column=0, padx=5, pady=5)
 button_design(button_load_xml)
+
+button_load_db3 = tk.Button(frame_load, text="     Load Config.db3     ", 
+                            bg="ghost white", 
+                            command=populate_table_from_db3)
+button_load_db3.grid(row=1, column=0, padx=5, pady=5)
+button_design(button_load_db3)
 
 # Button to save the StaticRoutes.xml file
 save_button = tk.Button(frame_xml, text="Save StaticRoutes.xml", 
@@ -853,7 +959,8 @@ treeview.bind("<Button-3>", show_context_menu)
 
 root.mainloop()
 
-# leer config.db3 y llenar tabla con eso
+# leer config.db3 y llenar tabla con eso - DONE
+
 # agregar rutas de ads
 
 # add local route by default
