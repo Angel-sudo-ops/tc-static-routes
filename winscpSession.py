@@ -4,13 +4,14 @@ import subprocess
 import tkinter as tk
 from tkinter import messagebox
 
-# Path to the custom winscp.ini file
-custom_ini_path = r'C:\WinSCPConfig\WinSCP.ini'  # Change this path if needed
-
 # Function to create a session in the winscp.ini file
 def create_session(host_name, transfer_type, folder_name, session_name):
+    # Dynamic path based on the folder name
+    custom_ini_dir = os.path.join(r'C:\WinSCPConfig', folder_name)
+    custom_ini_path = os.path.join(custom_ini_dir, 'WinSCP.ini')
+
     # Ensure the directory exists
-    os.makedirs(os.path.dirname(custom_ini_path), exist_ok=True)
+    os.makedirs(custom_ini_dir, exist_ok=True)
 
     # Create config parser and read the INI file (if it exists)
     config = configparser.ConfigParser()
@@ -62,18 +63,26 @@ def on_create():
 
 # Function to open the directory containing the INI file
 def open_ini_directory():
-    ini_dir = os.path.dirname(custom_ini_path)
+    folder_name = folder_entry.get().strip()
+    custom_ini_dir = os.path.join(r'C:\WinSCPConfig', folder_name)
     
-    if os.path.exists(ini_dir):
-        os.startfile(ini_dir)
+    if os.path.exists(custom_ini_dir):
+        os.startfile(custom_ini_dir)
     else:
-        messagebox.showerror("Error", f"Directory not found: {ini_dir}")
+        messagebox.showerror("Error", f"Directory not found: {custom_ini_dir}")
 
-# Function to start WinSCP with the custom INI path
+# Function to start WinSCP with the custom INI path and then close the Python program
 def start_winscp_with_custom_ini():
+    folder_name = folder_entry.get().strip()
+    custom_ini_path = os.path.join(r'C:\WinSCPConfig', folder_name, 'WinSCP.ini')
     winscp_path = r'C:\Program Files (x86)\WinSCP\WinSCP.exe'  # Adjust if needed
     command = f'"{winscp_path}" /ini="{custom_ini_path}"'
+    
+    # Run WinSCP with the custom INI file
     subprocess.run(command)
+    
+    # Close the Python program
+    root.destroy()
 
 # Create the main application window
 root = tk.Tk()
@@ -105,7 +114,7 @@ create_button.pack(pady=10)
 open_dir_button = tk.Button(root, text="Open INI Directory", command=open_ini_directory)
 open_dir_button.pack(pady=10)
 
-# Create a button to start WinSCP with the custom INI path
+# Create a button to start WinSCP with the custom INI path and close the Python program
 start_winscp_button = tk.Button(root, text="Start WinSCP", command=start_winscp_with_custom_ini)
 start_winscp_button.pack(pady=10)
 
