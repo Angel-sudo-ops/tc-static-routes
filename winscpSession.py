@@ -6,8 +6,8 @@ from tkinter import messagebox
 # Function to create a session in the winscp.ini file
 def create_session(host_name, transfer_type, folder_name, session_name):
     # Path to the winscp.ini file
-    ini_path = os.path.expanduser('~\\AppData\\Roaming\\WinSCP.ini')
-
+    ini_path = os.path.expanduser('~\\AppData\\Roaming\\WinSCP.ini')  # Adjust this path if needed
+    print(ini_path)
     # Check if the INI file exists
     if not os.path.exists(ini_path):
         return f"INI file not found at {ini_path}"
@@ -59,6 +59,16 @@ def on_create():
     else:
         messagebox.showerror("Error", result)
 
+# Function to open the directory containing the INI file
+def open_ini_directory():
+    ini_path = os.path.expanduser('~\\AppData\\Roaming\\WinSCP.ini')  # Adjust this path if needed
+    ini_dir = os.path.dirname(ini_path)
+    
+    if os.path.exists(ini_dir):
+        os.startfile(ini_dir)
+    else:
+        messagebox.showerror("Error", f"Directory not found: {ini_dir}")
+
 # Create the main application window
 root = tk.Tk()
 root.title("WinSCP Session Creator")
@@ -83,7 +93,11 @@ transfer_type_dropdown.pack(pady=5)
 
 # Create a button to trigger the session creation
 create_button = tk.Button(root, text="Create Session", command=on_create)
-create_button.pack(pady=20)
+create_button.pack(pady=10)
+
+# Create a button to open the directory containing the INI file
+open_dir_button = tk.Button(root, text="Open INI Directory", command=open_ini_directory)
+open_dir_button.pack(pady=10)
 
 # Run the Tkinter event loop
 root.mainloop()
