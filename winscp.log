@@ -1,0 +1,44 @@
+. 2024-08-15 20:01:05.203 --------------------------------------------------------------------------
+. 2024-08-15 20:01:05.203 WinSCP Version 6.3.2 (Build 14890 2024-03-12) (OS 10.0.22631 – Windows 10 Enterprise)
+. 2024-08-15 20:01:05.203 Configuration: HKCU\Software\Martin Prikryl\WinSCP 2\
+. 2024-08-15 20:01:05.204 Log level: Normal
+. 2024-08-15 20:01:05.204 Local account: ELETTRIC80\contreras.j
+. 2024-08-15 20:01:05.204 Working directory: D:\Documents\PythonPrograms\StaticRoutesCreator
+. 2024-08-15 20:01:05.204 Process ID: 2168
+. 2024-08-15 20:01:05.229 Ancestor processes: WinSCP, cmd, python3.11, python3.11, powershell, Code, Code, explorer, ...
+. 2024-08-15 20:01:05.229 Command-line: "C:\Program Files (x86)\WinSCP\WinSCP.exe" /console=6.3.2 /consoleinstance=_14360_952 "/log=winscp.log" "/defaults" "open" "ftp://your_username@example.com:21/" "-sessionname=MySession" 
+. 2024-08-15 20:01:05.231 Time zone: Current: GMT-7, Standard: GMT-8 (Pacific Standard Time), DST: GMT-7 (Pacific Daylight Time), DST Start: 3/10/2024, DST End: 11/3/2024
+. 2024-08-15 20:01:05.232 Login time: Thursday, August 15, 2024 8:01:05 PM
+. 2024-08-15 20:01:05.232 --------------------------------------------------------------------------
+. 2024-08-15 20:01:05.232 Session name: MySession (Ad-Hoc site)
+. 2024-08-15 20:01:05.232 Host name: open (Port: 22)
+. 2024-08-15 20:01:05.232 User name:  (Password: No, Key file: No, Passphrase: No)
+. 2024-08-15 20:01:05.232 Tunnel: No
+. 2024-08-15 20:01:05.232 Transfer Protocol: SFTP (SCP)
+. 2024-08-15 20:01:05.232 Ping type: Off, Ping interval: 30 sec; Timeout: 15 sec
+. 2024-08-15 20:01:05.232 Disable Nagle: No
+. 2024-08-15 20:01:05.232 Proxy: None
+. 2024-08-15 20:01:05.232 Send buffer: 262144
+. 2024-08-15 20:01:05.232 Compression: No
+. 2024-08-15 20:01:05.232 Bypass authentication: No
+. 2024-08-15 20:01:05.232 Try agent: Yes; Agent forwarding: No; KI: Yes; GSSAPI: Yes
+. 2024-08-15 20:01:05.232 GSSAPI: KEX: No; Forwarding: No; Libs: gssapi32,sspi,custom; Custom: 
+. 2024-08-15 20:01:05.232 Ciphers: aes,chacha20,aesgcm,3des,WARN,des,blowfish,arcfour; Ssh2DES: No
+. 2024-08-15 20:01:05.232 KEX: ntru-curve25519,ecdh,dh-gex-sha1,dh-group18-sha512,dh-group17-sha512,dh-group16-sha512,dh-group15-sha512,dh-group14-sha1,rsa,WARN,dh-group1-sha1
+. 2024-08-15 20:01:05.232 SSH Bugs: Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto
+. 2024-08-15 20:01:05.232 Simple channel: Yes
+. 2024-08-15 20:01:05.232 Return code variable: Autodetect; Lookup user groups: Auto
+. 2024-08-15 20:01:05.232 Shell: default
+. 2024-08-15 20:01:05.232 EOL: LF, UTF: Auto
+. 2024-08-15 20:01:05.232 Clear aliases: Yes, Unset nat.vars: Yes, Resolve symlinks: Yes; Follow directory symlinks: No
+. 2024-08-15 20:01:05.232 LS: ls -la, Ign LS warn: Yes, Scp1 Comp: No; Exit code 1 is error: No
+. 2024-08-15 20:01:05.232 SFTP Bugs: Auto,Auto
+. 2024-08-15 20:01:05.232 SFTP Server: default
+. 2024-08-15 20:01:05.232 Local directory: default, Remote directory: home, Update: Yes, Cache: Yes
+. 2024-08-15 20:01:05.232 Cache directory changes: Yes, Permanent: Yes
+. 2024-08-15 20:01:05.232 Recycle bin: Delete to: No, Overwritten to: No, Bin path: 
+. 2024-08-15 20:01:05.232 DST mode: Unix
+. 2024-08-15 20:01:05.232 --------------------------------------------------------------------------
+< 2024-08-15 20:01:05.232 Script: Searching for host...
+. 2024-08-15 20:01:05.233 Looking up host "open" for SSH connection
+< 2024-08-15 20:01:08.361 Script: Host "open" does not exist.
