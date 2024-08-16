@@ -1,3 +1,4 @@
+import configparser
 import os
 import tkinter as tk
 from tkinter import messagebox
@@ -11,26 +12,33 @@ def save_winscp_session():
     host = 'example.com'
     port = '22' if protocol == 'sftp' else '21'
     username = 'your_username'
-    privatekey = 'C:\\path\\to\\private_key.ppk' if protocol == 'sftp' else ''
-    hostkey = 'ssh-rsa 2048 ABCDEFGHIJKLMNOPQRSTUVWXYZ' if protocol == 'sftp' else ''
-    remotedir = '/home/your_username'
     localdir = 'C:\\Users\\your_user\\Documents'
+    remotedir = '/home/your_username'
 
-    # Construct the command to save the session
-    winscp_path = r'"C:\Program Files (x86)\WinSCP\winscp.com"'  # Adjust path if necessary
-    session_command = f'{winscp_path} /log=winscp.log /defaults'
+    # Path to the winscp.ini file
+    ini_path = os.path.expanduser('~\\AppData\\Roaming\\WinSCP.ini')
 
-    if protocol == 'sftp':
-        session_command += f' open sftp://{username}@{host}:{port}/ -privatekey="{privatekey}" -hostkey="{hostkey}"'
-    else:
-        session_command += f' open ftp://{username}@{host}:{port}/'
+    # Create config parser and read the INI file
+    config = configparser.ConfigParser()
+    config.read(ini_path)
 
-    # Save the session without connecting
-    session_command += f' -sessionname={session_name}'
-    os.system(session_command)
+    # Create a new session section in the INI file
+    section_name = f'Session.{session_name}'
+    config[section_name] = {
+        'HostName': host,
+        'UserName': username,
+        'PortNumber': port,
+        'FSProtocol': '2' if protocol == 'sftp' else '0',
+        'LocalDirectory': localdir,
+        'RemoteDirectory': remotedir
+    }
+
+    # Save the session to the INI file
+    with open(ini_path, 'w') as configfile:
+        config.write(configfile)
 
     # Show a message box to indicate the session has been saved
-    messagebox.showinfo("WinSCP Session", f"{protocol.upper()} session has been successfully saved without connecting!")
+    messagebox.showinfo("WinSCP Session", f"{protocol.upper()} session has been successfully saved in {ini_path}!")
 
 # Create the main application window
 root = tk.Tk()
