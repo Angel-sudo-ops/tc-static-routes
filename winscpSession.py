@@ -1,24 +1,40 @@
 import configparser
 import os
+import winreg as reg
 import tkinter as tk
 from tkinter import messagebox
 
-# Function to create a session in the winscp.ini file
-def create_session(host_name, transfer_type, folder_name, session_name):
-    # Dynamic path based on the folder name
-    custom_ini_dir = os.path.join(r'C:\WinSCPConfig', folder_name)
-    custom_ini_path = os.path.join(custom_ini_dir, 'WinSCP.ini')
+# Function to set the custom INI path in the Windows Registry
+def set_custom_ini_path(ini_path):
+    key_path = r'Software\\Martin Prikryl\\WinSCP 2\\Configuration'
+    
+    try:
+        key = reg.OpenKey(reg.HKEY_CURRENT_USER, key_path, 0, reg.KEY_SET_VALUE)
+        reg.SetValueEx(key, "ConfigurationStorage", 0, reg.REG_DWORD, 2)
+        reg.SetValueEx(key, "CustomIniFile", 0, reg.REG_SZ, ini_path)
+        reg.CloseKey(key)
+        return True
+    except Exception as e:
+        print(f"Failed to set registry key: {e}")
+        return False
 
-    # Ensure the directory exists
-    os.makedirs(custom_ini_dir, exist_ok=True)
+# Function to create a session in the winscp.ini file
+def create_session(host_name, transfer_type, session_name, ini_path):
+    # Ensure the directory for the INI file exists
+    ini_dir = os.path.dirname(ini_path)
+    os.makedirs(ini_dir, exist_ok=True)
+
+    # Set the custom INI path in the registry
+    if not set_custom_ini_path(ini_path):
+        return "Failed to set the custom INI path in the registry."
 
     # Create config parser and read the INI file (if it exists)
     config = configparser.ConfigParser()
-    if os.path.exists(custom_ini_path):
-        config.read(custom_ini_path)
+    if os.path.exists(ini_path):
+        config.read(ini_path)
 
-    # Define the section name based on the folder and session name
-    section_name = f'Sessions\\{folder_name}/{session_name}'
+    # Define the section name based on the session name
+    section_name = f'Sessions\\{session_name}'
 
     # Check if the session already exists
     if config.has_section(section_name):
@@ -37,23 +53,25 @@ def create_session(host_name, transfer_type, folder_name, session_name):
         config[section_name]['FSProtocol'] = '5'
 
     # Write the session to the INI file
-    with open(custom_ini_path, 'w') as configfile:
+    with open(ini_path, 'w') as configfile:
         config.write(configfile)
 
-    return f"Session created successfully in {custom_ini_path}!"
+    return f"Session created successfully in {ini_path}!"
 
 # Function to handle button click in Tkinter
 def on_create():
     host_name = host_entry.get().strip()
     transfer_type = type_var.get().strip()
-    folder_name = folder_entry.get().strip()
     session_name = session_entry.get().strip()
 
-    if not host_name or not transfer_type or not folder_name or not session_name:
+    # Custom path for the INI file (not in Roaming)
+    ini_path = r'C:\WinSCPConfig\WinSCP.ini'  # Adjust this path if needed
+
+    if not host_name or not transfer_type or not session_name:
         messagebox.showwarning("Input Error", "Please provide all required inputs.")
         return
 
-    result = create_session(host_name, transfer_type, folder_name, session_name)
+    result = create_session(host_name, transfer_type, session_name, ini_path)
     
     if "successfully" in result:
         messagebox.showinfo("WinSCP Session", result)
@@ -62,13 +80,12 @@ def on_create():
 
 # Function to open the directory containing the INI file
 def open_ini_directory():
-    folder_name = folder_entry.get().strip()
-    custom_ini_dir = os.path.join(r'C:\WinSCPConfig', folder_name)
+    ini_dir = r'C:\WinSCPConfig'
     
-    if os.path.exists(custom_ini_dir):
-        os.startfile(custom_ini_dir)
+    if os.path.exists(ini_dir):
+        os.startfile(ini_dir)
     else:
-        messagebox.showerror("Error", f"Directory not found: {custom_ini_dir}")
+        messagebox.showerror("Error", f"Directory not found: {ini_dir}")
 
 # Create the main application window
 root = tk.Tk()
@@ -78,10 +95,6 @@ root.title("WinSCP Session Creator")
 tk.Label(root, text="Host Name:").pack(pady=5)
 host_entry = tk.Entry(root, width=50)
 host_entry.pack(pady=5)
-
-tk.Label(root, text="Folder Name:").pack(pady=5)
-folder_entry = tk.Entry(root, width=50)
-folder_entry.pack(pady=5)
 
 tk.Label(root, text="Session Name:").pack(pady=5)
 session_entry = tk.Entry(root, width=50)
