@@ -1,6 +1,7 @@
 
-    open sftp://Administrator:your_password@example.com:22/ -privatekey=C:\path\to\private_key.ppk -hostkey="ssh-rsa 2048 ABCDEFGHIJKLMNOPQRSTUVWXYZ" 
-    lcd C:\Users\your_user\Documents
-    cd /home/your_username
-    exit
+    open sftp://your_username@example.com:22/ -privatekey=C:\path\to\private_key.ppk -hostkey="ssh-rsa 2048 ABCDEFGHIJKLMNOPQRSTUVWXYZ" -session=MySession
+    option batch abort
+    option confirm off
+    close
+    save
     
