@@ -5,6 +5,10 @@ from tkinter import messagebox, filedialog, ttk
 import xml.etree.ElementTree as ET
 from xml.dom import minidom
 import sqlite3
+import winreg as reg
+import configparser
+
+version = 1.5
 
 default_file_path = os.path.join(r'C:\TwinCAT\3.1\Target', 'StaticRoutes.xml')
 
@@ -589,6 +593,7 @@ def save_cc_xml():
                                              filetypes=[("XML files", "*.xml")])
     if file_path:
         create_cc_xml_from_table(file_path)
+
 ######################################## Modify data directly on table ############################################
 
 def on_double_click(event):
@@ -667,6 +672,7 @@ def create_entry_for_editing(column, row, col_index, current_value):
     entry_edit.bind("<Return>", save_edit)
     entry_edit.bind("<Escape>", lambda e: cancel_edit())
     entry_edit.bind("<FocusOut>", lambda e: cancel_edit())
+
 
 ################################## Sorting ################################################
 def setup_treeview():
@@ -805,6 +811,114 @@ def populate_table_from_db3():
     for item in routes_data:
         treeview.insert("", "end", values=item)
 
+################################# Slipt project and LGV numer ######################################
+def split_string(input_string):
+    # Check if there is an underscore
+    if '_' in input_string:
+        # Split by underscore
+        parts = input_string.split('_')
+    else:
+        # Use regular expression to split between numbers and letters
+        match = re.match(r"([A-Za-z]+)(\d+)([A-Za-z]+\d+)", input_string)
+        if match:
+            parts = [match.group(1) + match.group(2), match.group(3)]
+        else:
+            parts = [input_string]
+
+    return parts
+################################### Create ini file for WinSCP connections ##########################
+# Function to set the custom INI path in the Windows Registry
+def set_custom_ini_path(ini_path):
+    key_path = r'Software\Martin Prikryl\WinSCP 2\Configuration'
+    
+    try:
+        key = reg.OpenKey(reg.HKEY_CURRENT_USER, key_path, 0, reg.KEY_SET_VALUE)
+        reg.SetValueEx(key, "ConfigurationStorage", 0, reg.REG_DWORD, 2)
+        reg.SetValueEx(key, "CustomIniFile", 0, reg.REG_SZ, ini_path)
+        reg.CloseKey(key)
+        return True
+    except Exception as e:
+        print(f"Failed to set registry key: {e}")
+        return False
+    
+# Function to check if a HostName already exists in the INI file
+def hostname_exists(config, host_name):
+    for section in config.sections():
+        if config.has_option(section, 'HostName') and config.get(section, 'HostName') == host_name:
+            return True
+    return False
+
+# Function to create a session in the winscp.ini file
+def create_winscp_ini_from_table(ini_path):
+    # Ensure the directory for the INI file exists
+    ini_dir = os.path.dirname(ini_path)
+    os.makedirs(ini_dir, exist_ok=True)
+
+    # Set the custom INI path in the registry
+    if not set_custom_ini_path(ini_path):
+        return "Failed to set the custom INI path in the registry."
+
+    # Create config parser and read the INI file (if it exists)
+    config = configparser.ConfigParser()
+    if os.path.exists(ini_path):
+        config.read(ini_path)
+
+    data = get_table_data()
+
+    for row in data: 
+        name, address, netid, tc_type = row
+        name_parts = split_string(str(name))
+        folder_name = name_parts[0]
+        session_name = name_parts[1]
+
+        section_name = f'Sessions\\{folder_name}/{session_name}'
+
+        # Check if the HostName already exists
+        if hostname_exists(config, address):
+            print("HostName already exists.")
+            return 
+
+        # Define session details
+        config[section_name] = {
+            'HostName': address,
+            'PortNumber': '20022' if tc_type == "TC3" else '21',
+            'UserName': 'Administrator' if tc_type == "TC3" else 'anonymous',
+            'Password': 'A35C45504648113EE96A1003AC13A5A41D38313532352F282E3D28332E6D6B6E726E6C726E726A6A6D84CA5BFA50425E8C85' if tc_type == "TC3" else 'A35C755E6D593D323332253133292F6D6B6E726E6C726E72696D3D323332253133292F1C39243D312C3039723F333130FAB0',
+        }
+
+        # Add FSProtocol only for FTP
+        if tc_type == "TC2":
+            config[section_name]['FSProtocol'] = '5'
+
+        # Handle SshHostKeys separately to avoid duplicates
+        ssh_key = 'ecdsa-sha2-nistp384@20022'
+        if config.has_section('SshHostKeys'):
+            if ssh_key not in config['SshHostKeys']:
+                config.set('SshHostKeys', ssh_key, 'value')
+        else:
+            config['SshHostKeys'] = {ssh_key: 'value'}
+
+
+    # Write the session to the INI file
+    with open(ini_path, 'w') as configfile:
+        config.write(configfile)
+
+    messagebox.showinfo("Success", f"Session created successfully in {ini_path}")
+
+def save_winscp_ini():
+    # Custom path for the INI file (not in Roaming)
+    file_path = r'C:\WinSCPConfig\WinSCP.ini'  # Adjust this path if needed
+
+    if get_table_data() == []:
+        messagebox.showerror("Attention", "Routes table is empty!")
+        return
+    # file_path = filedialog.asksaveasfilename(defaultextension=".ini",
+    #                                          initialdir= os.path.join(os.path.expanduser("~"), "Documents"),
+    #                                          initialfile="WinSCP.ini",
+    #                                          filetypes=[("INI files", "*.ini")])
+    if file_path:
+        create_winscp_ini_from_table(file_path)
+
 
 ################################### Button design ##########################################
 def on_enter(e):
@@ -823,7 +937,7 @@ def button_design(entry):
 
 ####################################### Set up the GUI ######################################
 root = tk.Tk()
-root.title("Static Routes XML Creator 1.4")
+root.title(f"Static Routes XML Creator {version}")
 
 #Disable resizing
 root.resizable(False, False)
@@ -941,12 +1055,22 @@ save_button = tk.Button(frame_xml, text="Save StaticRoutes.xml",
 save_button.grid(row=0, column=1, padx=10, pady=10)
 button_design(save_button)
 
+frame_save_ext = tk.Frame(frame_xml)
+frame_save_ext.grid(row=0, column=2, padx=5, pady=5)
+
 # Button to save the ControlCenter.xml file
-create_cc_button = tk.Button(frame_xml, text="Save ControlCenter file", 
+create_cc_button = tk.Button(frame_save_ext, text="Save ControlCenter file", 
                              bg="ghost white", 
                              command=save_cc_xml)
-create_cc_button.grid(row=0, column=2, padx=10, pady=10)
+create_cc_button.grid(row=0, column=0, padx=5, pady=5)
 button_design(create_cc_button)
+
+# Button to save WinSCP.ini file
+create_winscp_ini_button = tk.Button(frame_save_ext, text="      Save WinSCP.ini      ", 
+                             bg="ghost white", 
+                             command=save_winscp_ini)
+create_winscp_ini_button.grid(row=1, column=0, padx=5, pady=5)
+button_design(create_winscp_ini_button)
 
 
 

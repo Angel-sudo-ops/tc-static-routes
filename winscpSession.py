@@ -6,7 +6,7 @@ from tkinter import messagebox
 
 # Function to set the custom INI path in the Windows Registry
 def set_custom_ini_path(ini_path):
-    key_path = r'Software\\Martin Prikryl\\WinSCP 2\\Configuration'
+    key_path = r'Software\Martin Prikryl\WinSCP 2\Configuration'
     
     try:
         key = reg.OpenKey(reg.HKEY_CURRENT_USER, key_path, 0, reg.KEY_SET_VALUE)
@@ -19,7 +19,7 @@ def set_custom_ini_path(ini_path):
         return False
 
 # Function to create a session in the winscp.ini file
-def create_session(host_name, transfer_type, session_name, ini_path):
+def create_session(host_name, transfer_type, folder_name, session_name, ini_path):
     # Ensure the directory for the INI file exists
     ini_dir = os.path.dirname(ini_path)
     os.makedirs(ini_dir, exist_ok=True)
@@ -33,9 +33,9 @@ def create_session(host_name, transfer_type, session_name, ini_path):
     if os.path.exists(ini_path):
         config.read(ini_path)
 
-    # Define the section name based on the session name
-    section_name = f'Sessions\\{session_name}'
-
+    # Define the section name based on the folder and session name
+    section_name = f'Sessions\\{folder_name}/{session_name}'
+    
     # Check if the session already exists
     if config.has_section(section_name):
         return "Session already exists."
@@ -62,16 +62,17 @@ def create_session(host_name, transfer_type, session_name, ini_path):
 def on_create():
     host_name = host_entry.get().strip()
     transfer_type = type_var.get().strip()
+    folder_name = folder_entry.get().strip()
     session_name = session_entry.get().strip()
 
     # Custom path for the INI file (not in Roaming)
     ini_path = r'C:\WinSCPConfig\WinSCP.ini'  # Adjust this path if needed
 
-    if not host_name or not transfer_type or not session_name:
+    if not host_name or not transfer_type or not folder_name or not session_name:
         messagebox.showwarning("Input Error", "Please provide all required inputs.")
         return
 
-    result = create_session(host_name, transfer_type, session_name, ini_path)
+    result = create_session(host_name, transfer_type, folder_name, session_name, ini_path)
     
     if "successfully" in result:
         messagebox.showinfo("WinSCP Session", result)
@@ -95,6 +96,10 @@ root.title("WinSCP Session Creator")
 tk.Label(root, text="Host Name:").pack(pady=5)
 host_entry = tk.Entry(root, width=50)
 host_entry.pack(pady=5)
+
+tk.Label(root, text="Folder Name:").pack(pady=5)
+folder_entry = tk.Entry(root, width=50)
+folder_entry.pack(pady=5)
 
 tk.Label(root, text="Session Name:").pack(pady=5)
 session_entry = tk.Entry(root, width=50)
