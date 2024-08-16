@@ -1,20 +1,21 @@
 import configparser
 import os
+import subprocess
 import tkinter as tk
 from tkinter import messagebox
 
+# Path to the custom winscp.ini file
+custom_ini_path = r'C:\WinSCPConfig\WinSCP.ini'  # Change this path if needed
+
 # Function to create a session in the winscp.ini file
 def create_session(host_name, transfer_type, folder_name, session_name):
-    # Path to the winscp.ini file (writing to a different path for testing)
-    ini_path = os.path.expanduser('~\\AppData\\Roaming\\WinSCP.ini')  # Adjust this path if needed
-
     # Ensure the directory exists
-    os.makedirs(os.path.dirname(ini_path), exist_ok=True)
+    os.makedirs(os.path.dirname(custom_ini_path), exist_ok=True)
 
     # Create config parser and read the INI file (if it exists)
     config = configparser.ConfigParser()
-    if os.path.exists(ini_path):
-        config.read(ini_path)
+    if os.path.exists(custom_ini_path):
+        config.read(custom_ini_path)
 
     # Define the section name based on the folder and session name
     section_name = f'Sessions\\{folder_name}/{session_name}'
@@ -29,7 +30,6 @@ def create_session(host_name, transfer_type, folder_name, session_name):
         'PortNumber': '20022' if transfer_type.lower() == 'sftp' else '21',
         'UserName': 'Administrator' if transfer_type.lower() == 'sftp' else 'anonymous',
         'Password': 'A35C45504648113EE96A1003AC13A5A41D38313532352F282E3D28332E6D6B6E726E6C726E726A6A6D84CA5BFA50425E8C85' if transfer_type.lower() == 'sftp' else 'A35C755E6D593D323332253133292F6D6B6E726E6C726E72696D3D323332253133292F1C39243D312C3039723F333130FAB0',
-
     }
 
     # Add FSProtocol only for FTP
@@ -37,10 +37,10 @@ def create_session(host_name, transfer_type, folder_name, session_name):
         config[section_name]['FSProtocol'] = '5'
 
     # Write the session to the INI file
-    with open(ini_path, 'w') as configfile:
+    with open(custom_ini_path, 'w') as configfile:
         config.write(configfile)
 
-    return f"Session created successfully in {ini_path}!"
+    return f"Session created successfully in {custom_ini_path}!"
 
 # Function to handle button click in Tkinter
 def on_create():
@@ -62,13 +62,18 @@ def on_create():
 
 # Function to open the directory containing the INI file
 def open_ini_directory():
-    ini_path = r'C:\Temp\WinSCP.ini'  # Adjust this path if needed
-    ini_dir = os.path.dirname(ini_path)
+    ini_dir = os.path.dirname(custom_ini_path)
     
     if os.path.exists(ini_dir):
         os.startfile(ini_dir)
     else:
         messagebox.showerror("Error", f"Directory not found: {ini_dir}")
+
+# Function to start WinSCP with the custom INI path
+def start_winscp_with_custom_ini():
+    winscp_path = r'C:\Program Files (x86)\WinSCP\WinSCP.exe'  # Adjust if needed
+    command = f'"{winscp_path}" /ini="{custom_ini_path}"'
+    subprocess.run(command)
 
 # Create the main application window
 root = tk.Tk()
@@ -99,6 +104,10 @@ create_button.pack(pady=10)
 # Create a button to open the directory containing the INI file
 open_dir_button = tk.Button(root, text="Open INI Directory", command=open_ini_directory)
 open_dir_button.pack(pady=10)
+
+# Create a button to start WinSCP with the custom INI path
+start_winscp_button = tk.Button(root, text="Start WinSCP", command=start_winscp_with_custom_ini)
+start_winscp_button.pack(pady=10)
 
 # Run the Tkinter event loop
 root.mainloop()
