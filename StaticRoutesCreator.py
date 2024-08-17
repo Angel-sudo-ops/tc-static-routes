@@ -729,7 +729,8 @@ def read_db3_file(db3_file_path, table_name):
         # Check if the table exists
         cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name=?", (table_name,))
         if not cursor.fetchone():
-            messagebox.showerror("Error", f"Table '{table_name}' does not exist in the database.")
+            # messagebox.showerror("Error", f"Table '{table_name}' does not exist in the database.")
+            messagebox.showerror("Error", f"Wrong database format.")
             conn.close()
             return None, None
 
@@ -813,18 +814,22 @@ def populate_table_from_db3():
 
 ################################# Slipt project and LGV numer ######################################
 def split_string(input_string):
-    # Check if there is an underscore
-    if '_' in input_string:
-        # Split by underscore
+    # Regular expression pattern for CCxxxxLGVxx or CCxxxx_LGVxx
+    pattern_with_underscore = r"^CC\d{4}_(LGV|CB|BC)\d{2}$"
+    pattern_without_underscore = r"^CC\d{4}(LGV|CB|BC)\d{2}$"
+    
+    # Check if the input string matches the expected patterns
+    if re.match(pattern_with_underscore, input_string):
+        # Split by underscore if present
         parts = input_string.split('_')
+    elif re.match(pattern_without_underscore, input_string):
+         # Use regular expression to split between the numeric and alphanumeric parts
+        match = re.match(r"(CC\d{4})(LGV\d{2}|CB\d{2}|BC\d{2})", input_string)
+        parts = [match.group(1), match.group(2)]
     else:
-        # Use regular expression to split between numbers and letters
-        match = re.match(r"([A-Za-z]+)(\d+)([A-Za-z]+\d+)", input_string)
-        if match:
-            parts = [match.group(1) + match.group(2), match.group(3)]
-        else:
-            parts = [input_string]
-
+        # Raise a ValueError if the string does not match the expected format
+        messagebox.showerror("Error", "At least one route name does not match the expected format: CCxxxxLGV/CB/BCxx or CCxxxx_LGV/CB/BCxx")
+    
     return parts
 ################################### Create ini file for WinSCP connections ##########################
 # Function to set the custom INI path in the Windows Registry
@@ -861,11 +866,16 @@ def create_winscp_ini_from_table(ini_path):
     # Create config parser and read the INI file (if it exists)
     config = configparser.ConfigParser()
     if os.path.exists(ini_path):
+        if config.has_section("Sessions\CC1548/LGV41"):
+            config.remove_section('SshHostKeys')
         config.read(ini_path)
-
+           
+    
     data = get_table_data()
-
-    for row in data: 
+    repeated = 0
+    total = 0
+    for row in data:
+        total = total + 1 
         name, address, netid, tc_type = row
         name_parts = split_string(str(name))
         folder_name = name_parts[0]
@@ -875,8 +885,9 @@ def create_winscp_ini_from_table(ini_path):
 
         # Check if the HostName already exists
         if hostname_exists(config, address):
+            repeated=repeated+1
             print("HostName already exists.")
-            return 
+            continue 
 
         # Define session details
         config[section_name] = {
@@ -890,20 +901,12 @@ def create_winscp_ini_from_table(ini_path):
         if tc_type == "TC2":
             config[section_name]['FSProtocol'] = '5'
 
-        # Handle SshHostKeys separately to avoid duplicates
-        ssh_key = 'ecdsa-sha2-nistp384@20022'
-        if config.has_section('SshHostKeys'):
-            if ssh_key not in config['SshHostKeys']:
-                config.set('SshHostKeys', ssh_key, 'value')
-        else:
-            config['SshHostKeys'] = {ssh_key: 'value'}
-
 
     # Write the session to the INI file
     with open(ini_path, 'w') as configfile:
         config.write(configfile)
 
-    messagebox.showinfo("Success", f"Session created successfully in {ini_path}")
+    messagebox.showinfo("Success", f"Session created successfully in {ini_path} with {repeated} repeated routes out of {total}")
 
 def save_winscp_ini():
     # Custom path for the INI file (not in Roaming)
@@ -1088,3 +1091,8 @@ root.mainloop()
 # agregar rutas de ads
 
 # add local route by default
+
+# DELETE
+# [Configuration\LastFingerprints]
+# 172.20.2.68=20022:ssh=ecdsa-sha2-nistp384%20384%20iXnY+SMyoQRSUxJMzgWWA+yadddMZqqgM4dLPp/uHhs
+# 172.20.2.68:20022:ssh=ecdsa-sha2-nistp384%20384%20iXnY+SMyoQRSUxJMzgWWA+yadddMZqqgM4dLPp/uHhs
