@@ -1,0 +1,7 @@
+
+    open sftp://your_username@example.com:22/ -privatekey=C:\path\to\private_key.ppk -hostkey="ssh-rsa 2048 ABCDEFGHIJKLMNOPQRSTUVWXYZ" -session=MySession
+    option batch abort
+    option confirm off
+    close
+    save
+    
