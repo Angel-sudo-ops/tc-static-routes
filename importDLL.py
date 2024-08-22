@@ -21,35 +21,31 @@ else:
     # Instantiate the TwinCATCom object using Activator
     twincat_com = Activator.CreateInstance(twin_cat_type)
 
-    # Set a valid AMS Net ID before invoking CreateDLLInstance
+    # Set m_TargetAMSNetID to a valid value before invoking Write
     m_TargetAMSNetID_field = twin_cat_type.GetField("m_TargetAMSNetID", BindingFlags.NonPublic | BindingFlags.Instance)
     if m_TargetAMSNetID_field:
-        m_TargetAMSNetID_field.SetValue(twincat_com, "10.209.80.202.1.1")  # Example AMS Net ID, adjust as needed
+        m_TargetAMSNetID_field.SetValue(twincat_com, "10.209.80.202.1.1")
         print("m_TargetAMSNetID set successfully.")
-    else:
-        print("Failed to retrieve m_TargetAMSNetID field")
 
-    # Get the private CreateDLLInstance method via reflection
-    create_dll_instance_method = twin_cat_type.GetMethod(
-        "CreateDLLInstance",
-        BindingFlags.NonPublic | BindingFlags.Instance
-    )
+    # Now, use the Write method to trigger CreateDLLInstance indirectly
+    write_method = twin_cat_type.GetMethod("Write", BindingFlags.Public | BindingFlags.Instance)
 
-    # Invoke the CreateDLLInstance method if found
-    if create_dll_instance_method:
-        print("Calling CreateDLLInstance directly...")
-        create_dll_instance_method.Invoke(twincat_com, None)
-        print("CreateDLLInstance called successfully.")
+    if write_method:
+        print("Calling Write method to trigger CreateDLLInstance...")
+        start_address = "SomeAddress"  # Example, replace with the actual address you need
+        data_to_write = ["data1", "data2"]  # Example data, adjust accordingly
+        number_of_elements = 2  # Example, adjust as needed
+
+        write_method.Invoke(twincat_com, [start_address, data_to_write, number_of_elements])
+        print("Write method called successfully, CreateDLLInstance should be triggered if needed.")
     else:
-        print("Failed to locate CreateDLLInstance method")
+        print("Failed to locate Write method")
 
     # Additional debugging to see if MyDLLInstance has been set
     my_dll_instance_field = twin_cat_type.GetField("MyDLLInstance", BindingFlags.NonPublic | BindingFlags.Instance)
     if my_dll_instance_field:
         my_dll_instance_value = my_dll_instance_field.GetValue(twincat_com)
         print(f"MyDLLInstance value: {my_dll_instance_value}")
-    else:
-        print("Failed to retrieve MyDLLInstance field")
 
     # Now proceed with setting properties and calling CreateRoute
     twincat_com.DisableSubScriptions = True
