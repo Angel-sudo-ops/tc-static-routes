@@ -54,17 +54,11 @@ def initialize_twincat_com():
 
     return twincat_com
 
-def create_route(entry, username, password):
+def create_route(twincat_com, entry, username, password):
     name, ip, net_id, type_ = entry
 
     # Determine the port based on TC2 or TC3
     port = 851 if type_ == 'TC3' else 801
-
-    # Initialize the TwinCATCom object
-    twincat_com = initialize_twincat_com()
-    if not twincat_com:
-        print(f"Initialization failed for {name} ({ip})")
-        return
 
     # Set properties for the current IP
     twincat_com.DisableSubScriptions = True
@@ -86,13 +80,18 @@ def create_route(entry, username, password):
         print(f"Error during CreateRoute invocation for {name} ({ip}): {e}")
 
 def create_routes_from_data(data, username, password):
+    # Initialize TwinCATCom only once
+    twincat_com = initialize_twincat_com()
+    if not twincat_com:
+        print("Failed to initialize TwinCATCom")
+        return
+
     for entry in data:
-        threading.Thread(target=create_route, args=(entry, username, password)).start()
+        threading.Thread(target=create_route, args=(twincat_com, entry, username, password)).start()
 
 # Example usage with your data
 data = [['CC1965_LGV18', '172.20.2.68', '172.20.2.68.1.1', 'TC3'], 
         ['CC1965_LGV17', '172.20.2.67', '172.20.2.67.1.1', 'TC3'], 
-        # ... (add more entries as needed)
        ]
 
 # Call the function with the data, username, and password
