@@ -1060,7 +1060,7 @@ button_design(save_button)
 
 frame_save_ext = tk.Frame(frame_xml)
 frame_save_ext.grid(row=0, column=2, padx=5, pady=5)
-
+    
 # Button to save the ControlCenter.xml file
 create_cc_button = tk.Button(frame_save_ext, text="Save ControlCenter file", 
                              bg="ghost white", 

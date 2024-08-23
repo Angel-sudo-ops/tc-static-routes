@@ -4,6 +4,7 @@ from System import Activator
 from System import Type
 from System.Reflection import BindingFlags
 from System.Net import IPAddress
+from System import Array
 
 # Load the assembly explicitly if not already done
 clr.AddReference('CRADSDriver')
@@ -27,14 +28,24 @@ else:
         m_TargetAMSNetID_field.SetValue(twincat_com, "10.209.80.202.1.1")
         print("m_TargetAMSNetID set successfully.")
 
-    # Now, use the Write method to trigger CreateDLLInstance indirectly
-    write_method = twin_cat_type.GetMethod("Write", BindingFlags.Public | BindingFlags.Instance)
+    # Get the specific Write method with the correct parameter types
+    string_type = clr.GetClrType(str)
+    array_string_type = clr.GetClrType(System.Array[System.String])
+    ushort_type = clr.GetClrType(System.UInt16)
+
+    write_method = twin_cat_type.GetMethod(
+        "Write",
+        BindingFlags.Public | BindingFlags.Instance,
+        None,
+        Array[Type]([string_type, array_string_type, ushort_type]),
+        None
+    )
 
     if write_method:
         print("Calling Write method to trigger CreateDLLInstance...")
         start_address = "SomeAddress"  # Example, replace with the actual address you need
-        data_to_write = ["data1", "data2"]  # Example data, adjust accordingly
-        number_of_elements = 2  # Example, adjust as needed
+        data_to_write = Array[str](["data1", "data2"])  # Example data, adjust accordingly
+        number_of_elements = System.UInt16(2)  # Example, adjust as needed
 
         write_method.Invoke(twincat_com, [start_address, data_to_write, number_of_elements])
         print("Write method called successfully, CreateDLLInstance should be triggered if needed.")
@@ -49,7 +60,8 @@ else:
 
     # Now proceed with setting properties and calling CreateRoute
     twincat_com.DisableSubScriptions = True
-    twincat_com.Password = "your_password"
+    twincat_com.Password = "1"
+    twincat_com.PollRateOverride = 500
     twincat_com.TargetAMSNetID = "10.209.80.202.1.1"  # Ensure this matches the AMS Net ID set earlier
     twincat_com.TargetIPAddress = "10.209.80.202"
     twincat_com.TargetAMSPort = 851
