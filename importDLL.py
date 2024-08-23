@@ -5,10 +5,24 @@ from System import Type
 from System.Reflection import BindingFlags
 from System.Net import IPAddress
 import threading
+import os
+import sys
 
 def initialize_twincat_com():
+    # Determine if the application is running as a standalone executable
+    if getattr(sys, 'frozen', False):
+        # If the application is frozen (bundled by PyInstaller), get the path of the executable
+        base_path = sys._MEIPASS
+    else:
+        # If running as a script, use the current directory
+        base_path = os.path.dirname(os.path.abspath(__file__))
+
+    # Construct the full path to the DLL
+    dll_path = os.path.join(base_path, "CRADSDriver.dll")
+
+
     # Load the assembly
-    clr.AddReference('CRADSDriver')
+    clr.AddReference(dll_path)
 
     # Use the fully qualified name, including the assembly name, if necessary
     assembly_name = "CRADSDriver"
@@ -75,9 +89,9 @@ def create_route(twincat_com, entry, username, password, netid_ip):
     # Call CreateRoute
     try:
         result = twincat_com.CreateRoute(name, local_ip)
-        print(f"Route created successfully for {name} ({ip}), result: {result}")
+        print(f"Route created successfully for {name} ({ip}), result: {result}\n")
     except Exception as e:
-        print(f"Error during CreateRoute invocation for {name} ({ip}): {e}")
+        print(f"Error during CreateRoute invocation for {name} ({ip}): {e}\n")
 
 def create_routes_from_data(data, username, password):
     # Initialize TwinCATCom only once
