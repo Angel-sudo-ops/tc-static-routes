@@ -503,7 +503,7 @@ def get_table_data():
         rows.append(treeview.item(item)["values"])
     print(rows)
     return rows
-
+    
 def create_routes_xml_from_table(file_path):
     data = get_table_data()
     # Create the root element

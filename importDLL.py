@@ -20,7 +20,7 @@ def initialize_twincat_com():
     # Construct the full path to the DLL
     dll_path = os.path.join(base_path, "CRADSDriver.dll")
 
-
+    
     # Load the assembly
     clr.AddReference(dll_path)
 
