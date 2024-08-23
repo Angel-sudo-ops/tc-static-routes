@@ -54,7 +54,7 @@ def initialize_twincat_com():
 
     return twincat_com
 
-def create_route(entry):
+def create_route(entry, username, password):
     name, ip, net_id, type_ = entry
 
     # Determine the port based on TC2 or TC3
@@ -68,12 +68,12 @@ def create_route(entry):
 
     # Set properties for the current IP
     twincat_com.DisableSubScriptions = True
-    twincat_com.Password = "1"
+    twincat_com.Password = password
     twincat_com.PollRateOverride = 500
     twincat_com.TargetAMSNetID = net_id
     twincat_com.TargetIPAddress = ip
     twincat_com.TargetAMSPort = port
-    twincat_com.UserName = "Administrator"
+    twincat_com.UserName = username
     twincat_com.UseStaticRoute = True
 
     local_ip = IPAddress.Parse(ip)
@@ -85,9 +85,9 @@ def create_route(entry):
     except Exception as e:
         print(f"Error during CreateRoute invocation for {name} ({ip}): {e}")
 
-def create_routes_from_data(data):
+def create_routes_from_data(data, username, password):
     for entry in data:
-        threading.Thread(target=create_route, args=(entry,)).start()
+        threading.Thread(target=create_route, args=(entry, username, password)).start()
 
 # Example usage with your data
 data = [['CC1965_LGV18', '172.20.2.68', '172.20.2.68.1.1', 'TC3'], 
@@ -95,5 +95,5 @@ data = [['CC1965_LGV18', '172.20.2.68', '172.20.2.68.1.1', 'TC3'],
         # ... (add more entries as needed)
        ]
 
-# Call the function with the data
-create_routes_from_data(data)
+# Call the function with the data, username, and password
+create_routes_from_data(data, "Administrator", "1")
