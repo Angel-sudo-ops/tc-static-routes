@@ -54,8 +54,8 @@ def initialize_twincat_com():
 
     return twincat_com
 
-def create_route(twincat_com, entry, username, password):
-    name, ip, net_id, type_ = entry
+def create_route(twincat_com, entry, username, password, netid_ip):
+    name, ip, amsnet_id, type_ = entry
 
     # Determine the port based on TC2 or TC3
     port = 851 if type_ == 'TC3' else 801
@@ -64,13 +64,13 @@ def create_route(twincat_com, entry, username, password):
     twincat_com.DisableSubScriptions = True
     twincat_com.Password = password
     twincat_com.PollRateOverride = 500
-    twincat_com.TargetAMSNetID = net_id
+    twincat_com.TargetAMSNetID = amsnet_id
     twincat_com.TargetIPAddress = ip
     twincat_com.TargetAMSPort = port
     twincat_com.UserName = username
     twincat_com.UseStaticRoute = True
 
-    local_ip = IPAddress.Parse(ip)
+    local_ip = IPAddress.Parse(netid_ip)
 
     # Call CreateRoute
     try:
@@ -85,12 +85,12 @@ def create_routes_from_data(data, username, password):
     if not twincat_com:
         print("Failed to initialize TwinCATCom")
         return
-
+    netid_ip = '10.230.0.34' #Replace this with a method to get AMS Net ID
     for entry in data:
-        threading.Thread(target=create_route, args=(twincat_com, entry, username, password)).start()
+        threading.Thread(target=create_route, args=(twincat_com, entry, username, password, netid_ip)).start()
 
 # Example usage with your data
-data = [['CC1965_LGV18', '172.20.2.68', '172.20.2.68.1.1', 'TC3'], 
+data = [['CC1965_LGV18', '172.20.2.68', '172.20.2.68.1.1', 'TC2'], 
         ['CC1965_LGV17', '172.20.2.67', '172.20.2.67.1.1', 'TC3'], 
        ]
 
