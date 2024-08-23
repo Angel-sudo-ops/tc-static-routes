@@ -7,7 +7,7 @@ from System.Net import IPAddress
 import os
 import sys
 
-def get_local_ams_netid():
+def load_dll():
     # Determine if the application is running as a standalone executable
     if getattr(sys, 'frozen', False):
         # If the application is frozen (bundled by PyInstaller), get the path of the executable
@@ -22,6 +22,8 @@ def get_local_ams_netid():
     # Load the assembly
     clr.AddReference(dll_path)
 
+def get_local_ams_netid():
+    
     # Use the fully qualified name, including the assembly name, if necessary
     assembly_name = "CRADSDriver"
     type_name = "TwinCATAds.ADSforTwinCAT, " + assembly_name
@@ -34,14 +36,11 @@ def get_local_ams_netid():
         return None
 
     # Instantiate the TwinCATCom object using Activator
-    ads_twincat_com = Activator.CreateInstance(ads_twincat_type)
+    ads_twincat = Activator.CreateInstance(ads_twincat_type)
 
-    return ads_twincat_com.get_MyAMSNetID()
-
-
-
-
+    return ads_twincat.get_MyAMSNetID()
 
 # Example usage
+load_dll()
 local_ams_netid = get_local_ams_netid()
 print(f"Local AMS NetID: {local_ams_netid}")
