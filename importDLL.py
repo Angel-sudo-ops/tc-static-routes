@@ -28,7 +28,19 @@ else:
         m_TargetAMSNetID_field.SetValue(twincat_com, "10.209.80.202.1.1")
         print("m_TargetAMSNetID set successfully.")
 
-    # Get the specific Write method with the correct parameter types
+    # Check MyDLLInstance value before proceeding
+    my_dll_instance_field = twin_cat_type.GetField("MyDLLInstance", BindingFlags.NonPublic | BindingFlags.Instance)
+    if my_dll_instance_field:
+        my_dll_instance_value = my_dll_instance_field.GetValue(twincat_com)
+        print(f"Initial MyDLLInstance value: {my_dll_instance_value}")
+    
+    # Check the DLL dictionary
+    dll_field = twin_cat_type.GetField("DLL", BindingFlags.NonPublic | BindingFlags.Static)
+    if dll_field:
+        dll_dict = dll_field.GetValue(None)
+        print(f"DLL Dictionary contains {len(dll_dict)} items before Write")
+
+    # Attempt to invoke Write method
     string_type = clr.GetClrType(str)
     array_string_type = clr.GetClrType(System.Array[System.String])
     ushort_type = clr.GetClrType(System.UInt16)
@@ -47,16 +59,16 @@ else:
         data_to_write = Array[str](["data1", "data2"])  # Example data, adjust accordingly
         number_of_elements = System.UInt16(2)  # Example, adjust as needed
 
-        write_method.Invoke(twincat_com, [start_address, data_to_write, number_of_elements])
-        print("Write method called successfully, CreateDLLInstance should be triggered if needed.")
-    else:
-        print("Failed to locate Write method")
+        try:
+            write_method.Invoke(twincat_com, [start_address, data_to_write, number_of_elements])
+            print("Write method called successfully.")
+        except Exception as e:
+            print(f"Error during Write method invocation: {e}")
 
-    # Additional debugging to see if MyDLLInstance has been set
-    my_dll_instance_field = twin_cat_type.GetField("MyDLLInstance", BindingFlags.NonPublic | BindingFlags.Instance)
-    if my_dll_instance_field:
-        my_dll_instance_value = my_dll_instance_field.GetValue(twincat_com)
-        print(f"MyDLLInstance value: {my_dll_instance_value}")
+    # Check the DLL dictionary after Write
+    if dll_field:
+        dll_dict = dll_field.GetValue(None)
+        print(f"DLL Dictionary contains {len(dll_dict)} items after Write")
 
     # Now proceed with setting properties and calling CreateRoute
     twincat_com.DisableSubScriptions = True
