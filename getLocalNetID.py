@@ -6,6 +6,7 @@ from System.Reflection import BindingFlags
 from System.Net import IPAddress
 import os
 import sys
+import platform
 
 def load_dll():
     # Determine if the application is running as a standalone executable
@@ -23,7 +24,6 @@ def load_dll():
     clr.AddReference(dll_path)
 
 def get_local_ams_netid():
-    
     # Use the fully qualified name, including the assembly name, if necessary
     assembly_name = "CRADSDriver"
     type_name = "TwinCATAds.ADSforTwinCAT, " + assembly_name
@@ -40,7 +40,22 @@ def get_local_ams_netid():
 
     return ads_twincat.get_MyAMSNetID()
 
+
 # Example usage
 load_dll()
 local_ams_netid = get_local_ams_netid()
 print(f"Local AMS NetID: {local_ams_netid}")
+
+system_name = platform.system()
+node_name = platform.node()
+release = platform.release()
+version = platform.version()
+machine = platform.machine()
+processor = platform.processor()
+
+print(f"System Name: {system_name}")
+print(f"Node Name: {node_name}")
+print(f"Release: {release}")
+print(f"Version: {version}")
+print(f"Machine: {machine}")
+print(f"Processor: {processor}")
