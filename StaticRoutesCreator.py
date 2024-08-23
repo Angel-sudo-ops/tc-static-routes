@@ -501,6 +501,7 @@ def get_table_data():
     rows = []
     for item in treeview.get_children():
         rows.append(treeview.item(item)["values"])
+    print(rows)
     return rows
 
 def create_routes_xml_from_table(file_path):
@@ -715,7 +716,6 @@ def natural_keys(text):
     """
     Alphanumeric (natural) sort to handle numbers within strings correctly
     """
-    import re
     return [int(c) if c.isdigit() else c for c in re.split('(\d+)', text)]
 
 

@@ -23,10 +23,10 @@ else:
     twincat_com = Activator.CreateInstance(twin_cat_type)
 
     # Set m_TargetAMSNetID to a valid value before proceeding
-    m_TargetAMSNetID_field = twin_cat_type.GetField("m_TargetAMSNetID", BindingFlags.NonPublic | BindingFlags.Instance)
-    if m_TargetAMSNetID_field:
-        m_TargetAMSNetID_field.SetValue(twincat_com, "10.209.80.202.1.1")
-        print("m_TargetAMSNetID set successfully.")
+    # m_TargetAMSNetID_field = twin_cat_type.GetField("m_TargetAMSNetID", BindingFlags.NonPublic | BindingFlags.Instance)
+    # if m_TargetAMSNetID_field:
+    #     m_TargetAMSNetID_field.SetValue(twincat_com, "10.209.80.202.1.1")
+    #     print("m_TargetAMSNetID set successfully.")
 
     # Manually invoke CreateDLLInstance method to ensure initialization
     create_dll_instance_method = twin_cat_type.GetMethod(
