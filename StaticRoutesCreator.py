@@ -8,7 +8,7 @@ import sqlite3
 import winreg as reg
 import configparser
 
-version = 1.5
+__version__ = '1.5'
 
 default_file_path = os.path.join(r'C:\TwinCAT\3.1\Target', 'StaticRoutes.xml')
 
@@ -716,7 +716,7 @@ def natural_keys(text):
     """
     Alphanumeric (natural) sort to handle numbers within strings correctly
     """
-    return [int(c) if c.isdigit() else c for c in re.split('(\d+)', text)]
+    return [int(c) if c.isdigit() else c for c in re.split(r'(\d+)', text)]
 
 
 #################################### Read config.db3 #######################################
@@ -866,7 +866,7 @@ def create_winscp_ini_from_table(ini_path):
     # Create config parser and read the INI file (if it exists)
     config = configparser.ConfigParser()
     if os.path.exists(ini_path):
-        if config.has_section("Sessions\CC1548/LGV41"):
+        if config.has_section(r"Sessions\CC1548/LGV41"):
             config.remove_section('SshHostKeys')
         config.read(ini_path)
            
@@ -940,7 +940,7 @@ def button_design(entry):
 
 ####################################### Set up the GUI ######################################
 root = tk.Tk()
-root.title(f"Static Routes XML Creator {version}")
+root.title(f"Static Routes XML Creator {__version__}")
 
 #Disable resizing
 root.resizable(False, False)
