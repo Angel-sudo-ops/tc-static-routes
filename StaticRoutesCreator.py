@@ -1,5 +1,7 @@
 import sys
 import os
+import platform
+import threading
 import re
 import tkinter as tk
 from tkinter import messagebox, filedialog, ttk
@@ -8,8 +10,14 @@ from xml.dom import minidom
 import sqlite3
 import winreg as reg
 import configparser
+import clr
+import System
+from System import Activator 
+from System import Type
+from System.Reflection import BindingFlags
+from System.Net import IPAddress
 
-__version__ = '1.6'
+__version__ = '1.7'
 
 default_file_path = os.path.join(r'C:\TwinCAT\3.1\Target', 'StaticRoutes.xml')
 
@@ -923,6 +931,153 @@ def save_winscp_ini():
     if file_path:
         create_winscp_ini_from_table(file_path)
 
+######################################################## Create Routes ############################################################################
+
+def load_dll():
+    # Determine if the application is running as a standalone executable
+    if getattr(sys, 'frozen', False):
+        # If the application is frozen (bundled by PyInstaller), get the path of the executable
+        base_path = sys._MEIPASS
+    else:
+        # If running as a script, use the current directory
+        base_path = os.path.dirname(os.path.abspath(__file__))
+
+    # Construct the full path to the DLL
+    dll_path = os.path.join(base_path, "CRADSDriver.dll")
+
+    # Load the assembly
+    clr.AddReference(dll_path)
+
+def initialize_twincat_com():
+    # Use the fully qualified name, including the assembly name, if necessary
+    assembly_name = "CRADSDriver"
+    type_name = "TwinCATAds.TwinCATCom, " + assembly_name
+
+    # Get the type using the fully qualified name
+    twincat_type = Type.GetType(type_name)
+
+    if twincat_type is None:
+        print(f"Failed to find type '{type_name}'")
+        return None
+
+    # Instantiate the TwinCATCom object using Activator
+    twincat_com = Activator.CreateInstance(twincat_type)
+
+    # Manually invoke CreateDLLInstance method to ensure initialization
+    create_dll_instance_method = twincat_type.GetMethod(
+        "CreateDLLInstance",
+        BindingFlags.NonPublic | BindingFlags.Instance
+    )
+    if create_dll_instance_method:
+        create_dll_instance_method.Invoke(twincat_com, None)
+    else:
+        print("Failed to locate CreateDLLInstance method")
+        return None
+
+    # Check the DLL dictionary and manually add an entry if necessary
+    my_dll_instance_field = twincat_type.GetField("MyDLLInstance", BindingFlags.NonPublic | BindingFlags.Instance)
+    dll_field = twincat_type.GetField("DLL", BindingFlags.NonPublic | BindingFlags.Static)
+    
+    if my_dll_instance_field and dll_field:
+        my_dll_instance_value = my_dll_instance_field.GetValue(twincat_com)
+        dll_dict = dll_field.GetValue(None)
+        print(f"MyDLLInstance value after CreateDLLInstance: {my_dll_instance_value}")
+        print(f"DLL Dictionary contains {len(dll_dict)} items after CreateDLLInstance")
+
+        if my_dll_instance_value not in dll_dict:
+            ads_for_twincat_ex_type = Type.GetType("TwinCATAds.ADSforTwinCATEx, " + assembly_name)
+            if ads_for_twincat_ex_type:
+                ads_for_twincat_ex = Activator.CreateInstance(ads_for_twincat_ex_type)
+                # ADSforTwinCATEx is the type of values for the DLL dictionary
+                dll_dict[my_dll_instance_value] = ads_for_twincat_ex 
+                print(f"Manually added DLL entry for key {my_dll_instance_value}")
+            else:
+                print("Failed to create ADSforTwinCATEx instance")
+                return None
+            
+    # Check the DLL dictionary after manual insertion
+    if dll_field:
+        dll_dict = dll_field.GetValue(None)
+        print(f"DLL Dictionary contains {len(dll_dict)} items after manual insertion")
+
+    return twincat_com
+
+def get_local_ams_netid():
+    # Use the fully qualified name, including the assembly name, if necessary
+    assembly_name = "CRADSDriver"
+    type_name = "TwinCATAds.ADSforTwinCAT, " + assembly_name
+
+    # Get the type using the fully qualified name
+    ads_twincat_type = Type.GetType(type_name)
+
+    if ads_twincat_type is None:
+        print(f"Failed to find type '{type_name}'")
+        return None
+
+    # Instantiate the TwinCATCom object using Activator
+    ads_twincat = Activator.CreateInstance(ads_twincat_type)
+
+    local_ams_netid = ads_twincat.get_MyAMSNetID()
+    print(f"Local AMS NetID: {local_ams_netid}")
+
+    return local_ams_netid
+
+def create_route(twincat_com, entry, username, password, netid_ip, system_name):
+    name, ip, amsnet_id, type_ = entry
+
+    # Determine the port based on TC2 or TC3
+    port = 851 if type_ == 'TC3' else 801
+
+    # Set properties for the current IP
+    twincat_com.DisableSubScriptions = True
+    twincat_com.Password = password
+    twincat_com.PollRateOverride = 500
+    twincat_com.TargetAMSNetID = amsnet_id
+    twincat_com.TargetIPAddress = ip
+    twincat_com.TargetAMSPort = port
+    twincat_com.UserName = username
+    twincat_com.UseStaticRoute = True
+
+    local_ip = IPAddress.Parse(netid_ip)
+
+    # Call CreateRoute
+    try:
+        result = twincat_com.CreateRoute(system_name, local_ip)
+        print(f"Route created successfully for {name} ({ip}), result: {result}\n")
+    except Exception as e:
+        print(f"Error during CreateRoute invocation for {name} ({ip}): {e}\n")
+
+def create_routes_from_data(data, username, password):
+    load_dll()
+    # Initialize TwinCATCom only once
+    twincat_com = initialize_twincat_com()
+    if not twincat_com:
+        print("Failed to initialize TwinCATCom")
+        return
+    # netid_ip = '10.230.0.34' #Replace this with a method to get AMS Net ID
+    netid = str(get_local_ams_netid()).split('.')
+    netid_ip = '.'.join(netid[:4])
+    system_name = platform.node()
+    print(f"IP: {netid_ip}")
+    print(f"System Name: {system_name}")
+    for entry in data:
+        threading.Thread(target=create_route, args=(twincat_com, entry, username, password, netid_ip, system_name)).start()
+
+def create_tc_routes():
+    data = get_table_data()
+    username = username_entry.get()
+    password = password_entry.get()
+    if username == "":
+        messagebox.showerror("Attention", "Add username!")
+        return
+    if password == "":
+        messagebox.showerror("Attention", "Add password!")
+        return
+    if data == []:
+        messagebox.showerror("Attention", "Routes table is empty!")
+        return
+    create_routes_from_data(data, username, password)
+
 
 ################################### Button design ##########################################
 def on_enter(e):
@@ -951,7 +1106,7 @@ else:
 root.iconbitmap(icon_path)
 
 window_width = 470
-window_lenght = 480
+window_lenght = 570
 root.geometry(f"{window_width}x{window_lenght}")
 root.minsize(window_width, window_lenght)
 # root.resizable(True, True)
@@ -1019,9 +1174,57 @@ delete_table_button = tk.Button(root, text="Delete Table",
 delete_table_button.grid(row=3, column=1, pady=10)
 button_design(delete_table_button)
 
+
+frame_load = tk.Frame(root, bd=1, relief="groove")
+frame_load.grid(row=4, column=0, columnspan=1, padx=15, pady=5, sticky='w')
+
+load_label = tk.Label(frame_load, text="Load")
+load_label.grid(row=0, column=0, padx=5, pady=0, sticky='w')
+# Add a button to trigger the XML file selection and table population
+load_xml_button = tk.Button(frame_load, text="StaticRoutes.xml", 
+                            bg="ghost white", 
+                            command=populate_table_from_xml)
+load_xml_button.grid(row=1, column=0, padx=10, pady=5)
+button_design(load_xml_button)
+
+load_db3_button = tk.Button(frame_load, text="     Config.db3     ", 
+                            bg="ghost white", 
+                            command=populate_table_from_db3)
+load_db3_button.grid(row=2, column=0, padx=10, pady=5)
+button_design(load_db3_button)
+
+
+frame_login = tk.Frame(root)
+frame_login.grid(row=4, column=0, columnspan=3, padx=5, pady=5)
+
+frame_user = tk.Frame(frame_login)
+frame_user.grid(row=0, column=0, padx=5, pady=0)
+
+username_label = tk.Label(frame_user, text="Username:")
+username_label.grid(row=0, column=0, padx=5, pady=5, sticky='e')
+
+username_entry = tk.Entry(frame_user, width=15)
+username_entry.insert(0, "Administrator")
+username_entry.grid(row=0, column=1, padx=5, pady=5)
+
+frame_password = tk.Frame(frame_login)
+frame_password.grid(row=1, column=0, padx=5, pady=0)
+
+password_label = tk.Label(frame_password, text="Password:")
+password_label.grid(row=0, column=0, padx=5, pady=5, sticky='e')
+
+password_entry = tk.Entry(frame_password, show="*", width=15)
+password_entry.grid(row=0, column=1, padx=5, pady=5)
+
+create_route_button = tk.Button(frame_login, text="Create Routes",
+                                bg="ghost white",
+                                command=create_tc_routes)
+create_route_button.grid(row=0, column=2, padx=5, pady=5)
+button_design(create_route_button)
+
 # Add a frame to hold the Treeview and the scrollbar
 frame_table = tk.Frame(root)
-frame_table.grid(row=4, columnspan=3, padx=15, pady=10)
+frame_table.grid(row=5, columnspan=3, padx=15, pady=10)
 
 # Add a Treeview to display the data
 treeview = ttk.Treeview(frame_table, columns=("Name", "Address", "NetId", "Type"), show="headings", height=10)
@@ -1045,47 +1248,30 @@ treeview.bind('<Delete>', delete_selected_record)
 treeview.bind('<Double-1>', on_double_click)
 
 
-frame_xml = tk.Frame(root)
-frame_xml.grid(row=5, column=0, columnspan=3, padx=5, pady=5)
-frame_load = tk.Frame(frame_xml)
-frame_load.grid(row=0, column=0, padx=10, pady=10)
-# Add a button to trigger the XML file selection and table population
-button_load_xml = tk.Button(frame_load, text="Load StaticRoutes.xml", 
-                            bg="ghost white", 
-                            command=populate_table_from_xml)
-button_load_xml.grid(row=0, column=0, padx=5, pady=5)
-button_design(button_load_xml)
-
-button_load_db3 = tk.Button(frame_load, text="     Load Config.db3     ", 
-                            bg="ghost white", 
-                            command=populate_table_from_db3)
-button_load_db3.grid(row=1, column=0, padx=5, pady=5)
-button_design(button_load_db3)
-
+frame_save_file = tk.Frame(root, bd=1, relief="groove")
+frame_save_file.grid(row=6, column=0, columnspan=3, padx=5, pady=5)
+save_label = tk.Label(frame_save_file, text="Save")
+save_label.grid(row=0, column=0, padx=5, pady=0, sticky='w')
 # Button to save the StaticRoutes.xml file
-save_button = tk.Button(frame_xml, text="Save StaticRoutes.xml", 
+save_xml_button = tk.Button(frame_save_file, text="StaticRoutes.xml", 
                         bg="ghost white", 
                         command=save_routes_xml)
-save_button.grid(row=0, column=1, padx=10, pady=10)
-button_design(save_button)
+save_xml_button.grid(row=1, column=0, padx=5, pady=5)
+button_design(save_xml_button)
 
-frame_save_ext = tk.Frame(frame_xml)
-frame_save_ext.grid(row=0, column=2, padx=5, pady=5)
-    
 # Button to save the ControlCenter.xml file
-create_cc_button = tk.Button(frame_save_ext, text="Save ControlCenter file", 
+save_cc_button = tk.Button(frame_save_file, text="ControlCenter file", 
                              bg="ghost white", 
                              command=save_cc_xml)
-create_cc_button.grid(row=0, column=0, padx=5, pady=5)
-button_design(create_cc_button)
+save_cc_button.grid(row=1, column=2, padx=5, pady=5)
+button_design(save_cc_button)
 
 # Button to save WinSCP.ini file
-create_winscp_ini_button = tk.Button(frame_save_ext, text="      Save WinSCP.ini      ", 
+save_winscp_button = tk.Button(frame_save_file, text="      WinSCP.ini      ", 
                              bg="ghost white", 
                              command=save_winscp_ini)
-create_winscp_ini_button.grid(row=1, column=0, padx=5, pady=5)
-button_design(create_winscp_ini_button)
-
+save_winscp_button.grid(row=1, column=3, padx=5, pady=5)
+button_design(save_winscp_button)
 
 
 # Create the context menu
