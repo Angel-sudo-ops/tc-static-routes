@@ -5,7 +5,7 @@ a = Analysis(
     ['StaticRoutesCreator.py'],
     pathex=[],
     binaries=[],
-    datas=[],
+    datas=[('route.ico', '.')],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},

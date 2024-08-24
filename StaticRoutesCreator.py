@@ -1,3 +1,4 @@
+import sys
 import os
 import re
 import tkinter as tk
@@ -8,7 +9,7 @@ import sqlite3
 import winreg as reg
 import configparser
 
-__version__ = '1.5'
+__version__ = '1.6'
 
 default_file_path = os.path.join(r'C:\TwinCAT\3.1\Target', 'StaticRoutes.xml')
 
@@ -942,8 +943,17 @@ def button_design(entry):
 root = tk.Tk()
 root.title(f"Static Routes XML Creator {__version__}")
 
-#Disable resizing
-root.resizable(False, False)
+# Check if running as a script or frozen executable
+if getattr(sys, 'frozen', False):
+    icon_path = os.path.join(sys._MEIPASS, "./route.ico")
+else:
+    icon_path = os.path.abspath("./route.ico")
+root.iconbitmap(icon_path)
+
+root.geometry("470x480")
+root.minsize(470, 480)
+# root.resizable(True, True)
+
 frame_tc = tk.Frame(root)
 frame_tc.grid(row=0, column=1, padx=5, pady=5)
 optionTC = tk.StringVar(value="TC3")
@@ -951,7 +961,6 @@ tc2_radio = tk.Radiobutton(frame_tc, text="TC2", variable=optionTC, value="TC2")
 tc2_radio.grid(row=0, column=0, padx=0, pady=0, sticky='w')
 tc3_radio = tk.Radiobutton(frame_tc, text="TC3", variable=optionTC, value="TC3")
 tc3_radio.grid(row=0, column=1, padx=0, pady=0, sticky='w')
-
 
 frame_project = tk.Frame(root)
 frame_project.grid(row=0, column=0, padx=5, pady=5, sticky='e')
