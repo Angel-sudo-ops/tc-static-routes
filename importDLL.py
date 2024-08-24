@@ -66,7 +66,8 @@ def initialize_twincat_com():
             ads_for_twincat_ex_type = Type.GetType("TwinCATAds.ADSforTwinCATEx, " + assembly_name)
             if ads_for_twincat_ex_type:
                 ads_for_twincat_ex = Activator.CreateInstance(ads_for_twincat_ex_type)
-                dll_dict[my_dll_instance_value] = twincat_com  #ads_for_twincat_ex
+                # ADSforTwinCATEx is the type of values for the DLL dictionary
+                dll_dict[my_dll_instance_value] = ads_for_twincat_ex 
                 print(f"Manually added DLL entry for key {my_dll_instance_value}")
             else:
                 print("Failed to create ADSforTwinCATEx instance")
