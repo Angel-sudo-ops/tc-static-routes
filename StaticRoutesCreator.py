@@ -950,8 +950,10 @@ else:
     icon_path = os.path.abspath("./route.ico")
 root.iconbitmap(icon_path)
 
-root.geometry("470x480")
-root.minsize(470, 480)
+window_width = 470
+window_lenght = 480
+root.geometry(f"{window_width}x{window_lenght}")
+root.minsize(window_width, window_lenght)
 # root.resizable(True, True)
 
 frame_tc = tk.Frame(root)
