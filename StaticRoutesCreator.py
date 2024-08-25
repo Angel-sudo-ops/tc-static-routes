@@ -17,12 +17,12 @@ from System import Type
 from System.Reflection import BindingFlags
 from System.Net import IPAddress
 
-__version__ = '1.7'
+__version__ = '1.9'
 
 default_file_path = os.path.join(r'C:\TwinCAT\3.1\Target', 'StaticRoutes.xml')
 
 class ToolTip:
-    def __init__(self, widget, text, delay=500, fade_duration=500):
+    def __init__(self, widget, text, delay=400, fade_duration=500):
         self.widget = widget
         self.text = text
         self.delay = delay  # delay before showing tooltip in milliseconds
@@ -211,6 +211,11 @@ def validate_and_create_cc():
         return
     convert_static_to_cc(static_file_path, path_to_save_file)
 
+################################################ Validate inputs ##################################################################
+good_input_bg = 'white'
+bad_input_bg = '#fbcbcb' # light red
+good_input_fg = 'black'
+bad_input_fg = '#de021a'
 # Function to validate IP address format
 def validate_ip(ip):
     # Compile the regex pattern for the base IP format 'xxx.xxx.xxx.xxx'
@@ -234,31 +239,60 @@ def validate_ams_net_id(ams_net_id):
 # Real-time validation functions
 def validate_project(*args):
     project = entry_project.get().strip()
-    if project.isdigit() and len(project) == 4:
-        entry_project.config(bg='white')
+    if (project.isdigit() and len(project) == 4):
+        entry_project.config(bg= good_input_bg, fg= good_input_fg)
+        return True
+    elif not project or project == placeholders[entry_project]:
+        entry_project.config(bg= good_input_bg)
+        return  False
     else:
-        entry_project.config(bg='yellow')
+        entry_project.config(bg= bad_input_bg, fg= bad_input_fg)
+        return False
 
-# def validate_limit(*args):
-#     limit = entry_limit.get().strip()
-#     if limit.isdigit() and int(limit) > 0:
-#         entry_limit.config(bg='white')
-#     else:
-#         entry_limit.config(bg='yellow')
-
-# def validate_offset_lgv(*args):
-#     offset_lgv = entry_offsetLGV.get().strip()
-#     if offset_lgv.isdigit() and int(offset_lgv) > 0:
-#         entry_offsetLGV.config(bg='white')
-#     else:
-#         entry_offsetLGV.config(bg='yellow')
+def validate_range(*args):
+    pattern = r"^\d+(-\d+)?(,\d+(-\d+)?)*$"
+    input_range = entry_lgv_range.get().strip()
+    
+    # If the input is empty, reset to good input colors and return False
+    if not input_range or input_range == placeholders[entry_lgv_range]:
+        entry_lgv_range.config(bg=good_input_bg)
+        return False
+    
+    # Check if the input matches the pattern
+    if re.match(pattern, input_range):
+        ranges = input_range.split(',')
+        
+        # Check that each range is in increasing order, starts with a number greater than 0,
+        # and does not have leading zeros
+        for r in ranges:
+            if '-' in r:
+                start, end = r.split('-')
+                if not start.isdigit() or not end.isdigit() or int(start) <= 0 or int(start) > int(end) or start != str(int(start)) or end != str(int(end)):
+                    entry_lgv_range.config(bg=bad_input_bg, fg=bad_input_fg)
+                    return False
+            else:
+                # If it's a single number, ensure it's greater than 0 and does not have leading zeros
+                if not r.isdigit() or int(r) <= 0 or r != str(int(r)):
+                    entry_lgv_range.config(bg=bad_input_bg, fg=bad_input_fg)
+                    return False
+        
+        entry_lgv_range.config(bg=good_input_bg, fg=good_input_fg)
+        return True
+    else:
+        entry_lgv_range.config(bg=bad_input_bg, fg=bad_input_fg)
+        return False
 
 def validate_base_ip(*args):
     base_ip = entry_base_ip.get().strip()
     if validate_ip(base_ip):
-        entry_base_ip.config(bg='white')
+        entry_base_ip.config(bg= good_input_bg, fg= good_input_fg)
+        return True
+    elif not base_ip or base_ip == placeholders[entry_base_ip]:
+        entry_base_ip.config(bg= good_input_bg)
+        return False
     else:
-        entry_base_ip.config(bg='yellow')
+        entry_base_ip.config(bg= bad_input_bg, fg= bad_input_fg)
+        return False
 
 ######################################## placeholders #######################################33
 placeholders = {}
@@ -374,19 +408,15 @@ def populate_table_from_inputs():
     is_tc3 = optionTC.get() == "TC3"
     # is_lgv = optionLGV.get() == "LGV"
 
-    try:
-        if len(project) != 4 or project == placeholders[entry_project]:
-            raise ValueError("Project number must be a 4 digit number")
-        
-    except ValueError as e:
-        messagebox.showerror("Invalid input", str(e))
-        return
+    if not validate_project():
+        messagebox.showerror("Invalid input", "Project number must be a 4 digit number")
+        return 
     
-    if lgv_range is None or lgv_range == placeholders[entry_lgv_range]:
+    if not validate_range():
         messagebox.showerror("Invalid input", "Please enter a valid range")
         return
     
-    if not validate_ip(base_ip) or base_ip == placeholders[entry_base_ip]:
+    if not validate_base_ip():
         messagebox.showerror("Invalid input", "Please enter a valid base IP address in the format 'xxx.xxx.xxx.xxx'")
         return
     
@@ -412,7 +442,6 @@ def populate_table_from_inputs():
                 existing_values[2] == net_id):
                 record_exists = True
                 # messagebox.showwarning("Duplicate Entry", f"The IP {current_ip} already exists.")
-
                 break
 
         # Only add the record if it doesn't already exist
@@ -510,7 +539,7 @@ def get_table_data():
     rows = []
     for item in treeview.get_children():
         rows.append(treeview.item(item)["values"])
-    print(rows)
+    # print(rows)
     return rows
     
 def create_routes_xml_from_table(file_path):
@@ -550,7 +579,7 @@ def create_routes_xml_from_table(file_path):
     messagebox.showinfo("Success", "StaticRoutes file has been created successfully!")
 
 def save_routes_xml():
-    if get_table_data() == []:
+    if not get_table_data():
         messagebox.showerror("Attention", "Routes table is empty!")
         return
     file_path = filedialog.asksaveasfilename(defaultextension=".xml",
@@ -594,7 +623,7 @@ def create_cc_xml_from_table(file_path):
     messagebox.showinfo("Success", "ControlCenter file has been created successfully!")
 
 def save_cc_xml():
-    if get_table_data() == []:
+    if not get_table_data():
         messagebox.showerror("Attention", "Routes table is empty!")
         return
     file_path = filedialog.asksaveasfilename(defaultextension=".xml",
@@ -766,7 +795,7 @@ def read_db3_file(db3_file_path, table_name):
 def populate_table_from_db3():
     project = entry_project.get()
     if len(project) != 4 or project == placeholders[entry_project]:
-        messagebox.showinfo("Attention", "Add project number")
+        messagebox.showinfo("Attention", "Add project number first!")
         return
     
     db3_path = filedialog.askopenfilename(title="Select config.db3 file", 
@@ -921,7 +950,7 @@ def save_winscp_ini():
     # Custom path for the INI file (not in Roaming)
     file_path = r'C:\WinSCPConfig\WinSCP.ini'  # Adjust this path if needed
 
-    if get_table_data() == []:
+    if not get_table_data():
         messagebox.showerror("Attention", "Routes table is empty!")
         return
     # file_path = filedialog.asksaveasfilename(defaultextension=".ini",
@@ -1047,7 +1076,7 @@ def create_route(twincat_com, entry, username, password, netid_ip, system_name):
     except Exception as e:
         print(f"Error during CreateRoute invocation for {name} ({ip}): {e}\n")
 
-def create_routes_from_data(data, username, password):
+def create_tc_routes_from_data(data, username, password):
     load_dll()
     # Initialize TwinCATCom only once
     twincat_com = initialize_twincat_com()
@@ -1064,21 +1093,33 @@ def create_routes_from_data(data, username, password):
         threading.Thread(target=create_route, args=(twincat_com, entry, username, password, netid_ip, system_name)).start()
 
 def create_tc_routes():
+    result = check_inputs()
+    if result is None:
+        return
+    data, username, password = result
+    create_tc_routes_from_data(data, username, password)
+
+def test_tc_routes():
+    result = check_inputs()
+    if result is None:
+        return
+    data, username, password = result
+    print("Test Routes")
+
+def check_inputs():
     data = get_table_data()
     username = username_entry.get()
     password = password_entry.get()
     if username == "":
         messagebox.showerror("Attention", "Add username!")
-        return
+        return None
     if password == "":
         messagebox.showerror("Attention", "Add password!")
-        return
-    if data == []:
+        return None
+    if not data:
         messagebox.showerror("Attention", "Routes table is empty!")
-        return
-    create_routes_from_data(data, username, password)
-
-
+        return None
+    return data, username, password
 ################################### Button design ##########################################
 def on_enter(e):
     if e.widget['state']== "normal":
@@ -1093,7 +1134,6 @@ def button_design(entry):
     entry.bind("<Leave>", on_leave)
     entry.bind("<Button-1>", on_enter)
 
-
 ####################################### Set up the GUI ######################################
 root = tk.Tk()
 root.title(f"Static Routes XML Creator {__version__}")
@@ -1105,7 +1145,7 @@ else:
     icon_path = os.path.abspath("./route.ico")
 root.iconbitmap(icon_path)
 
-window_width = 470
+window_width = 450
 window_lenght = 570
 root.geometry(f"{window_width}x{window_lenght}")
 root.minsize(window_width, window_lenght)
@@ -1142,6 +1182,7 @@ lgv_radio.grid(row=0, column=1, padx=1, pady=1, sticky='w')
 entry_lgv_range = tk.Entry(frame_range, fg="grey")
 entry_lgv_range.grid(row=0, column=1, padx=5, pady=5)
 create_placeholder(entry_lgv_range, "e.g., 1-5,11-17,20-25")
+entry_lgv_range.bind("<KeyRelease>", validate_range)
 
 # Add a button to trigger table population
 button_populate_table = tk.Button(root, text="Update Table", 
@@ -1194,8 +1235,8 @@ load_db3_button.grid(row=2, column=0, padx=10, pady=5)
 button_design(load_db3_button)
 
 
-frame_login = tk.Frame(root)
-frame_login.grid(row=4, column=0, columnspan=3, padx=5, pady=5)
+frame_login = tk.Frame(root, bd=1, relief="groove")
+frame_login.grid(row=4, column=0, columnspan=2, padx=5, pady=5, sticky='e')
 
 frame_user = tk.Frame(frame_login)
 frame_user.grid(row=0, column=0, padx=5, pady=0)
@@ -1216,11 +1257,19 @@ password_label.grid(row=0, column=0, padx=5, pady=5, sticky='e')
 password_entry = tk.Entry(frame_password, show="*", width=15)
 password_entry.grid(row=0, column=1, padx=5, pady=5)
 
-create_route_button = tk.Button(frame_login, text="Create Routes",
+test_routes_button = tk.Button(frame_login, text="  Test Routes  ",
+                                bg="ghost white",
+                                command=test_tc_routes)
+test_routes_button.grid(row=0, column=1, padx=5, pady=5)
+button_design(test_routes_button)
+
+create_routes_button = tk.Button(frame_login, text="Create Routes",
                                 bg="ghost white",
                                 command=create_tc_routes)
-create_route_button.grid(row=0, column=2, padx=5, pady=5)
-button_design(create_route_button)
+create_routes_button.grid(row=1, column=1, padx=5, pady=5)
+button_design(create_routes_button)
+
+
 
 # Add a frame to hold the Treeview and the scrollbar
 frame_table = tk.Frame(root)
