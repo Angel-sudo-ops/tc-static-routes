@@ -4,7 +4,7 @@ import platform
 import threading
 import re
 import tkinter as tk
-from tkinter import messagebox, filedialog, ttk
+from tkinter import messagebox, filedialog, ttk, font
 import xml.etree.ElementTree as ET
 from xml.dom import minidom
 import sqlite3
@@ -17,7 +17,7 @@ from System import Type
 from System.Reflection import BindingFlags
 from System.Net import IPAddress
 
-__version__ = '1.9'
+__version__ = '1.10'
 
 default_file_path = os.path.join(r'C:\TwinCAT\3.1\Target', 'StaticRoutes.xml')
 
@@ -216,6 +216,66 @@ good_input_bg = 'white'
 bad_input_bg = '#fbcbcb' # light red
 good_input_fg = 'black'
 bad_input_fg = '#de021a'
+placeholder_fg = 'grey'
+
+def validate_entry(entry, style_name, validate_func):
+    def inner_validate(*args):
+        if entry.get() != placeholders[entry]:
+            result = validate_func(entry)
+            if result:
+                style.configure(style_name, background=good_input_bg, foreground=good_input_fg)
+            else:
+                style.configure(style_name, background=bad_input_bg, foreground=bad_input_fg)
+        else:
+             style.configure(style_name, background=good_input_bg, foreground=placeholder_fg)
+    return inner_validate
+
+# Real-time validation functions
+def validate_project(*args):
+    project = entry_project.get().strip()
+    if (project.isdigit() and len(project) == 4):
+        return True
+    elif not project or project == placeholders[entry_project]:
+        return  False
+    else:
+        return False
+
+def validate_range(*args):
+    pattern = r"^\d+(-\d+)?(,\d+(-\d+)?)*$"
+    input_range = entry_lgv_range.get().strip()
+    
+    # If the input is empty, reset to good input colors and return False
+    if not input_range or input_range == placeholders[entry_lgv_range]:
+        return False
+    
+    # Check if the input matches the pattern
+    if re.match(pattern, input_range):
+        ranges = input_range.split(',')
+        
+        # Check that each range is in increasing order, starts with a number greater than 0,
+        # and does not have leading zeros
+        for r in ranges:
+            if '-' in r:
+                start, end = r.split('-')
+                if not start.isdigit() or not end.isdigit() or int(start) <= 0 or int(start) > int(end) or start != str(int(start)) or end != str(int(end)):
+                    return False
+            else:
+                # If it's a single number, ensure it's greater than 0 and does not have leading zeros
+                if not r.isdigit() or int(r) <= 0 or r != str(int(r)):
+                    return False
+        return True
+    else:
+        return False
+
+def validate_base_ip(*args):
+    base_ip = entry_base_ip.get().strip()
+    if validate_ip(base_ip):
+        return True
+    elif not base_ip or base_ip == placeholders[entry_base_ip]:      
+        return False
+    else:
+        return False
+
 # Function to validate IP address format
 def validate_ip(ip):
     # Compile the regex pattern for the base IP format 'xxx.xxx.xxx.xxx'
@@ -236,82 +296,25 @@ def validate_ams_net_id(ams_net_id):
         return all(0 <= int(num) <= 255 for num in parts[:-2])
     return False
 
-# Real-time validation functions
-def validate_project(*args):
-    project = entry_project.get().strip()
-    if (project.isdigit() and len(project) == 4):
-        entry_project.config(bg= good_input_bg, fg= good_input_fg)
-        return True
-    elif not project or project == placeholders[entry_project]:
-        entry_project.config(bg= good_input_bg)
-        return  False
-    else:
-        entry_project.config(bg= bad_input_bg, fg= bad_input_fg)
-        return False
-
-def validate_range(*args):
-    pattern = r"^\d+(-\d+)?(,\d+(-\d+)?)*$"
-    input_range = entry_lgv_range.get().strip()
-    
-    # If the input is empty, reset to good input colors and return False
-    if not input_range or input_range == placeholders[entry_lgv_range]:
-        entry_lgv_range.config(bg=good_input_bg)
-        return False
-    
-    # Check if the input matches the pattern
-    if re.match(pattern, input_range):
-        ranges = input_range.split(',')
-        
-        # Check that each range is in increasing order, starts with a number greater than 0,
-        # and does not have leading zeros
-        for r in ranges:
-            if '-' in r:
-                start, end = r.split('-')
-                if not start.isdigit() or not end.isdigit() or int(start) <= 0 or int(start) > int(end) or start != str(int(start)) or end != str(int(end)):
-                    entry_lgv_range.config(bg=bad_input_bg, fg=bad_input_fg)
-                    return False
-            else:
-                # If it's a single number, ensure it's greater than 0 and does not have leading zeros
-                if not r.isdigit() or int(r) <= 0 or r != str(int(r)):
-                    entry_lgv_range.config(bg=bad_input_bg, fg=bad_input_fg)
-                    return False
-        
-        entry_lgv_range.config(bg=good_input_bg, fg=good_input_fg)
-        return True
-    else:
-        entry_lgv_range.config(bg=bad_input_bg, fg=bad_input_fg)
-        return False
-
-def validate_base_ip(*args):
-    base_ip = entry_base_ip.get().strip()
-    if validate_ip(base_ip):
-        entry_base_ip.config(bg= good_input_bg, fg= good_input_fg)
-        return True
-    elif not base_ip or base_ip == placeholders[entry_base_ip]:
-        entry_base_ip.config(bg= good_input_bg)
-        return False
-    else:
-        entry_base_ip.config(bg= bad_input_bg, fg= bad_input_fg)
-        return False
-
 ######################################## placeholders #######################################33
 placeholders = {}
 
-def create_placeholder(entry, placeholder_text):
+def create_placeholder(entry, placeholder_text, entry_style, placeholder_style):
     entry.insert(0, placeholder_text)
-    entry.bind("<FocusIn>", lambda event: on_focus_in(entry, placeholder_text))
-    entry.bind("<FocusOut>", lambda event: on_focus_out(entry, placeholder_text))
+    entry.config(style=placeholder_style)
+    entry.bind("<FocusIn>", lambda event: on_focus_in(entry, placeholder_text, entry_style))
+    entry.bind("<FocusOut>", lambda event: on_focus_out(entry, placeholder_text, placeholder_style))
     placeholders[entry] = placeholder_text
 
-def on_focus_in(entry, placeholder_text):
+def on_focus_in(entry, placeholder_text, entry_style):
     if entry.get() == placeholder_text:
         entry.delete(0, tk.END)
-        entry.config(fg='black')
+        entry.config(style=entry_style)
 
-def on_focus_out(entry, placeholder_text):
+def on_focus_out(entry, placeholder_text, placeholder_style):
     if not entry.get():
         entry.insert(0, placeholder_text)
-        entry.config(fg='grey')
+        entry.config(style=placeholder_style)
 
 # Function to validate the inputs and create XML
 def validate_and_create_xml():
@@ -475,14 +478,13 @@ def is_duplicate(col_index, new_value, current_row):
 def parse_ip(base_ip, lgv_list):
     base_ip_prefix, start_ip = base_ip.rsplit('.', 1)
     start_ip = int(start_ip) - lgv_list[0]
-    
     ip_list = []
     for lgv in lgv_list:
-        current_ip = f"{base_ip_prefix}.{start_ip + lgv}"
-        ip_list.append(current_ip)
-        if start_ip + lgv + 1> 255: # IP digit must not be grater than 255
+        if start_ip + lgv > 255: # IP digit must not be grater than 255
             messagebox.showinfo("Attention", f"Resulting IPs after {current_ip} out of range")
             return ip_list
+        current_ip = f"{base_ip_prefix}.{start_ip + lgv}"
+        ip_list.append(current_ip)
     return ip_list
 
 ############################ Get range ##################################################
@@ -1147,6 +1149,22 @@ else:
     icon_path = os.path.abspath("./route.ico")
 root.iconbitmap(icon_path)
 
+# italic_font = font.Font(family="Segoe UI", size=10, slant="italic")
+
+# Create a custom style for the LabelFrame with an italic font
+style = ttk.Style()
+style.configure("Custom.TLabelframe.Label", font=("Segoe", 10, "italic"))
+
+# Create a style for the Entry widget
+style.configure('Project.TEntry', foreground='black')
+style.configure('Range.TEntry', foreground='black')
+style.configure('BaseIP.TEntry', foreground='black')
+
+style.configure('Placeholder.TEntry', foreground='grey')
+
+# Customize the button's style for when it gains focus
+style.configure("TButton", focuscolor="white", focusthickness=1)
+
 window_width = 450
 window_lenght = 570
 root.geometry(f"{window_width}x{window_lenght}")
@@ -1156,120 +1174,122 @@ root.minsize(window_width, window_lenght)
 frame_tc = tk.Frame(root)
 frame_tc.grid(row=0, column=1, padx=5, pady=5)
 optionTC = tk.StringVar(value="TC3")
-tc2_radio = tk.Radiobutton(frame_tc, text="TC2", variable=optionTC, value="TC2")
+tc2_radio = ttk.Radiobutton(frame_tc, text="TC2", variable=optionTC, value="TC2")
 tc2_radio.grid(row=0, column=0, padx=0, pady=0, sticky='w')
-tc3_radio = tk.Radiobutton(frame_tc, text="TC3", variable=optionTC, value="TC3")
+tc3_radio = ttk.Radiobutton(frame_tc, text="TC3", variable=optionTC, value="TC3")
 tc3_radio.grid(row=0, column=1, padx=0, pady=0, sticky='w')
 
 frame_project = tk.Frame(root)
 frame_project.grid(row=0, column=0, padx=5, pady=5, sticky='e')
-label_project = tk.Label(frame_project, text="Project number CC:")
+label_project = ttk.Label(frame_project, text="Project number CC:")
 label_project.grid(row=0, column=0, padx=5, pady=5)
 
-entry_project = tk.Entry(frame_project, fg="grey")
+entry_project = ttk.Entry(frame_project, style="Project.TEntry")#, fg="grey"
 entry_project.grid(row=0, column=1, padx=5, pady=5)
-create_placeholder(entry_project, "e.g., 1584")
-entry_project.bind("<KeyRelease>", validate_project)
+create_placeholder(entry_project, "e.g., 1584", "Project.TEntry", "Placeholder.TEntry")
+entry_project.bind("<KeyRelease>", validate_entry(entry_project, 'Project.TEntry', validate_project))
 
 frame_range = tk.Frame(root)
 frame_range.grid(row=1, column=0, padx=5, pady=5, sticky='e')
 frame_lgv = tk.Frame(frame_range)
 frame_lgv.grid(row=0, column=0, padx=1, pady=1)
 optionLGV = tk.StringVar(value="LGV")
-cb_radio = tk.Radiobutton(frame_lgv, text="CB", variable=optionLGV, value="CB")
+cb_radio = ttk.Radiobutton(frame_lgv, text="CB", variable=optionLGV, value="CB")
 cb_radio.grid(row=0, column=0, padx=1, pady=1, sticky='w')
-lgv_radio = tk.Radiobutton(frame_lgv, text="LGV: ", variable=optionLGV, value="LGV")
+lgv_radio = ttk.Radiobutton(frame_lgv, text="LGV: ", variable=optionLGV, value="LGV")
 lgv_radio.grid(row=0, column=1, padx=1, pady=1, sticky='w')
 
-entry_lgv_range = tk.Entry(frame_range, fg="grey")
+entry_lgv_range = ttk.Entry(frame_range, style="Range.TEntry")#, fg="grey")
 entry_lgv_range.grid(row=0, column=1, padx=5, pady=5)
-create_placeholder(entry_lgv_range, "e.g., 1-5,11-17,20-25")
-entry_lgv_range.bind("<KeyRelease>", validate_range)
+create_placeholder(entry_lgv_range, "e.g., 1-5,11-17,20-25", "Range.TEntry", "Placeholder.TEntry")
+entry_lgv_range.bind("<KeyRelease>", validate_entry(entry_lgv_range, 'Range.TEntry', validate_range))
 
 # Add a button to trigger table population
-button_populate_table = tk.Button(root, text="Update Table", 
-                                  bg="ghost white", 
+button_populate_table = ttk.Button(root, text=" Update Table ", 
+                                #   bg="ghost white", 
                                   command=populate_table_from_inputs)
 button_populate_table.grid(row=1, column=1, pady=10)
-button_design(button_populate_table)
+# button_design(button_populate_table)
 
 frame_ip = tk.Frame(root)
 frame_ip.grid(row=3, column=0, padx=5, pady=5, sticky='e')
 
-label_ip_help = tk.Label(frame_ip, text=" ? ", bd=2, relief='raised')
+# label_ip_help = tk.Label(frame_ip, text=" ? ", bd=2, relief='raised')
+# label_ip_help = ttk.Label(frame_ip, text=" ? ")
+style.configure("Help.TLabel", padding=2, background="white", relief="flat")
+
+label_ip_help = ttk.Label(frame_ip, text=" ? ", style="Help.TLabel")
 label_ip_help.grid(row=0, column=0, padx=5, pady=5)
 
 ToolTip(label_ip_help, "The IP of the first element of the range")
 
-label_ip = tk.Label(frame_ip, text="First IP: ")
+label_ip = ttk.Label(frame_ip, text="First IP: ")
 label_ip.grid(row=0, column=1, padx=5, pady=5)
 
-entry_base_ip = tk.Entry(frame_ip, fg="grey")
-create_placeholder(entry_base_ip, "e.g., 172.20.3.10")
+entry_base_ip = ttk.Entry(frame_ip, style="BaseIP.TEntry")#, fg="grey")
+create_placeholder(entry_base_ip, "e.g., 172.20.3.10", "BaseIP.TEntry", "Placeholder.TEntry")
 entry_base_ip.grid(row=0, column=2, padx=5, pady=5)
-entry_base_ip.bind("<KeyRelease>", validate_base_ip)
+entry_base_ip.bind("<KeyRelease>", validate_entry(entry_base_ip, 'BaseIP.TEntry', validate_base_ip))
 
 
-# Button to delete the XML
-delete_table_button = tk.Button(root, text="Delete Table", 
-                                bg="ghost white", 
+delete_table_button = ttk.Button(root, text=" Delete Table ", 
+                                # bg="ghost white", 
                                 command=delete_whole_table)
 delete_table_button.grid(row=3, column=1, pady=10)
-button_design(delete_table_button)
+# button_design(delete_table_button)
 
 
-frame_load = tk.Frame(root, bd=1, relief="groove")
+frame_load = ttk.Labelframe(root, text="Load", labelanchor='nw', style="Custom.TLabelframe")
+# frame_load = tk.LabelFrame(root, text="Load", labelanchor='nw', font=italic_font)
 frame_load.grid(row=4, column=0, columnspan=1, padx=15, pady=5, sticky='w')
-
-load_label = tk.Label(frame_load, text="Load")
-load_label.grid(row=0, column=0, padx=5, pady=0, sticky='w')
 # Add a button to trigger the XML file selection and table population
-load_xml_button = tk.Button(frame_load, text="StaticRoutes.xml", 
-                            bg="ghost white", 
+load_xml_button = ttk.Button(frame_load, text=" StaticRoutes.xml ", 
+                            # bg="ghost white", 
                             command=populate_table_from_xml)
-load_xml_button.grid(row=1, column=0, padx=10, pady=5)
-button_design(load_xml_button)
+load_xml_button.grid(row=1, column=0, padx=10, pady=5, sticky='ew')
+# button_design(load_xml_button)
 
-load_db3_button = tk.Button(frame_load, text="     Config.db3     ", 
-                            bg="ghost white", 
+load_db3_button = ttk.Button(frame_load, text="     Config.db3     ", 
+                            # bg="ghost white", 
                             command=populate_table_from_db3)
-load_db3_button.grid(row=2, column=0, padx=10, pady=5)
-button_design(load_db3_button)
+load_db3_button.grid(row=2, column=0, padx=10, pady=5, sticky='ew')
+# button_design(load_db3_button)
 
 
-frame_login = tk.Frame(root, bd=1, relief="groove")
-frame_login.grid(row=4, column=0, columnspan=2, padx=5, pady=5, sticky='e')
+# frame_login = ttk.Frame(root, bd=1, relief="groove")
+frame_login = ttk.Labelframe(root)
+frame_login.grid(row=4, column=0, columnspan=2, padx=1, pady=5, sticky='e')
 
 frame_user = tk.Frame(frame_login)
 frame_user.grid(row=0, column=0, padx=5, pady=0)
 
-username_label = tk.Label(frame_user, text="Username:")
+username_label = ttk.Label(frame_user, text="Username:")
 username_label.grid(row=0, column=0, padx=5, pady=5, sticky='e')
 
-username_entry = tk.Entry(frame_user, width=15)
+username_entry = ttk.Entry(frame_user, width=15)
 username_entry.insert(0, "Administrator")
 username_entry.grid(row=0, column=1, padx=5, pady=5)
 
 frame_password = tk.Frame(frame_login)
 frame_password.grid(row=1, column=0, padx=5, pady=0)
 
-password_label = tk.Label(frame_password, text="Password:")
+password_label = ttk.Label(frame_password, text="Password:")
 password_label.grid(row=0, column=0, padx=5, pady=5, sticky='e')
 
-password_entry = tk.Entry(frame_password, show="*", width=15)
+password_entry = ttk.Entry(frame_password, show="*", width=15)
 password_entry.grid(row=0, column=1, padx=5, pady=5)
 
-test_routes_button = tk.Button(frame_login, text="  Test Routes  ",
-                                bg="ghost white",
+test_routes_button = ttk.Button(frame_login, text="  Test Routes  ",
+                                # bg="ghost white",
                                 command=test_tc_routes)
 test_routes_button.grid(row=0, column=1, padx=5, pady=5)
-button_design(test_routes_button)
+# button_design(test_routes_button)
 
-create_routes_button = tk.Button(frame_login, text="Create Routes",
-                                bg="ghost white",
+create_routes_button = ttk.Button(frame_login, text="Create Routes",
+                                # bg="ghost white",
                                 command=create_tc_routes)
 create_routes_button.grid(row=1, column=1, padx=5, pady=5)
-button_design(create_routes_button)
+# button_design(create_routes_button)
 
 
 
@@ -1299,30 +1319,30 @@ treeview.bind('<Delete>', delete_selected_record)
 treeview.bind('<Double-1>', on_double_click)
 
 
-frame_save_file = tk.Frame(root, bd=1, relief="groove")
+frame_save_file = ttk.Labelframe(root, text="Save", labelanchor='nw', style="Custom.TLabelframe")
 frame_save_file.grid(row=6, column=0, columnspan=3, padx=5, pady=5)
-save_label = tk.Label(frame_save_file, text="Save")
-save_label.grid(row=0, column=0, padx=5, pady=0, sticky='w')
+# save_label = tk.Label(frame_save_file, text="Save", font=italic_font)
+# save_label.grid(row=0, column=0, padx=5, pady=0, sticky='w')
 # Button to save the StaticRoutes.xml file
-save_xml_button = tk.Button(frame_save_file, text=" StaticRoutes.xml ", 
-                        bg="ghost white", 
+save_xml_button = ttk.Button(frame_save_file, text=" StaticRoutes.xml ", 
+                        style="TButton", 
                         command=save_routes_xml)
 save_xml_button.grid(row=1, column=0, padx=5, pady=5)
-button_design(save_xml_button)
+# button_design(save_xml_button)
 
 # Button to save the ControlCenter.xml file
-save_cc_button = tk.Button(frame_save_file, text=" ControlCenter.xml ", 
-                             bg="ghost white", 
-                             command=save_cc_xml)
+save_cc_button = ttk.Button(frame_save_file, text=" ControlCenter.xml ", 
+                            style="TButton", 
+                            command=save_cc_xml)
 save_cc_button.grid(row=1, column=2, padx=5, pady=5)
-button_design(save_cc_button)
+# button_design(save_cc_button)
 
 # Button to save WinSCP.ini file
-save_winscp_button = tk.Button(frame_save_file, text="      WinSCP.ini      ", 
-                             bg="ghost white", 
-                             command=save_winscp_ini)
+save_winscp_button = ttk.Button(frame_save_file, text="      WinSCP.ini      ", 
+                            style="TButton", 
+                            command=save_winscp_ini)
 save_winscp_button.grid(row=1, column=3, padx=5, pady=5)
-button_design(save_winscp_button)
+# button_design(save_winscp_button)
 
 
 # Create the context menu
