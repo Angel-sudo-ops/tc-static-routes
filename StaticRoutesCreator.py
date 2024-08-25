@@ -728,7 +728,7 @@ def setup_treeview():
     }
     
     for col in treeview['columns']:
-        treeview.heading(col, text=headings[col], command=lambda _col=col: treeview_sort_column(treeview, _col, False))
+        treeview.heading(col, text=headings[col], command=lambda _col=col: treeview_sort_column(treeview, _col, False), anchor='w')
 
 def treeview_sort_column(tv, col, reverse):
     # Retrieve all data from the treeview
@@ -774,7 +774,7 @@ def read_db3_file(db3_file_path, table_name):
             # messagebox.showerror("Error", f"Table '{table_name}' does not exist in the database.")
             messagebox.showerror("Error", f"Wrong database format.")
             conn.close()
-            return None, None
+            return None
 
         # Query to get all rows from the specified table
         cursor.execute(f"SELECT * FROM {table_name}")
@@ -798,24 +798,28 @@ def read_db3_file(db3_file_path, table_name):
 
 def populate_table_from_db3():
     project = entry_project.get()
-    if len(project) != 4 or project == placeholders[entry_project]:
+    if not validate_project():
         messagebox.showinfo("Attention", "Add project number first!")
         return
     
     db3_path = filedialog.askopenfilename(title="Select config.db3 file", 
                                           initialdir="C:\\Program Files (x86)\\Elettric80",
                                           filetypes=[("DB3 files", "*.db3")])
+    if not db3_path:
+        return
+    
     table_agvs = "tbl_AGVs"
     rows_agvs = read_db3_file(db3_path, table_agvs)
-
+    if rows_agvs is None:
+        return
+    
     table_param = "tbl_Parameter"
     rows_param = read_db3_file(db3_path, table_param)
+    if rows_param is None:
+        return
     
     # # print(columns, rows)
-    # for row in rows_agvs:
-    #     if row['dbf_Enabled']:
-    #         print(f"LGV{str(row['dbf_ID']).zfill(2)}")
-
+    
     # Clear the existing table data
     for i in treeview.get_children():
         treeview.delete(i)
@@ -908,11 +912,10 @@ def create_winscp_ini_from_table(ini_path):
     # Create config parser and read the INI file (if it exists)
     config = configparser.ConfigParser()
     if os.path.exists(ini_path):
-        if config.has_section(r"Sessions\CC1548/LGV41"):
+        if config.has_section(r"Sessions\CC1548/LGV41"): #test
             config.remove_section('SshHostKeys')
         config.read(ini_path)
            
-    
     data = get_table_data()
     repeated = 0
     total = 0
@@ -964,7 +967,7 @@ def save_winscp_ini():
     if file_path:
         create_winscp_ini_from_table(file_path)
 
-######################################################## Create Routes ############################################################################
+######################################################## Create TC Routes ############################################################################
 
 def load_dll():
     # Determine if the application is running as a standalone executable
@@ -1077,8 +1080,10 @@ def create_route(twincat_com, entry, username, password, netid_ip, system_name):
     try:
         result = twincat_com.CreateRoute(system_name, local_ip)
         print(f"Route created successfully for {name} ({ip}), result: {result}\n")
+        messagebox.showinfo("Success!", f"Route created successfully for {name} ({ip}), result: {result}")
     except Exception as e:
         print(f"Error during CreateRoute invocation for {name} ({ip}): {e}\n")
+        messagebox.showerror(f"Failed To Create Route For {name}", f"Error during route creation for {name} ({ip}): {e}")
 
 def create_tc_routes_from_data(data, username, password):
     load_dll()
@@ -1140,7 +1145,7 @@ def button_design(entry):
 
 ####################################### Set up the GUI ######################################
 root = tk.Tk()
-root.title(f"Static Routes XML Creator {__version__}")
+root.title(f"Static Routes Creator {__version__}")
 
 # Check if running as a script or frozen executable
 if getattr(sys, 'frozen', False):
@@ -1149,11 +1154,17 @@ else:
     icon_path = os.path.abspath("./route.ico")
 root.iconbitmap(icon_path)
 
+window_width = 430
+window_lenght = 570
+root.geometry(f"{window_width}x{window_lenght}")
+root.minsize(window_width, window_lenght)
+# root.resizable(True, True)
+
 # italic_font = font.Font(family="Segoe UI", size=10, slant="italic")
 
 # Create a custom style for the LabelFrame with an italic font
 style = ttk.Style()
-style.configure("Custom.TLabelframe.Label", font=("Segoe", 10, "italic"))
+style.configure("Custom.TLabelframe.Label", font=("Segoe UI", 10, "italic"))
 
 # Create a style for the Entry widget
 style.configure('Project.TEntry', foreground='black')
@@ -1164,12 +1175,6 @@ style.configure('Placeholder.TEntry', foreground='grey')
 
 # Customize the button's style for when it gains focus
 style.configure("TButton", focuscolor="white", focusthickness=1)
-
-window_width = 450
-window_lenght = 570
-root.geometry(f"{window_width}x{window_lenght}")
-root.minsize(window_width, window_lenght)
-# root.resizable(True, True)
 
 frame_tc = tk.Frame(root)
 frame_tc.grid(row=0, column=1, padx=5, pady=5)
@@ -1182,7 +1187,7 @@ tc3_radio.grid(row=0, column=1, padx=0, pady=0, sticky='w')
 frame_project = tk.Frame(root)
 frame_project.grid(row=0, column=0, padx=5, pady=5, sticky='e')
 label_project = ttk.Label(frame_project, text="Project number CC:")
-label_project.grid(row=0, column=0, padx=5, pady=5)
+label_project.grid(row=0, column=0, padx=0, pady=5)
 
 entry_project = ttk.Entry(frame_project, style="Project.TEntry")#, fg="grey"
 entry_project.grid(row=0, column=1, padx=5, pady=5)
@@ -1216,12 +1221,12 @@ frame_ip.grid(row=3, column=0, padx=5, pady=5, sticky='e')
 
 # label_ip_help = tk.Label(frame_ip, text=" ? ", bd=2, relief='raised')
 # label_ip_help = ttk.Label(frame_ip, text=" ? ")
-style.configure("Help.TLabel", padding=2, background="white", relief="flat")
+style.configure("Help.TLabel", padding=2, relief="raised", font=("Segoe UI", 9))
 
 label_ip_help = ttk.Label(frame_ip, text=" ? ", style="Help.TLabel")
-label_ip_help.grid(row=0, column=0, padx=5, pady=5)
-
+label_ip_help.grid(row=0, column=0, padx=0, pady=5)
 ToolTip(label_ip_help, "The IP of the first element of the range")
+
 
 label_ip = ttk.Label(frame_ip, text="First IP: ")
 label_ip.grid(row=0, column=1, padx=5, pady=5)
@@ -1258,13 +1263,13 @@ load_db3_button.grid(row=2, column=0, padx=10, pady=5, sticky='ew')
 
 # frame_login = ttk.Frame(root, bd=1, relief="groove")
 frame_login = ttk.Labelframe(root)
-frame_login.grid(row=4, column=0, columnspan=2, padx=1, pady=5, sticky='e')
+frame_login.grid(row=4, column=0, columnspan=2, padx=0, pady=5, sticky='e')
 
 frame_user = tk.Frame(frame_login)
 frame_user.grid(row=0, column=0, padx=5, pady=0)
 
 username_label = ttk.Label(frame_user, text="Username:")
-username_label.grid(row=0, column=0, padx=5, pady=5, sticky='e')
+username_label.grid(row=0, column=0, padx=0, pady=5, sticky='e')
 
 username_entry = ttk.Entry(frame_user, width=15)
 username_entry.insert(0, "Administrator")
@@ -1274,7 +1279,7 @@ frame_password = tk.Frame(frame_login)
 frame_password.grid(row=1, column=0, padx=5, pady=0)
 
 password_label = ttk.Label(frame_password, text="Password:")
-password_label.grid(row=0, column=0, padx=5, pady=5, sticky='e')
+password_label.grid(row=0, column=0, padx=0, pady=5, sticky='e')
 
 password_entry = ttk.Entry(frame_password, show="*", width=15)
 password_entry.grid(row=0, column=1, padx=5, pady=5)
@@ -1310,17 +1315,17 @@ vsb.pack(side=tk.RIGHT, fill=tk.Y)
 treeview.configure(yscrollcommand=vsb.set)
 
 # Define the column widths
-treeview.column("Name", width=120)
-treeview.column("Address", width=120)
-treeview.column("NetId", width=120)
-treeview.column("Type", width=50)
+treeview.column("Name", width=110, anchor='w')
+treeview.column("Address", width=110, anchor='w')
+treeview.column("NetId", width=120, anchor='w')
+treeview.column("Type", width=50, anchor='w')
 
 treeview.bind('<Delete>', delete_selected_record)
 treeview.bind('<Double-1>', on_double_click)
 
 
 frame_save_file = ttk.Labelframe(root, text="Save", labelanchor='nw', style="Custom.TLabelframe")
-frame_save_file.grid(row=6, column=0, columnspan=3, padx=5, pady=5)
+frame_save_file.grid(row=6, column=0, columnspan=3, padx=15, pady=5, sticky='w')
 # save_label = tk.Label(frame_save_file, text="Save", font=italic_font)
 # save_label.grid(row=0, column=0, padx=5, pady=0, sticky='w')
 # Button to save the StaticRoutes.xml file
