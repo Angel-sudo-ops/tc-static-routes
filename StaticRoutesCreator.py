@@ -480,7 +480,9 @@ def parse_ip(base_ip, lgv_list):
     for lgv in lgv_list:
         current_ip = f"{base_ip_prefix}.{start_ip + lgv}"
         ip_list.append(current_ip)
-    
+        if start_ip + lgv + 1> 255: # IP digit must not be grater than 255
+            messagebox.showinfo("Attention", f"Resulting IPs after {current_ip} out of range")
+            return ip_list
     return ip_list
 
 ############################ Get range ##################################################
@@ -1302,14 +1304,14 @@ frame_save_file.grid(row=6, column=0, columnspan=3, padx=5, pady=5)
 save_label = tk.Label(frame_save_file, text="Save")
 save_label.grid(row=0, column=0, padx=5, pady=0, sticky='w')
 # Button to save the StaticRoutes.xml file
-save_xml_button = tk.Button(frame_save_file, text="StaticRoutes.xml", 
+save_xml_button = tk.Button(frame_save_file, text=" StaticRoutes.xml ", 
                         bg="ghost white", 
                         command=save_routes_xml)
 save_xml_button.grid(row=1, column=0, padx=5, pady=5)
 button_design(save_xml_button)
 
 # Button to save the ControlCenter.xml file
-save_cc_button = tk.Button(frame_save_file, text="ControlCenter file", 
+save_cc_button = tk.Button(frame_save_file, text=" ControlCenter.xml ", 
                              bg="ghost white", 
                              command=save_cc_xml)
 save_cc_button.grid(row=1, column=2, padx=5, pady=5)
