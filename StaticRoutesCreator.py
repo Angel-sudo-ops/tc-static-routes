@@ -861,8 +861,8 @@ def populate_table_from_db3():
 ################################# Slipt project and LGV numer ######################################
 def split_string(input_string):
     # Regular expression pattern for CCxxxxLGVxx or CCxxxx_LGVxx
-    pattern_with_underscore = r"^CC\d{4}_(LGV|CB|BC)\d{2}$"
-    pattern_without_underscore = r"^CC\d{4}(LGV|CB|BC)\d{2}$"
+    pattern_with_underscore = r"^CC\d{4}_(LGV|CB|BC)\d{2,3}$"
+    pattern_without_underscore = r"^CC\d{4}(LGV|CB|BC)\d{2,3}$"
     
     # Check if the input string matches the expected patterns
     if re.match(pattern_with_underscore, input_string):
@@ -870,12 +870,12 @@ def split_string(input_string):
         parts = input_string.split('_')
     elif re.match(pattern_without_underscore, input_string):
          # Use regular expression to split between the numeric and alphanumeric parts
-        match = re.match(r"(CC\d{4})(LGV\d{2}|CB\d{2}|BC\d{2})", input_string)
+        match = re.match(r"(CC\d{4})(LGV\d{2}|CB\d{2}|BC\d{2,3})", input_string)
         parts = [match.group(1), match.group(2)]
     else:
         # Raise a ValueError if the string does not match the expected format
-        messagebox.showerror("Error", "At least one route name does not match the expected format: CCxxxxLGV/CB/BCxx or CCxxxx_LGV/CB/BCxx")
-    
+        messagebox.showerror("Error", f"Route name '{input_string}' does not match the expected format: CCxxxxLGV/CB/BCxx or CCxxxx_LGV/CB/BCxx")
+        parts = None
     return parts
 ################################### Create ini file for WinSCP connections ##########################
 # Function to set the custom INI path in the Windows Registry
@@ -900,7 +900,7 @@ def hostname_exists(config, host_name):
     return False
 
 # Function to create a session in the winscp.ini file
-def create_winscp_ini_from_table(ini_path):
+def create_winscp_ini_from_table(ini_path, data):
     # Ensure the directory for the INI file exists
     ini_dir = os.path.dirname(ini_path)
     os.makedirs(ini_dir, exist_ok=True)
@@ -916,13 +916,15 @@ def create_winscp_ini_from_table(ini_path):
             config.remove_section('SshHostKeys')
         config.read(ini_path)
            
-    data = get_table_data()
+    # data = get_table_data()
     repeated = 0
     total = 0
     for row in data:
         total = total + 1 
         name, address, netid, tc_type = row
         name_parts = split_string(str(name))
+        if name_parts is None:
+            return
         folder_name = name_parts[0]
         session_name = name_parts[1]
 
@@ -956,8 +958,8 @@ def create_winscp_ini_from_table(ini_path):
 def save_winscp_ini():
     # Custom path for the INI file (not in Roaming)
     file_path = r'C:\WinSCPConfig\WinSCP.ini'  # Adjust this path if needed
-
-    if not get_table_data():
+    data = get_table_data()
+    if not data:
         messagebox.showerror("Attention", "Routes table is empty!")
         return
     # file_path = filedialog.asksaveasfilename(defaultextension=".ini",
@@ -965,7 +967,7 @@ def save_winscp_ini():
     #                                          initialfile="WinSCP.ini",
     #                                          filetypes=[("INI files", "*.ini")])
     if file_path:
-        create_winscp_ini_from_table(file_path)
+        create_winscp_ini_from_table(file_path, data)
 
 ######################################################## Create TC Routes ############################################################################
 
@@ -1143,7 +1145,14 @@ def button_design(entry):
     entry.bind("<Leave>", on_leave)
     entry.bind("<Button-1>", on_enter)
 
-####################################### Set up the GUI ######################################
+############################# Set GUI icon ##########################
+def set_icon():
+    if os.path.exists(icon_path):
+        root.iconbitmap(icon_path)
+    else:
+        print("Icon file not found.")
+
+################################################################# Set up the GUI ######################################################################
 root = tk.Tk()
 root.title(f"Static Routes Creator {__version__}")
 
@@ -1152,13 +1161,16 @@ if getattr(sys, 'frozen', False):
     icon_path = os.path.join(sys._MEIPASS, "./route.ico")
 else:
     icon_path = os.path.abspath("./route.ico")
-root.iconbitmap(icon_path)
+# root.iconbitmap(icon_path)
 
 window_width = 430
-window_lenght = 570
+window_lenght = 550
 root.geometry(f"{window_width}x{window_lenght}")
 root.minsize(window_width, window_lenght)
 # root.resizable(True, True)
+
+# Apply the icon after the window is initialized
+root.after(100, set_icon)
 
 # italic_font = font.Font(family="Segoe UI", size=10, slant="italic")
 
