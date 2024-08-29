@@ -54,9 +54,15 @@ class ToolTip:
         tw.wm_geometry(f"+{x}+{y}")
         tw.attributes('-alpha', 0.0)  # Start with full transparency
 
-        label = tk.Label(tw, text=self.text, justify='left',
-                         background="white", relief='solid', borderwidth=1,
-                         font=("helvetica", "8", "normal"))
+        style = ttk.Style()
+        style.configure("Tooltip.TLabel", background="white", relief='solid', borderwidth=1, font=("helvetica", "8", "normal"))
+
+        label = ttk.Label(tw, text=self.text, 
+                          style="Tooltip.TLabel"
+                        #   justify='left',
+                        #   background="white", relief='solid', borderwidth=1,
+                        #   font=("helvetica", "8", "normal")
+                          )
         label.pack(ipadx=1)
 
         self.is_fading_out = False
@@ -325,7 +331,8 @@ def validate_and_create_xml():
     except ValueError as e:
         messagebox.showerror("Invalid input", str(e))
         return
-    
+    # if not validate_project():
+
     base_ip = entry_base_ip.get().strip()
     if not validate_ip(base_ip):
         messagebox.showerror("Invalid input", "Please enter a valid base IP address in the format 'xxx.xxx.xxx.xxx'")
@@ -527,9 +534,12 @@ def show_context_menu(event):
 
 # With DEL key
 def delete_selected_record(event):
-    selected_item = treeview.selection()
-    if selected_item:
-        treeview.delete(selected_item)
+    selected_items = treeview.selection()
+    # print(selected_item)
+    for item in selected_items:
+        if item:
+            # print(item)
+            treeview.delete(item)
 
 ################################### Delete whole table ########################################
 
@@ -580,7 +590,7 @@ def create_routes_xml_from_table(file_path):
     with open(file_path, "w", encoding='utf-8') as f:
         f.write(xmlstr)
 
-    messagebox.showinfo("Success", "StaticRoutes file has been created successfully!")
+    messagebox.showinfo("Success", "StaticRoutes file has been created successfully. \nRemember to restart TwinCAT!!")
 
 def save_routes_xml():
     if not get_table_data():
@@ -1274,7 +1284,7 @@ load_db3_button.grid(row=2, column=0, padx=10, pady=5, sticky='ew')
 
 
 # frame_login = ttk.Frame(root, bd=1, relief="groove")
-frame_login = ttk.Labelframe(root)
+frame_login = ttk.Labelframe(root, text="Router", labelanchor='nw', style="Custom.TLabelframe")
 frame_login.grid(row=4, column=0, columnspan=2, padx=0, pady=5, sticky='e')
 
 frame_user = tk.Frame(frame_login)
@@ -1381,3 +1391,5 @@ root.mainloop()
 # [Configuration\LastFingerprints]
 # 172.20.2.68=20022:ssh=ecdsa-sha2-nistp384%20384%20iXnY+SMyoQRSUxJMzgWWA+yadddMZqqgM4dLPp/uHhs
 # 172.20.2.68:20022:ssh=ecdsa-sha2-nistp384%20384%20iXnY+SMyoQRSUxJMzgWWA+yadddMZqqgM4dLPp/uHhs
+
+# Tener la posibilidad de borrar más rows al seleccionar shift o control
