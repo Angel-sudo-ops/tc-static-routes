@@ -17,7 +17,7 @@ from System import Type
 from System.Reflection import BindingFlags
 from System.Net import IPAddress
 
-__version__ = '1.10'
+__version__ = '2.10.2'
 
 default_file_path = os.path.join(r'C:\TwinCAT\3.1\Target', 'StaticRoutes.xml')
 
@@ -535,10 +535,8 @@ def show_context_menu(event):
 # With DEL key
 def delete_selected_record(event):
     selected_items = treeview.selection()
-    # print(selected_item)
     for item in selected_items:
         if item:
-            # print(item)
             treeview.delete(item)
 
 ################################### Delete whole table ########################################
@@ -1128,7 +1126,6 @@ def test_tc_routes():
     print("Test Routes")
 
 def check_inputs():
-    data = get_table_data()
     username = username_entry.get()
     password = password_entry.get()
     if username == "":
@@ -1137,10 +1134,25 @@ def check_inputs():
     if password == "":
         messagebox.showerror("Attention", "Add password!")
         return None
+    
+    data = get_data_for_routes()
     if not data:
         messagebox.showerror("Attention", "Routes table is empty!")
         return None
     return data, username, password
+
+def get_data_for_routes():
+    data = []
+    selected_items = treeview.selection()
+    if selected_items: 
+        for item in selected_items:
+            data.append(treeview.item(item)["values"])
+    else:
+        data = get_table_data()
+    print(data)
+    return data
+    
+
 ################################### Button design ##########################################
 def on_enter(e):
     if e.widget['state']== "normal":
@@ -1154,6 +1166,19 @@ def button_design(entry):
     entry.bind("<Enter>", on_enter)
     entry.bind("<Leave>", on_leave)
     entry.bind("<Button-1>", on_enter)
+
+
+def is_descendant(widget, parent):
+    while widget:
+        if widget == parent:
+            return True
+        widget = widget.master
+    return False
+
+def on_click(event):
+    widget = event.widget
+    if widget not in exceptions and not any(is_descendant(widget, exception) for exception in exceptions):
+        treeview.selection_remove(treeview.selection())
 
 ############################# Set GUI icon ##########################
 def set_icon():
@@ -1254,7 +1279,7 @@ label_ip = ttk.Label(frame_ip, text="First IP: ")
 label_ip.grid(row=0, column=1, padx=5, pady=5)
 
 entry_base_ip = ttk.Entry(frame_ip, style="BaseIP.TEntry")#, fg="grey")
-create_placeholder(entry_base_ip, "e.g., 172.20.3.10", "BaseIP.TEntry", "Placeholder.TEntry")
+create_placeholder(entry_base_ip, "e.g., 172.20.3.11", "BaseIP.TEntry", "Placeholder.TEntry")
 entry_base_ip.grid(row=0, column=2, padx=5, pady=5)
 entry_base_ip.bind("<KeyRelease>", validate_entry(entry_base_ip, 'BaseIP.TEntry', validate_base_ip))
 
@@ -1378,6 +1403,9 @@ context_menu.add_command(label="Delete", command=delete_selected_record_from_men
 
 # Bind right-click to show the context menu
 treeview.bind("<Button-3>", show_context_menu)
+
+exceptions = [treeview, vsb, frame_login]
+root.bind("<Button-1>", on_click)
 
 root.mainloop()
 
