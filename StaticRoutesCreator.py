@@ -10,6 +10,7 @@ from xml.dom import minidom
 import sqlite3
 import winreg as reg
 import configparser
+import pyads
 import clr
 import System
 from System import Activator 
@@ -1118,12 +1119,56 @@ def create_tc_routes():
     data, username, password = result
     create_tc_routes_from_data(data, username, password)
 
+    
+
 def test_tc_routes():
     result = check_inputs()
     if result is None:
         return
     data, username, password = result
-    print("Test Routes")
+    test_route_from_data(data)
+    print("Test Routes")    
+
+def test_route_from_data(data):
+    for entry in data:
+        name, ip, ams_net_id, type_ = entry
+        port = 851 if type_ == 'TC3' else 801
+        threading.Thread(target=test_connection, args=(ams_net_id, port, name)).start()
+
+def test_connection(ams_net_id, port, name):
+    plc = pyads.Connection(ams_net_id, port)
+    try:
+        # Open the connection
+        plc.open()
+        # Check if the connection is established
+        if plc.is_open:
+            print("PLC connection open")
+            ams_addres = plc.get_local_address()
+            ams_addres_net_id = ams_addres.netid
+            print(ams_addres_net_id)
+
+            state = plc.read_state()
+            print(f"PLC Status: {state}")
+            if state[0] == 5: #PLC in run
+                print(f"Connection to {name} established successfully.") 
+                plc.close()                                
+                return True
+            else:
+                print(f"Failed to establish connection to {name}.")
+        else:
+            print(f"Failed to establish connection to {name}.\n")
+        # return False
+    except pyads.ADSError as ads_error:
+        print(f"ADS Error: {ads_error} ")
+        print(f"Failed to establish connection to {name}\n.")
+        # return False
+    
+    except Exception as e:
+        print(f"Exception: {e} ")
+        print(f"Failed to establish connection to {name}\n.")
+        # return False
+    plc.close()
+    return False
 
 def check_inputs():
     username = username_entry.get()
@@ -1421,3 +1466,5 @@ root.mainloop()
 # 172.20.2.68:20022:ssh=ecdsa-sha2-nistp384%20384%20iXnY+SMyoQRSUxJMzgWWA+yadddMZqqgM4dLPp/uHhs
 
 # Tener la posibilidad de borrar más rows al seleccionar shift o control
+
+# Routes can be created even if static routes file is not updated (TwinCAT is not restarted yet). But after routes are created TwinCAT should be restarted to have the comm
