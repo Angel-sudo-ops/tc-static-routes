@@ -89,25 +89,17 @@ def check_plc_connection(ams_net_id, port):
         print("PLC connection failed:", e)
         return False
     
-def get_local_ams_id():
+def get_local_ams_id_pyads():
     ams_net_id = None
     try:
-        # Create a connection object
         plc = pyads.Connection('0.0.0.0.0.0', pyads.PORT_TC3PLC1)
         plc.open()
-
         ams_net_id = plc.get_local_address().netid
-        
-    # except pyads.ADSError as e:
-    #     print(f"ADS Error: {e} \nCheck if TwiCAT on local machine is running")
-    # except (OSError, IOError) as e:
-    #     print(f"OS or I/O Error: {e} \nCheck if TwiCAT on local machine is running")
     except Exception as e:
-        print(f"Unexpected error: {e} \nCheck if TwiCAT on local machine is running")
+        print(f"Unexpected error: {e} \nCheck if TwinCAT on local machine is running")
     finally:
         if plc.is_open:
             plc.close()
-
     return ams_net_id
 
 # Define ADS parameters
