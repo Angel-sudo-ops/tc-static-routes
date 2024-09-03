@@ -1114,20 +1114,38 @@ def create_tc_routes():
 
     
 ############################################### Test Routes ##################################################################
+# Track the number of active threads
+active_threads = 0
+lock = threading.Lock()
 
 def test_tc_routes():
+    start_spinner()
+    global active_threads
     data = get_data_for_routes()
     if not data:
         messagebox.showerror("Attention", "Routes table is empty!")
+        stop_spinner()
         return None
+    
+    with lock:
+        active_threads = len(data)
+
     for entry in data:
         threading.Thread(target=test_route_and_update_ui, args=(entry,)).start()
 
 def test_route_and_update_ui(entry):
+    global active_threads
     name, ip, ams_net_id, type_ = entry
     port = 851 if type_ == 'TC3' else 801
     connection_ok = test_connection(ams_net_id, port, name)
     update_ui_with_result(name, connection_ok)
+
+    # Decrement the thread counter and check if all threads are done
+    with lock:
+        active_threads -= 1
+        if active_threads == 0:
+            treeview.after(0, lambda: treeview.selection_remove(treeview.selection()))
+            treeview.after(0, stop_spinner())
 
 def test_connection(ams_net_id, port, name):
     plc = pyads.Connection(ams_net_id, port)
@@ -1147,11 +1165,11 @@ def test_connection(ams_net_id, port, name):
 
     except pyads.ADSError as ads_error:
         print(f"ADS Error: {ads_error}")
-        messagebox.showerror('Error', f"ADS Error: {ads_error} Unable to connect to {name}")
+        # messagebox.showerror('Error', f"ADS Error: {ads_error} Unable to connect to {name}")
         return False
     except Exception as e:
         print(f"Unexpected Exception: {e}")
-        messagebox.showerror('Error', f"Unexpected Exception: {e} Unable to connect to {name}")
+        # messagebox.showerror('Error', f"Unexpected Exception: {e} Unable to connect to {name}")
         return False
     finally:
         # Ensure the connection is closed if it was successfully opened
@@ -1231,6 +1249,42 @@ def on_click(event):
     if widget not in exceptions and not any(is_descendant(widget, exception) for exception in exceptions):
         treeview.selection_remove(treeview.selection())
 
+
+############################# Spinner ###########################################3
+def start_spinner():
+    global spinner_window, spinner_canvas, spinner_arc
+    spinner_window = tk.Toplevel(root)
+    spinner_window.overrideredirect(True)
+    
+    # Get the current cursor position
+    cursor_x = root.winfo_pointerx()
+    cursor_y = root.winfo_pointery()
+
+    # Position the spinner at the cursor's location
+    spinner_window.geometry(f"50x50+{cursor_x}+{cursor_y}")
+    spinner_window.attributes('-topmost', True)
+
+    spinner_canvas = tk.Canvas(spinner_window, width=50, height=50)
+    spinner_canvas.pack()
+
+    spinner_arc = spinner_canvas.create_arc((5, 5, 45, 45), start=0, extent=30, width=4, outline='blue', style=tk.ARC)
+
+    rotate_spinner()
+
+def rotate_spinner():
+    global spinner_arc
+    if spinner_window is not None:
+        current_angle = spinner_canvas.itemcget(spinner_arc, 'start')
+        new_angle = (float(current_angle) + 10) % 360
+        spinner_canvas.itemconfig(spinner_arc, start=new_angle)
+        spinner_canvas.after(50, rotate_spinner)
+
+def stop_spinner():
+    global spinner_window
+    if spinner_window is not None:
+        spinner_window.destroy()
+        spinner_window = None
+
 ############################# Set GUI icon ##########################
 def set_icon():
     if os.path.exists(icon_path):
@@ -1242,6 +1296,7 @@ def set_icon():
 root = tk.Tk()
 root.title(f"Static Routes Creator {__version__}")
 
+spinner_window = None
 # Check if running as a script or frozen executable
 if getattr(sys, 'frozen', False):
     icon_path = os.path.join(sys._MEIPASS, "./route.ico")
