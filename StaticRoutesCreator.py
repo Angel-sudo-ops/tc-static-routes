@@ -18,7 +18,7 @@ from System import Type
 from System.Reflection import BindingFlags
 from System.Net import IPAddress
 
-__version__ = '2.10.2'
+__version__ = '2.12.2'
 
 default_file_path = os.path.join(r'C:\TwinCAT\3.1\Target', 'StaticRoutes.xml')
 
@@ -547,13 +547,6 @@ def delete_whole_table():
         treeview.delete(i)
 
 ################################## Create StaticRoutes.xml from table ##########################
-
-def get_table_data():
-    rows = []
-    for item in treeview.get_children():
-        rows.append(treeview.item(item)["values"])
-    # print(rows)
-    return rows
     
 def create_routes_xml_from_table(file_path):
     data = get_table_data()
@@ -1120,63 +1113,71 @@ def create_tc_routes():
     create_tc_routes_from_data(data, username, password)
 
     
+############################################### Test Routes ##################################################################
 
 def test_tc_routes():
-    result = check_inputs()
-    if result is None:
-        return
-    data, username, password = result
-    test_route_from_data(data)
-    print("Test Routes")    
-
-def test_route_from_data(data):
+    data = get_data_for_routes()
+    if not data:
+        messagebox.showerror("Attention", "Routes table is empty!")
+        return None
     for entry in data:
-        name, ip, ams_net_id, type_ = entry
-        port = 851 if type_ == 'TC3' else 801
-        threading.Thread(target=test_connection, args=(ams_net_id, port, name)).start()
+        threading.Thread(target=test_route_and_update_ui, args=(entry,)).start()
+
+def test_route_and_update_ui(entry):
+    name, ip, ams_net_id, type_ = entry
+    port = 851 if type_ == 'TC3' else 801
+    connection_ok = test_connection(ams_net_id, port, name)
+    update_ui_with_result(name, connection_ok)
 
 def test_connection(ams_net_id, port, name):
     plc = pyads.Connection(ams_net_id, port)
     try:
         # Open the connection
         plc.open()
-        # Check if the connection is established
-        if plc.is_open:
-            print("PLC connection open")
-            ams_addres = plc.get_local_address()
-            ams_addres_net_id = ams_addres.netid
-            print(ams_addres_net_id)
+        state = plc.read_state()
+        print(f"PLC Status: {state}")
 
-            state = plc.read_state()
-            print(f"PLC Status: {state}")
-            if state[0] == 5: #PLC in run
-                print(f"Connection to {name} established successfully.") 
-                plc.close()                                
-                return True
-            else:
-                print(f"Failed to establish connection to {name}.")
+        # Check if the PLC is in RUN state (state[0] == 5)
+        if state[0] == 5:
+            print("Connection to PLC established successfully.")
+            return True
         else:
-            print(f"Failed to establish connection to {name}.\n")
-        # return False
+            print("PLC is not in RUN state.")
+            return False
+
     except pyads.ADSError as ads_error:
-        print(f"ADS Error: {ads_error} ")
-        print(f"Failed to establish connection to {name}\n.")
-        # return False
-    
+        print(f"ADS Error: {ads_error}")
+        messagebox.showerror('Error', f"ADS Error: {ads_error} Unable to connect to {name}")
+        return False
     except Exception as e:
-        print(f"Exception: {e} ")
-        print(f"Failed to establish connection to {name}\n.")
-        # return False
-    plc.close()
-    return False
+        print(f"Unexpected Exception: {e}")
+        messagebox.showerror('Error', f"Unexpected Exception: {e} Unable to connect to {name}")
+        return False
+    finally:
+        # Ensure the connection is closed if it was successfully opened
+        if plc.is_open:
+            plc.close()
+
+
+def update_ui_with_result(name, connection_ok):
+    # Make sure to update the UI from the main thread
+    def update():
+        for item in treeview.get_children():
+            if treeview.item(item, 'values')[0] == name:  # Assuming 'name' is in the first column
+                color = 'green' if connection_ok else 'red'
+                treeview.item(item, tags=(color,))
+                break
+
+    # Use the `after` method to safely update the UI from the main thread
+    treeview.after(0, update)
 
 def check_inputs():
     username = username_entry.get()
     password = password_entry.get()
-    if username == "":
+    if not username:
         messagebox.showerror("Attention", "Add username!")
         return None
-    if password == "":
+    if not password:
         messagebox.showerror("Attention", "Add password!")
         return None
     
@@ -1197,6 +1198,11 @@ def get_data_for_routes():
     print(data)
     return data
     
+def get_table_data():
+    rows = []
+    for item in treeview.get_children():
+        rows.append(treeview.item(item)["values"])
+    return rows
 
 ################################### Button design ##########################################
 def on_enter(e):
@@ -1397,6 +1403,11 @@ frame_table.grid(row=5, columnspan=3, padx=15, pady=10)
 # Add a Treeview to display the data
 treeview = ttk.Treeview(frame_table, columns=("Name", "Address", "NetId", "Type"), show="headings", height=10)
 treeview.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
+# Define tags in your Treeview setup
+treeview.tag_configure('green', foreground='green')
+treeview.tag_configure('red', foreground='red')
+
 setup_treeview()
 
 # Add a vertical scrollbar to the Treeview
