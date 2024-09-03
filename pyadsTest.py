@@ -96,22 +96,18 @@ def get_local_ams_id():
         plc = pyads.Connection('0.0.0.0.0.0', pyads.PORT_TC3PLC1)
         plc.open()
 
-        print("PLC connection open")
         ams_net_id = plc.get_local_address().netid
-        print(f"My local AMS Net Id is {ams_net_id}")
-        # plc.close()
-        # return ams_net_id
         
-    except pyads.ADSError as e:
-        print("ADS Error:", e)
-    except (OSError, IOError) as e:
-        print("OS or I/O Error:", e)
+    # except pyads.ADSError as e:
+    #     print(f"ADS Error: {e} \nCheck if TwiCAT on local machine is running")
+    # except (OSError, IOError) as e:
+    #     print(f"OS or I/O Error: {e} \nCheck if TwiCAT on local machine is running")
     except Exception as e:
-        print("Unexpected error:", e)
+        print(f"Unexpected error: {e} \nCheck if TwiCAT on local machine is running")
     finally:
         if plc.is_open:
             plc.close()
-            
+
     return ams_net_id
 
 # Define ADS parameters
@@ -122,7 +118,7 @@ if test_connection(plc_ams_net_id, ams_port_TC3):
     print("Connection to PLC is ok")
 else:
     print("Route needs to be created")
-    create_connection(system_name, plc_ip_address, username, password, ams_port_TC3)
+    # create_connection(system_name, plc_ip_address, username, password, ams_port_TC3)
 
 
 if not check_plc_connection(plc_ams_net_id, ams_port_TC3):
