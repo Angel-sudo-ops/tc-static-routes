@@ -1,5 +1,6 @@
 import sys
 import os
+import time
 import platform
 import threading
 import re
@@ -1115,16 +1116,18 @@ def create_tc_routes():
     
 ############################################### Test Routes ##################################################################
 # Track the number of active threads
+max_threads = 3
+semaphore = threading.Semaphore(max_threads)
 active_threads = 0
 lock = threading.Lock()
 
 def test_tc_routes():
-    start_spinner()
+    # start_spinner()
     global active_threads
     data = get_data_for_routes()
     if not data:
         messagebox.showerror("Attention", "Routes table is empty!")
-        stop_spinner()
+        # stop_spinner()
         return None
     
     with lock:
@@ -1137,15 +1140,18 @@ def test_route_and_update_ui(entry):
     global active_threads
     name, ip, ams_net_id, type_ = entry
     port = 851 if type_ == 'TC3' else 801
-    connection_ok = test_connection(ams_net_id, port, name)
-    update_ui_with_result(name, connection_ok)
 
-    # Decrement the thread counter and check if all threads are done
-    with lock:
-        active_threads -= 1
-        if active_threads == 0:
-            treeview.after(0, lambda: treeview.selection_remove(treeview.selection()))
-            treeview.after(0, stop_spinner())
+    # Use semaphore to control the number of concurrent threads
+    with semaphore:
+        connection_ok = test_connection(ams_net_id, port, name)
+        update_ui_with_result(name, connection_ok)
+
+        # Decrement the thread counter and check if all threads are done
+        with lock:
+            active_threads -= 1
+            if active_threads == 0:
+                treeview.after(0, lambda: treeview.selection_remove(treeview.selection()))
+                # treeview.after(0, stop_spinner())
 
 def test_connection(ams_net_id, port, name):
     plc = pyads.Connection(ams_net_id, port)
@@ -1175,6 +1181,7 @@ def test_connection(ams_net_id, port, name):
         # Ensure the connection is closed if it was successfully opened
         if plc.is_open:
             plc.close()
+        time.sleep(2)
 
 
 def update_ui_with_result(name, connection_ok):
