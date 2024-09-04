@@ -1122,12 +1122,12 @@ active_threads = 0
 lock = threading.Lock()
 
 def test_tc_routes():
-    # start_spinner()
+    start_spinner(305,305)
     global active_threads
     data = get_data_for_routes()
     if not data:
         messagebox.showerror("Attention", "Routes table is empty!")
-        # stop_spinner()
+        stop_spinner()
         return None
     
     with lock:
@@ -1151,7 +1151,7 @@ def test_route_and_update_ui(entry):
             active_threads -= 1
             if active_threads == 0:
                 treeview.after(0, lambda: treeview.selection_remove(treeview.selection()))
-                # treeview.after(0, stop_spinner())
+                treeview.after(0, stop_spinner())
 
 def test_connection(ams_net_id, port, name):
     plc = pyads.Connection(ams_net_id, port)
@@ -1181,7 +1181,7 @@ def test_connection(ams_net_id, port, name):
         # Ensure the connection is closed if it was successfully opened
         if plc.is_open:
             plc.close()
-        time.sleep(2)
+        time.sleep(1)
 
 
 def update_ui_with_result(name, connection_ok):
@@ -1258,36 +1258,39 @@ def on_click(event):
 
 
 ############################# Spinner ###########################################3
-def start_spinner():
-    global spinner_window, spinner_canvas, spinner_arc
+def start_spinner(x=200, y=200):  # Set default position to (200, 200)
+    global spinner_window, spinner_canvas, spinner_arc, follow_cursor, running
+    running = True  # Set the spinner running flag
     spinner_window = tk.Toplevel(root)
     spinner_window.overrideredirect(True)
     
-    # Get the current cursor position
-    cursor_x = root.winfo_pointerx()
-    cursor_y = root.winfo_pointery()
+    # Make the window background transparent
+    spinner_window.wm_attributes("-transparentcolor", "white")
+    
+    # Set the spinner position at (x, y)
+    spinner_window.geometry(f"25x25+{x}+{y}")
 
-    # Position the spinner at the cursor's location
-    spinner_window.geometry(f"50x50+{cursor_x}+{cursor_y}")
-    spinner_window.attributes('-topmost', True)
-
-    spinner_canvas = tk.Canvas(spinner_window, width=50, height=50)
+    # Create a transparent canvas
+    spinner_canvas = tk.Canvas(spinner_window, width=25, height=25, bg="white", highlightthickness=0)
     spinner_canvas.pack()
 
-    spinner_arc = spinner_canvas.create_arc((5, 5, 45, 45), start=0, extent=30, width=4, outline='blue', style=tk.ARC)
+    # Draw a slightly larger arc for the spinner
+    spinner_arc = spinner_canvas.create_arc((2, 2, 22, 22), start=0, extent=90, width=4, outline='blue', style=tk.ARC)
 
-    rotate_spinner()
+    rotate_spinner()  # Start rotating the spinner
 
 def rotate_spinner():
     global spinner_arc
     if spinner_window is not None:
         current_angle = spinner_canvas.itemcget(spinner_arc, 'start')
-        new_angle = (float(current_angle) + 10) % 360
+        new_angle = (float(current_angle) + 15) % 360
         spinner_canvas.itemconfig(spinner_arc, start=new_angle)
-        spinner_canvas.after(50, rotate_spinner)
+        spinner_canvas.after(40, rotate_spinner)
 
 def stop_spinner():
-    global spinner_window
+    global spinner_window, follow_cursor, running
+    running = False  # Stop the spinner from running
+
     if spinner_window is not None:
         spinner_window.destroy()
         spinner_window = None
@@ -1524,6 +1527,11 @@ treeview.bind("<Button-3>", show_context_menu)
 
 exceptions = [treeview, vsb, frame_login]
 root.bind("<Button-1>", on_click)
+
+
+spinner_window = None
+follow_cursor = False
+running = False
 
 root.mainloop()
 
