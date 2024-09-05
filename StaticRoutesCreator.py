@@ -1125,7 +1125,7 @@ def test_tc_routes():
     global active_threads
     if active_threads != 0:
         return
-    start_spinner(190, 165)
+    start_spinner(190, 133)
     data = get_data_for_routes()
     if not data:
         messagebox.showerror("Attention", "Routes table is empty!")
@@ -1139,7 +1139,7 @@ def test_tc_routes():
         threading.Thread(target=test_route_and_update_ui, args=(entry,)).start()
 
 def test_tc_routes_no_thread():
-    start_spinner(210, 225)
+    # start_spinner(210, 225)
     data = get_data_for_routes()
     if not data:
         messagebox.showerror("Attention", "Routes table is empty!")
@@ -1272,70 +1272,45 @@ def on_click(event):
 
 
 ############################# Spinner ###########################################3
-def start_spinner(x=50, y=50):  # Default position relative to the GUI window
-    global spinner_window, spinner_canvas, spinner_arc, running
-    running = True  # Set the spinner running flag
-    spinner_window = tk.Toplevel(root)
-    spinner_window.overrideredirect(True)
-    
-    # Make the window background transparent
-    spinner_window.wm_attributes("-transparentcolor", "white")
-    
-    # Initially set the spinner position relative to the GUI window
-    update_spinner_position(x, y)
+def create_spinner_widget():
+    global spinner_frame, spinner_canvas, spinner_arc
 
-    # Create a transparent canvas, smaller
-    spinner_canvas = tk.Canvas(spinner_window, width=25, height=25, bg="white", highlightthickness=0)
+    # Create a frame to hold the spinner (fixed position in the layout)
+    spinner_frame = tk.Frame(root, width=25, height=25, bg=root['bg'])  # Match frame bg to window bg
+
+    # Create a canvas for the spinner with the same background color as the root window
+    spinner_canvas = tk.Canvas(spinner_frame, width=25, height=25, bg=root['bg'], highlightthickness=0)
     spinner_canvas.pack()
 
-    # Draw a larger arc inside the smaller canvas
-    spinner_arc = spinner_canvas.create_arc((2, 2, 22, 22), start=0, extent=30, width=4, outline='blue', style=tk.ARC)
+    # Draw a rotating arc (spinner)
+    spinner_arc = spinner_canvas.create_arc((2, 2, 22, 22), start=0, extent=90, width=4, outline='blue', style=tk.ARC)
+
+    # Initially hide the spinner frame
+    spinner_frame.place_forget()
+
+def start_spinner(x, y):
+    global running
+    running = True  # Set the spinner running flag
+
+     # Make the spinner visible
+    spinner_frame.place(x=x, y=y)  # Adjust position as needed
 
     rotate_spinner()  # Start rotating the spinner
 
-    # Bind the movement and resize events of the root window
-    root.bind("<Configure>", lambda event: schedule_position_update(x, y))
+def stop_spinner():
+    global running
+    running = False  # Stop the spinner from running
 
-def schedule_position_update(x, y):
-    if spinner_window is not None:
-        # Cancel any previous scheduled update to avoid too many updates during resizing
-        if hasattr(root, 'update_id'):
-            root.after_cancel(root.update_id)
-
-        # Schedule a delayed update to avoid rapid, redundant updates
-        root.update_id = root.after(100, lambda: update_spinner_position(x, y))
-
-def update_spinner_position(x, y):
-    if spinner_window is not None:
-        try:
-            # Get the current position of the root window
-            root_x = root.winfo_x()
-            root_y = root.winfo_y()
-
-            # Calculate the spinner position relative to the root window
-            spinner_x = root_x + x
-            spinner_y = root_y + y
-
-            # Position the spinner window relative to the root window's position
-            spinner_window.geometry(f"25x25+{spinner_x}+{spinner_y}")
-        except Exception as e:
-            print(f"Error updating spinner position: {e}")
+    # Hide the spinner frame
+    spinner_frame.place_forget()
 
 def rotate_spinner():
     global spinner_arc
-    if spinner_window is not None and running:
+    if running:
         current_angle = spinner_canvas.itemcget(spinner_arc, 'start')
-        new_angle = (float(current_angle) + 20) % 360 # Adjust rotation speed here
+        new_angle = (float(current_angle) + 20) % 360  # Adjust rotation speed here
         spinner_canvas.itemconfig(spinner_arc, start=new_angle)
-        spinner_canvas.after(50, rotate_spinner) # Adjust the delay for rotation speed
-
-def stop_spinner():
-    global spinner_window, running
-    running = False  # Stop the spinner from running
-
-    if spinner_window is not None:
-        spinner_window.destroy()
-        spinner_window = None
+        spinner_canvas.after(50, rotate_spinner)  # Adjust the delay for rotation speed
 
 ############################# Set GUI icon ##########################
 def set_icon():
@@ -1571,8 +1546,8 @@ exceptions = [treeview, vsb, frame_login]
 root.bind("<Button-1>", on_click)
 
 
-spinner_window = None
-running = False
+# Create the spinner as part of the layout
+create_spinner_widget()
 
 root.mainloop()
 
