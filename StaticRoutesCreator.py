@@ -19,7 +19,7 @@ from System import Type
 from System.Reflection import BindingFlags
 from System.Net import IPAddress
 
-__version__ = '2.12.2'
+__version__ = '2.12.3'
 
 default_file_path = os.path.join(r'C:\TwinCAT\3.1\Target', 'StaticRoutes.xml')
 
@@ -1116,14 +1116,16 @@ def create_tc_routes():
     
 ############################################### Test Routes ##################################################################
 # Track the number of active threads
-max_threads = 3
+max_threads = 5
 semaphore = threading.Semaphore(max_threads)
 active_threads = 0
 lock = threading.Lock()
 
 def test_tc_routes():
-    start_spinner(305,305)
     global active_threads
+    if active_threads != 0:
+        return
+    start_spinner(190, 165)
     data = get_data_for_routes()
     if not data:
         messagebox.showerror("Attention", "Routes table is empty!")
@@ -1135,6 +1137,17 @@ def test_tc_routes():
 
     for entry in data:
         threading.Thread(target=test_route_and_update_ui, args=(entry,)).start()
+
+def test_tc_routes_no_thread():
+    start_spinner(210, 225)
+    data = get_data_for_routes()
+    if not data:
+        messagebox.showerror("Attention", "Routes table is empty!")
+        stop_spinner()
+        return None
+    
+    for entry in data:
+        test_route_and_update_ui(entry,)
 
 def test_route_and_update_ui(entry):
     global active_threads
@@ -1151,7 +1164,7 @@ def test_route_and_update_ui(entry):
             active_threads -= 1
             if active_threads == 0:
                 treeview.after(0, lambda: treeview.selection_remove(treeview.selection()))
-                treeview.after(0, stop_spinner())
+                treeview.after(0, stop_spinner)
 
 def test_connection(ams_net_id, port, name):
     plc = pyads.Connection(ams_net_id, port)
@@ -1181,7 +1194,7 @@ def test_connection(ams_net_id, port, name):
         # Ensure the connection is closed if it was successfully opened
         if plc.is_open:
             plc.close()
-        time.sleep(1)
+        time.sleep(0.5)
 
 
 def update_ui_with_result(name, connection_ok):
@@ -1252,14 +1265,15 @@ def is_descendant(widget, parent):
     return False
 
 def on_click(event):
+    # print(f"x: {root.winfo_pointerx()}, y: {root.winfo_pointery()}")
     widget = event.widget
     if widget not in exceptions and not any(is_descendant(widget, exception) for exception in exceptions):
         treeview.selection_remove(treeview.selection())
 
 
 ############################# Spinner ###########################################3
-def start_spinner(x=200, y=200):  # Set default position to (200, 200)
-    global spinner_window, spinner_canvas, spinner_arc, follow_cursor, running
+def start_spinner(x=50, y=50):  # Default position relative to the GUI window
+    global spinner_window, spinner_canvas, spinner_arc, running
     running = True  # Set the spinner running flag
     spinner_window = tk.Toplevel(root)
     spinner_window.overrideredirect(True)
@@ -1267,28 +1281,56 @@ def start_spinner(x=200, y=200):  # Set default position to (200, 200)
     # Make the window background transparent
     spinner_window.wm_attributes("-transparentcolor", "white")
     
-    # Set the spinner position at (x, y)
-    spinner_window.geometry(f"25x25+{x}+{y}")
+    # Initially set the spinner position relative to the GUI window
+    update_spinner_position(x, y)
 
-    # Create a transparent canvas
+    # Create a transparent canvas, smaller
     spinner_canvas = tk.Canvas(spinner_window, width=25, height=25, bg="white", highlightthickness=0)
     spinner_canvas.pack()
 
-    # Draw a slightly larger arc for the spinner
-    spinner_arc = spinner_canvas.create_arc((2, 2, 22, 22), start=0, extent=90, width=4, outline='blue', style=tk.ARC)
+    # Draw a larger arc inside the smaller canvas
+    spinner_arc = spinner_canvas.create_arc((2, 2, 22, 22), start=0, extent=30, width=4, outline='blue', style=tk.ARC)
 
     rotate_spinner()  # Start rotating the spinner
 
+    # Bind the movement and resize events of the root window
+    root.bind("<Configure>", lambda event: schedule_position_update(x, y))
+
+def schedule_position_update(x, y):
+    if spinner_window is not None:
+        # Cancel any previous scheduled update to avoid too many updates during resizing
+        if hasattr(root, 'update_id'):
+            root.after_cancel(root.update_id)
+
+        # Schedule a delayed update to avoid rapid, redundant updates
+        root.update_id = root.after(100, lambda: update_spinner_position(x, y))
+
+def update_spinner_position(x, y):
+    if spinner_window is not None:
+        try:
+            # Get the current position of the root window
+            root_x = root.winfo_x()
+            root_y = root.winfo_y()
+
+            # Calculate the spinner position relative to the root window
+            spinner_x = root_x + x
+            spinner_y = root_y + y
+
+            # Position the spinner window relative to the root window's position
+            spinner_window.geometry(f"25x25+{spinner_x}+{spinner_y}")
+        except Exception as e:
+            print(f"Error updating spinner position: {e}")
+
 def rotate_spinner():
     global spinner_arc
-    if spinner_window is not None:
+    if spinner_window is not None and running:
         current_angle = spinner_canvas.itemcget(spinner_arc, 'start')
-        new_angle = (float(current_angle) + 15) % 360
+        new_angle = (float(current_angle) + 20) % 360 # Adjust rotation speed here
         spinner_canvas.itemconfig(spinner_arc, start=new_angle)
-        spinner_canvas.after(40, rotate_spinner)
+        spinner_canvas.after(50, rotate_spinner) # Adjust the delay for rotation speed
 
 def stop_spinner():
-    global spinner_window, follow_cursor, running
+    global spinner_window, running
     running = False  # Stop the spinner from running
 
     if spinner_window is not None:
@@ -1530,7 +1572,6 @@ root.bind("<Button-1>", on_click)
 
 
 spinner_window = None
-follow_cursor = False
 running = False
 
 root.mainloop()
