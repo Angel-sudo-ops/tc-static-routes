@@ -1125,6 +1125,9 @@ def test_tc_routes():
     global active_threads
     if active_threads != 0:
         return
+    # Set bakc to black when testing again
+    for item in treeview.get_children():
+            treeview.item(item, tags=("black"))
     start_spinner(190, 133)
     data = get_data_for_routes()
     if not data:
@@ -1489,6 +1492,7 @@ treeview.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 # Define tags in your Treeview setup
 treeview.tag_configure('green', foreground='green')
 treeview.tag_configure('red', foreground='red')
+treeview.tag_configure('black', foreground='black')
 
 setup_treeview()
 
