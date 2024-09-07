@@ -19,7 +19,7 @@ from System import Type
 from System.Reflection import BindingFlags
 from System.Net import IPAddress
 
-__version__ = '2.12.3'
+__version__ = '2.12.4'
 
 default_file_path = os.path.join(r'C:\TwinCAT\3.1\Target', 'StaticRoutes.xml')
 
@@ -1115,32 +1115,6 @@ def create_tc_routes():
 
     
 ############################################### Test Routes ##################################################################
-# Track the number of active threads
-max_threads = 5
-semaphore = threading.Semaphore(max_threads)
-active_threads = 0
-lock = threading.Lock()
-
-def test_tc_routes():
-    global active_threads
-    if active_threads != 0:
-        return
-    # Set bakc to black when testing again
-    for item in treeview.get_children():
-            treeview.item(item, tags=("black"))
-    start_spinner(190, 133)
-    data = get_data_for_routes()
-    if not data:
-        messagebox.showerror("Attention", "Routes table is empty!")
-        stop_spinner()
-        return None
-    
-    with lock:
-        active_threads = len(data)
-
-    for entry in data:
-        threading.Thread(target=test_route_and_update_ui, args=(entry,)).start()
-
 def test_tc_routes_no_thread():
     # start_spinner(210, 225)
     data = get_data_for_routes()
@@ -1152,22 +1126,71 @@ def test_tc_routes_no_thread():
     for entry in data:
         test_route_and_update_ui(entry,)
 
+
+# Track the number of active threads
+max_threads = 5
+semaphore = threading.Semaphore(max_threads)
+active_threads = 0
+lock = threading.Lock()
+
+def test_tc_routes():
+    global active_threads
+    if active_threads != 0:
+        return
+    
+    data = get_data_for_routes()
+    if not data:
+        messagebox.showerror("Attention", "Routes table is empty!")
+        stop_spinner()
+        return None
+    
+     # Set back to black when testing again
+     # only tested routes if selected, if not all of them
+    # for item in treeview.get_children():
+    selected = treeview.selection()
+    if selected:
+        for item in selected:
+            treeview.item(item, tags=("black"))
+    else:
+        for item in treeview.get_children():
+            treeview.item(item, tags=("black"))
+
+    start_spinner(190, 133)
+    
+    with lock:
+        active_threads = len(data)
+
+    start_thread_for_route(data)
+
+def start_thread_for_route(data):
+    global active_threads
+    # Check if there are routes left to test
+    if not data:
+        return
+    
+    entry = data.pop(0)  # Get the next entry
+    
+    threading.Thread(target=test_route_and_update_ui, args=(entry,)).start()
+
+    # Schedule the next thread execution
+    treeview.after(100, lambda: start_thread_for_route(data))
+
 def test_route_and_update_ui(entry):
     global active_threads
     name, ip, ams_net_id, type_ = entry
     port = 851 if type_ == 'TC3' else 801
 
-    # Use semaphore to control the number of concurrent threads
-    with semaphore:
-        connection_ok = test_connection(ams_net_id, port, name)
-        update_ui_with_result(name, connection_ok)
+    connection_ok = test_connection(ams_net_id, port, name)
+    update_ui_with_result(name, connection_ok)
 
-        # Decrement the thread counter and check if all threads are done
-        with lock:
-            active_threads -= 1
-            if active_threads == 0:
-                treeview.after(0, lambda: treeview.selection_remove(treeview.selection()))
-                treeview.after(0, stop_spinner)
+    # Decrement the thread counter and check if all threads are done
+    with lock:
+        active_threads -= 1
+        if active_threads == 0:
+            # Ensure that the spinner stops and the selection is removed after the UI update
+            treeview.after(0, lambda: stop_spinner())
+            treeview.after(0, lambda: treeview.selection_remove(treeview.selection()))
+
 
 def test_connection(ams_net_id, port, name):
     plc = pyads.Connection(ams_net_id, port)
