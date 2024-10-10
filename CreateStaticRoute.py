@@ -154,7 +154,7 @@ class RouteManager:
             retries = 0
             state = TcpStateObject()
             c = 0
-
+            timeout_occurred = False
             while retries < 1 and not self.AddRouteSuccess and not self.AddRouteError:
                 await loop.sock_sendall(self.UDPSocket, sendbuf)
                 print(f"Message sent. Polling for response... (Attempt {retries + 1})")
@@ -167,14 +167,18 @@ class RouteManager:
                         await self.DataReceivedA(self.UDPSocket, state)
                     else:
                         print("Timeout while waiting for data")
+                        timeout_occurred = True  # Set the timeout flag
                         break  # Exit the loop if the timeout occurs
 
                     c += 1
 
                 retries += 1
 
-            # If after polling c >= 40, throw an exception indicating no response
-            if c >= 40:
+            # Only set RouteAdded to True if AddRouteSuccess is explicitly True
+            if self.AddRouteSuccess:
+                self.RouteAdded = True
+                print("Route added successfully!")
+            elif c >= 40:
                 self.RouteAdded = False
                 print(f"No response from the remote system after {c} cycles.")
                 raise Exception("No response from remote system. Make sure firewall is off and check username, password, and computer name.")
@@ -182,9 +186,9 @@ class RouteManager:
                 self.RouteAdded = False
                 print("Error encountered while adding route.")
                 raise Exception("Error setting up remote system, check TwinCATCom for username, password, and computer name.")
-
-            self.RouteAdded = True
-            print("Route added successfully!")
+            elif timeout_occurred:
+                self.RouteAdded = False
+                print("Route was not added due to select timeout.")
 
         finally:
             self.UDPSocket.close()
