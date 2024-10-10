@@ -3,6 +3,7 @@ import struct
 import socket
 import platform
 import pyads
+import select
 
 def get_local_ams_netid():
     ams_net_id=None
@@ -33,6 +34,7 @@ class TcpStateObject:
     def __init__(self):
         self.data = bytearray(1024)  # Buffer size, adjust as needed
         self.CurrentIndex = 0
+
 
 class RouteManager:
     def __init__(self):
@@ -68,6 +70,7 @@ class RouteManager:
         sendbuf[10] = 0
         sendbuf[11] = 0
 
+        # Copy AMS Net ID into the buffer at the correct position
         sendbuf[12:18] = my_ams_net_id
 
         sendbuf[18] = 16
@@ -97,6 +100,7 @@ class RouteManager:
         sendbuf[i+2] = 6
         i += 3
 
+        # Copy AMS Net ID again into the buffer
         sendbuf[i:i+6] = my_ams_net_id
         i += 6
 
@@ -145,7 +149,6 @@ class RouteManager:
         loop = asyncio.get_event_loop()
         self.UDPSocket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.UDPSocket.setblocking(False)
-        self.UDPSocket.settimeout(2.0)
         self.UDPSocket.connect(address)
         try:
             retries = 0
@@ -154,18 +157,19 @@ class RouteManager:
 
             while retries < 1 and not self.AddRouteSuccess and not self.AddRouteError:
                 await loop.sock_sendall(self.UDPSocket, sendbuf)
-                # self.UDPSocket.sendto(sendbuf, address)
                 print(f"Message sent. Polling for response... (Attempt {retries + 1})")
 
                 # Polling mechanism to check for route addition success or error
                 while not self.AddRouteSuccess and not self.AddRouteError and c < 80:
-                    try:
-                        await asyncio.sleep(0.025)  # Non-blocking sleep for 25ms
+                    # Use select to monitor the socket for readability (timeout of 2 seconds)
+                    readable, _, _ = select.select([self.UDPSocket], [], [], 2.0)
+                    if readable:
                         await self.DataReceivedA(self.UDPSocket, state)
-                        c += 1
-                    except socket.timeout:
+                    else:
                         print("Timeout while waiting for data")
                         break  # Exit the loop if the timeout occurs
+
+                    c += 1
 
                 retries += 1
 
@@ -212,10 +216,6 @@ class RouteManager:
                 # Continue receiving asynchronously until enough data is received
                 await self.DataReceivedA(udp_socket, state_obj)
 
-        except socket.timeout:
-            print("Timeout occurred during data reception.")
-            return
-        
         except Exception as e:
             print(f"Error receiving data: {e}")
             return
