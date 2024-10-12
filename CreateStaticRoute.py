@@ -31,6 +31,20 @@ def string_to_byte_format(ip_string):
 def string_to_int_array (ip_string):
     return list(map(int, ip_string.split('.')))
 
+def get_local_ip():
+    try:
+        # Create a dummy socket to get the local IP
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.settimeout(0)
+        # Connect to a public address (no real connection is made)
+        s.connect(('8.8.8.8', 80))
+        local_ip = s.getsockname()[0]
+        s.close()
+        return local_ip
+    except Exception as e:
+        return f"Error: {e}"
+
+
 
 class TcpStateObject:
     def __init__(self):
@@ -89,8 +103,9 @@ class RouteManager:
         sendbuf[24] = 12
         sendbuf[25] = 0
         sendbuf[26] = len(router_table_name) + 1
-
-        i = 27
+        sendbuf[27] = 0
+ 
+        i = 28
         sendbuf[i:i+len(router_table_name)] = router_table_name.encode('ascii')
         i += len(router_table_name)
 
@@ -100,14 +115,16 @@ class RouteManager:
         sendbuf[i] = 7
         sendbuf[i+1] = 0
         sendbuf[i+2] = 6
-        i += 3
+        sendbuf[i+3] = 0
+        i += 4
 
         # Copy AMS Net ID again into the buffer
         sendbuf[i:i+6] = my_ams_net_id
         i += 6
 
         sendbuf[i] = 13
-        i += 1
+        sendbuf[i+1] = 0
+        i += 2
 
         sendbuf[i] = len(username) + 1
         sendbuf[i+1] = 0
@@ -121,6 +138,9 @@ class RouteManager:
 
         sendbuf[i] = 2
         sendbuf[i+1] = 0
+
+        if password == None: password = ""
+
         sendbuf[i+2] = len(password) + 1
         sendbuf[i+3] = 0
         i += 4
@@ -146,13 +166,17 @@ class RouteManager:
         if len(sendbuf) >= i + 8:
             sendbuf[i:i+8] = struct.pack('BBBBBBBB', 9, 0, 4, 0, 1, 0, 0, 0)
 
+        print(sendbuf)
+        print(sendbuf.hex())
+        print(len(sendbuf))
+
         # Now create the UDP socket and send the message asynchronously
         address = (remote_ip, 48899)  # Replace <target_ip> with the actual target IP
         loop = asyncio.get_event_loop()
         self.UDPSocket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.UDPSocket.settimeout(5.0)
         # self.UDPSocket.bind((local_ip, 0))
-        self.UDPSocket.setblocking(True)
+        self.UDPSocket.setblocking(False)
         self.UDPSocket.connect(address)
         # self.UDPSocket.connect(address)
         try:
@@ -160,7 +184,7 @@ class RouteManager:
             state = TcpStateObject()
             c = 0
             timeout_occurred = False
-            bypass_read = True
+            bypass_read = False
             while retries < 1 and not self.AddRouteSuccess and not self.AddRouteError:
                 # await loop.sock_sendall(self.UDPSocket, sendbuf)
                 self.UDPSocket.send(sendbuf)
@@ -220,6 +244,7 @@ class RouteManager:
 
                 if state_obj.data[27] == 0 and state_obj.data[28] == 0 and state_obj.data[29] == 0 and state_obj.data[30] == 0:
                     self.AddRouteSuccess = True
+                    print("SUCCESS!!!!")
                     print(f"Route added successfully. Remote AMSNetID: {self._remoteAMSNetID}")
                 else:
                     self.AddRouteError = True
@@ -250,13 +275,20 @@ async def main():
     print(ams_net_id_bit)
     ams_net_id_array = string_to_int_array(ams_net_id)
     print(ams_net_id_array)
+
     remote_ip = '10.40.10.74' # LGV05
     user = 'Administrator'
     pass_ = '1'
+    
+    machine_ip = get_local_ip()
+    print(machine_ip)
+    
+    net_id = ams_net_id.split('.')
+    local_ip = '.'.join(net_id[:4])
+
     system_name = platform.node()
-    machine_ip = '10.40.10.200'
     print(system_name)
-    await route_manager.EZRegisterToRemote(system_name, machine_ip, ams_net_id_bit, user, pass_, remote_ip, use_static_route=True)
+    await route_manager.EZRegisterToRemote(system_name, local_ip, ams_net_id_bit, user, pass_, remote_ip, use_static_route=True)
 
 # Run the async main function
 asyncio.run(main())
