@@ -28,6 +28,8 @@ def string_to_byte_format(ip_string):
     
     return byte_representation
 
+def string_to_int_array (ip_string):
+    return list(map(int, ip_string.split('.')))
 
 
 class TcpStateObject:
@@ -71,7 +73,7 @@ class RouteManager:
         sendbuf[11] = 0
 
         # Copy AMS Net ID into the buffer at the correct position
-        sendbuf[12:18] = my_ams_net_id
+        sendbuf[12:18] = my_ams_net_id 
 
         sendbuf[18] = 16
         sendbuf[19] = 39
@@ -148,22 +150,27 @@ class RouteManager:
         address = (remote_ip, 48899)  # Replace <target_ip> with the actual target IP
         loop = asyncio.get_event_loop()
         self.UDPSocket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self.UDPSocket.setblocking(False)
+        self.UDPSocket.settimeout(5.0)
+        # self.UDPSocket.bind((local_ip, 0))
+        self.UDPSocket.setblocking(True)
         self.UDPSocket.connect(address)
+        # self.UDPSocket.connect(address)
         try:
             retries = 0
             state = TcpStateObject()
             c = 0
             timeout_occurred = False
+            bypass_read = True
             while retries < 1 and not self.AddRouteSuccess and not self.AddRouteError:
-                await loop.sock_sendall(self.UDPSocket, sendbuf)
+                # await loop.sock_sendall(self.UDPSocket, sendbuf)
+                self.UDPSocket.send(sendbuf)
                 print(f"Message sent. Polling for response... (Attempt {retries + 1})")
 
                 # Polling mechanism to check for route addition success or error
                 while not self.AddRouteSuccess and not self.AddRouteError and c < 80:
                     # Use select to monitor the socket for readability (timeout of 2 seconds)
                     readable, _, _ = select.select([self.UDPSocket], [], [], 5.0)
-                    if readable:
+                    if readable or bypass_read:
                         await self.DataReceivedA(self.UDPSocket, state)
                     else:
                         print("Timeout while waiting for data")
@@ -196,13 +203,17 @@ class RouteManager:
 
     async def DataReceivedA(self, udp_socket, state_obj):
         try:
-            loop = asyncio.get_event_loop()
-            bytes_received = await loop.sock_recv(udp_socket, len(state_obj.data) - state_obj.CurrentIndex)
-            state_obj.CurrentIndex += bytes_received
+            # Receive UDP message, block call, wait for data    
+            bytes_received = udp_socket.recv(len(state_obj.data) - state_obj.CurrentIndex)
+
+            # Update buffer
+            state_obj.CurrentIndex += len(bytes_received)
+            state_obj.data[state_obj.CurrentIndex:state_obj.CurrentIndex + len(bytes_received)] = bytes_received
 
             if state_obj.CurrentIndex > 31:
                 AMSNetID = f"{state_obj.data[12]}.{state_obj.data[13]}.{state_obj.data[14]}.{state_obj.data[15]}.{state_obj.data[16]}.{state_obj.data[17]}"
                 PortNumber = struct.unpack_from('<H', state_obj.data, 18)[0]
+                print(PortNumber)
 
                 self._remoteAMSNetID = AMSNetID
                 self.ADSErrorCode = state_obj.data[28] + state_obj.data[29] * 256
@@ -219,6 +230,12 @@ class RouteManager:
             else:
                 # Continue receiving asynchronously until enough data is received
                 await self.DataReceivedA(udp_socket, state_obj)
+        
+        except socket.timeout:
+            print("Socket timed out waiting for a response")
+        
+        except BlockingIOError:
+            print("No data available right now, try again later")
 
         except Exception as e:
             print(f"Error receiving data: {e}")
@@ -231,12 +248,15 @@ async def main():
     print(ams_net_id)
     ams_net_id_bit = string_to_byte_format(ams_net_id)
     print(ams_net_id_bit)
-    remote_ip = '10.40.10.74'
+    ams_net_id_array = string_to_int_array(ams_net_id)
+    print(ams_net_id_array)
+    remote_ip = '10.40.10.74' # LGV05
     user = 'Administrator'
     pass_ = '1'
     system_name = platform.node()
+    machine_ip = '10.40.10.200'
     print(system_name)
-    await route_manager.EZRegisterToRemote(system_name, '10.40.10.200', ams_net_id_bit, user, pass_, remote_ip, use_static_route=True)
+    await route_manager.EZRegisterToRemote(system_name, machine_ip, ams_net_id_bit, user, pass_, remote_ip, use_static_route=True)
 
 # Run the async main function
 asyncio.run(main())
