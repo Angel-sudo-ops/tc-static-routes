@@ -139,8 +139,6 @@ class RouteManager:
         sendbuf[i] = 2
         sendbuf[i+1] = 0
 
-        if password == None: password = ""
-
         sendbuf[i+2] = len(password) + 1
         sendbuf[i+3] = 0
         i += 4
@@ -184,7 +182,6 @@ class RouteManager:
             state = TcpStateObject()
             c = 0
             timeout_occurred = False
-            bypass_read = False
             while retries < 1 and not self.AddRouteSuccess and not self.AddRouteError:
                 # await loop.sock_sendall(self.UDPSocket, sendbuf)
                 self.UDPSocket.send(sendbuf)
@@ -193,13 +190,13 @@ class RouteManager:
                 # Polling mechanism to check for route addition success or error
                 while not self.AddRouteSuccess and not self.AddRouteError and c < 80:
                     # Use select to monitor the socket for readability (timeout of 2 seconds)
-                    readable, _, _ = select.select([self.UDPSocket], [], [], 5.0)
-                    if readable or bypass_read:
+                    readable, _, _ = select.select([self.UDPSocket], [], [], 2.0)
+                    if readable:
                         await self.DataReceivedA(self.UDPSocket, state)
                     else:
                         print("Timeout while waiting for data")
                         timeout_occurred = True  # Set the timeout flag
-                        break  # Exit the loop if the timeout occurs
+                        # break  # Exit the loop if the timeout occurs
 
                     c += 1
 
@@ -212,11 +209,13 @@ class RouteManager:
             elif c >= 40:
                 self.RouteAdded = False
                 print(f"No response from the remote system after {c} cycles.")
-                raise Exception("No response from remote system. Make sure firewall is off and check username, password, and computer name.")
+                # raise Exception("No response from remote system. Make sure firewall is off and check username, password, and computer name.")
+                print("No response from remote system. Make sure firewall is off and check username, password, and computer name.")
             elif self.AddRouteError:
                 self.RouteAdded = False
                 print("Error encountered while adding route.")
-                raise Exception("Error setting up remote system, check TwinCATCom for username, password, and computer name.")
+                # raise Exception("Error setting up remote system, check TwinCATCom for username, password, and computer name.")
+                print("Error setting up remote system, check TwinCATCom for username, password, and computer name.")
             elif timeout_occurred:
                 self.RouteAdded = False
                 print("Route was not added due to select timeout.")
@@ -276,10 +275,12 @@ async def main():
     ams_net_id_array = string_to_int_array(ams_net_id)
     print(ams_net_id_array)
 
+    # Remote PLC to create route to
     remote_ip = '10.40.10.74' # LGV05
     user = 'Administrator'
     pass_ = '1'
     
+    # Not used
     machine_ip = get_local_ip()
     print(machine_ip)
     
