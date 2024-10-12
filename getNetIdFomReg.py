@@ -1,4 +1,7 @@
 import winreg
+import tkinter as tk
+from tkinter import ttk
+from tkinter import messagebox
 
 def get_ams_net_id():
     paths = [
@@ -27,10 +30,34 @@ def format_ams_net_id(raw_net_id):
     # Convert the byte array to an IP-like string format
     return '.'.join(str(byte) for byte in raw_net_id)
 
-# Get and print the AMS Net ID
-raw_ams_net_id = get_ams_net_id()
-if raw_ams_net_id:
-    formatted_ams_net_id = format_ams_net_id(raw_ams_net_id)
-    print(f"Local AMS Net ID: {formatted_ams_net_id}")
-else:
-    print("Failed to retrieve the AMS Net ID.")
+def on_button_click():
+    # Retrieve the AMS Net ID
+    raw_ams_net_id = get_ams_net_id()
+    
+    if raw_ams_net_id:
+        formatted_ams_net_id = format_ams_net_id(raw_ams_net_id)
+        ams_net_id_var.set(formatted_ams_net_id)
+    else:
+        messagebox.showerror("Error", "Failed to retrieve the AMS Net ID.")
+        ams_net_id_var.set("")
+
+# Create the Tkinter window
+root = tk.Tk()
+root.title("NetID Finder")
+root.geometry("250x150")
+
+# Label for AMS Net ID
+ttk.Label(root, text="Local AMS Net ID:").pack(pady=10)
+
+# StringVar to hold the AMS Net ID
+ams_net_id_var = tk.StringVar()
+
+# Entry field to display the AMS Net ID
+ams_net_id_entry = ttk.Entry(root, textvariable=ams_net_id_var, state="readonly")
+ams_net_id_entry.pack(pady=10)
+
+# Button to trigger AMS Net ID retrieval
+ttk.Button(root, text="Get AMS Net ID", command=on_button_click).pack(pady=10)
+
+# Start the Tkinter event loop
+root.mainloop()
