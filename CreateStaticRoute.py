@@ -190,7 +190,7 @@ class RouteManager:
                 # Polling mechanism to check for route addition success or error
                 while not self.AddRouteSuccess and not self.AddRouteError and c < 80:
                     # Use select to monitor the socket for readability (timeout of 2 seconds)
-                    readable, _, _ = select.select([self.UDPSocket], [], [], 2.0)
+                    readable, _, _ = select.select([self.UDPSocket], [], [], 0.25)
                     if readable:
                         await self.DataReceivedA(self.UDPSocket, state)
                     else:
@@ -276,7 +276,7 @@ async def main():
     print(ams_net_id_array)
 
     # Remote PLC to create route to
-    remote_ip = '10.40.10.74' # LGV05
+    remote_ip = '10.40.10.71' # LGV05
     user = 'Administrator'
     pass_ = '1'
     
