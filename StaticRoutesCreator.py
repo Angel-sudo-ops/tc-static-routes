@@ -19,7 +19,7 @@ from System import Type
 from System.Reflection import BindingFlags
 from System.Net import IPAddress
 
-__version__ = '2.12.4'
+__version__ = '3.3.4'
 
 default_file_path = os.path.join(r'C:\TwinCAT\3.1\Target', 'StaticRoutes.xml')
 
@@ -157,7 +157,7 @@ def create_routes_xml(project, lgv_list, base_ip, file_path, is_tc3):
     # tree = ET.ElementTree(config)
     # tree.write(file_path, encoding="utf-8", xml_declaration=True)
 
-    xmlstr = minidom.parseString(ET.tostring(config)).toprettyxml(indent="   ")
+    xmlstr = minidom.parseString(ET.tostring(config)).toprettyxml(indent="    ")
     #pretty_file_path = os.path.splitext(file_path)[0] + "_pretty.xml"
     with open(file_path, "w") as f:
         f.write(xmlstr)
@@ -196,7 +196,7 @@ def convert_static_to_cc(static_routes_file, CC_file):
     # Pretty print the XML
     raw_string = ET.tostring(CC_root, 'utf-8')
     reparsed = minidom.parseString(raw_string)
-    pretty_xml = reparsed.toprettyxml(indent="  ")
+    pretty_xml = reparsed.toprettyxml(indent="    ")
     
     # Write to the file
     with open(CC_file, 'w', encoding='utf-8') as f:
@@ -577,7 +577,7 @@ def create_routes_xml_from_table(file_path):
             ET.SubElement(route_element, "Flags").text = "32"
 
     # Convert to a pretty XML string
-    xmlstr = minidom.parseString(ET.tostring(config, 'utf-8')).toprettyxml(indent="   ")
+    xmlstr = minidom.parseString(ET.tostring(config, 'utf-8')).toprettyxml(indent="    ")
 
     # Write to a file
     with open(file_path, "w", encoding='utf-8') as f:
@@ -621,7 +621,7 @@ def create_cc_xml_from_table(file_path):
             netid_element.text = netid
 
     # Convert to a pretty XML string
-    xmlstr = minidom.parseString(ET.tostring(fleet, 'utf-8')).toprettyxml(indent="   ")
+    xmlstr = minidom.parseString(ET.tostring(fleet, 'utf-8')).toprettyxml(indent="    ")
 
     # Write to a file
     with open(file_path, "w", encoding='utf-8') as f:
@@ -974,75 +974,6 @@ def save_winscp_ini():
 
 ######################################################## Create TC Routes ############################################################################
 
-def load_dll():
-    # Determine if the application is running as a standalone executable
-    if getattr(sys, 'frozen', False):
-        # If the application is frozen (bundled by PyInstaller), get the path of the executable
-        base_path = sys._MEIPASS
-    else:
-        # If running as a script, use the current directory
-        base_path = os.path.dirname(os.path.abspath(__file__))
-
-    # Construct the full path to the DLL
-    dll_path = os.path.join(base_path, "CRADSDriver.dll")
-
-    # Load the assembly
-    clr.AddReference(dll_path)
-
-def initialize_twincat_com():
-    # Use the fully qualified name, including the assembly name, if necessary
-    assembly_name = "CRADSDriver"
-    type_name = "TwinCATAds.TwinCATCom, " + assembly_name
-
-    # Get the type using the fully qualified name
-    twincat_type = Type.GetType(type_name)
-
-    if twincat_type is None:
-        print(f"Failed to find type '{type_name}'")
-        return None
-
-    # Instantiate the TwinCATCom object using Activator
-    twincat_com = Activator.CreateInstance(twincat_type)
-
-    # Manually invoke CreateDLLInstance method to ensure initialization
-    create_dll_instance_method = twincat_type.GetMethod(
-        "CreateDLLInstance",
-        BindingFlags.NonPublic | BindingFlags.Instance
-    )
-    if create_dll_instance_method:
-        create_dll_instance_method.Invoke(twincat_com, None)
-    else:
-        print("Failed to locate CreateDLLInstance method")
-        return None
-
-    # Check the DLL dictionary and manually add an entry if necessary
-    my_dll_instance_field = twincat_type.GetField("MyDLLInstance", BindingFlags.NonPublic | BindingFlags.Instance)
-    dll_field = twincat_type.GetField("DLL", BindingFlags.NonPublic | BindingFlags.Static)
-    
-    if my_dll_instance_field and dll_field:
-        my_dll_instance_value = my_dll_instance_field.GetValue(twincat_com)
-        dll_dict = dll_field.GetValue(None)
-        print(f"MyDLLInstance value after CreateDLLInstance: {my_dll_instance_value}")
-        print(f"DLL Dictionary contains {len(dll_dict)} items after CreateDLLInstance")
-
-        if my_dll_instance_value not in dll_dict:
-            ads_for_twincat_ex_type = Type.GetType("TwinCATAds.ADSforTwinCATEx, " + assembly_name)
-            if ads_for_twincat_ex_type:
-                ads_for_twincat_ex = Activator.CreateInstance(ads_for_twincat_ex_type)
-                # ADSforTwinCATEx is the type of values for the DLL dictionary
-                dll_dict[my_dll_instance_value] = ads_for_twincat_ex 
-                print(f"Manually added DLL entry for key {my_dll_instance_value}")
-            else:
-                print("Failed to create ADSforTwinCATEx instance")
-                return None
-            
-    # Check the DLL dictionary after manual insertion
-    if dll_field:
-        dll_dict = dll_field.GetValue(None)
-        print(f"DLL Dictionary contains {len(dll_dict)} items after manual insertion")
-
-    return twincat_com
-
 def get_local_ams_netid():
     # Use the fully qualified name, including the assembly name, if necessary
     assembly_name = "CRADSDriver"
@@ -1062,6 +993,20 @@ def get_local_ams_netid():
     print(f"Local AMS NetID: {local_ams_netid}")
 
     return local_ams_netid
+
+
+def get_local_ams_netid_pyads():
+    ams_net_id=None
+    try:
+        pyads.open_port()
+        ams_net_id = pyads.get_local_address().netid
+        print (ams_net_id)
+    except Exception as e:
+        print(f"Unexpected error: {e} \nCheck if TwinCAT on local machine is running")
+    finally:
+        pyads.close_port()
+
+    return ams_net_id
 
 def create_route(twincat_com, entry, username, password, netid_ip, system_name):
     name, ip, amsnet_id, type_ = entry
@@ -1091,7 +1036,7 @@ def create_route(twincat_com, entry, username, password, netid_ip, system_name):
         messagebox.showerror(f"Failed To Create Route For {name}", f"Error during route creation for {name} ({ip}): {e}")
 
 def create_tc_routes_from_data(data, username, password):
-    load_dll()
+    load_dlls()
     # Initialize TwinCATCom only once
     twincat_com = initialize_twincat_com()
     if not twincat_com:
@@ -1103,6 +1048,7 @@ def create_tc_routes_from_data(data, username, password):
     system_name = platform.node()
     print(f"IP: {netid_ip}")
     print(f"System Name: {system_name}")
+    get_local_ams_netid_pyads()
     for entry in data:
         threading.Thread(target=create_route, args=(twincat_com, entry, username, password, netid_ip, system_name)).start()
 
@@ -1115,6 +1061,7 @@ def create_tc_routes():
 
     
 ############################################### Test Routes ##################################################################
+# Not used
 def test_tc_routes_no_thread():
     # start_spinner(210, 225)
     data = get_data_for_routes()
@@ -1162,8 +1109,8 @@ def test_tc_routes():
 
     start_thread_for_route(data)
 
+
 def start_thread_for_route(data):
-    global active_threads
     # Check if there are routes left to test
     if not data:
         return
@@ -1174,6 +1121,7 @@ def start_thread_for_route(data):
 
     # Schedule the next thread execution
     treeview.after(100, lambda: start_thread_for_route(data))
+
 
 def test_route_and_update_ui(entry):
     global active_threads
