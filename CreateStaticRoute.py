@@ -162,7 +162,7 @@ class RouteManager:
                 # Polling mechanism to check for route addition success or error
                 while not self.AddRouteSuccess and not self.AddRouteError and c < 80:
                     # Use select to monitor the socket for readability (timeout of 2 seconds)
-                    readable, _, _ = select.select([self.UDPSocket], [], [], 2.0)
+                    readable, _, _ = select.select([self.UDPSocket], [], [], 5.0)
                     if readable:
                         await self.DataReceivedA(self.UDPSocket, state)
                     else:
@@ -231,12 +231,12 @@ async def main():
     print(ams_net_id)
     ams_net_id_bit = string_to_byte_format(ams_net_id)
     print(ams_net_id_bit)
-    remote_ip = '10.40.10.79'
+    remote_ip = '10.40.10.74'
     user = 'Administrator'
     pass_ = '1'
     system_name = platform.node()
     print(system_name)
-    await route_manager.EZRegisterToRemote(system_name, '192.168.1.100', ams_net_id_bit, user, pass_, remote_ip, use_static_route=True)
+    await route_manager.EZRegisterToRemote(system_name, '10.40.10.200', ams_net_id_bit, user, pass_, remote_ip, use_static_route=True)
 
 # Run the async main function
 asyncio.run(main())
