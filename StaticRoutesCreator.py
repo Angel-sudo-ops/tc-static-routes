@@ -912,16 +912,22 @@ def create_winscp_ini_from_table(ini_path, data):
 
     # Create config parser and read the INI file (if it exists)
     config = configparser.ConfigParser()
-    if os.path.exists(ini_path):
-        if config.has_section(r"Sessions\CC1548/LGV41"): #test
-            config.remove_section('SshHostKeys')
-        config.read(ini_path)
-           
+    try:
+        if os.path.exists(ini_path):
+            config.read(ini_path)
+
+    except configparser.DuplicateOptionError as e:
+        print(f"Duplicate option found and skipped: {e}")
+
+    except configparser.ParsingError as e:
+        print(f"Error parsing INI file: {e}")
+        return "Failed to read the INI file due to a parsing error."
+
     # data = get_table_data()
     repeated = 0
     total = 0
     for row in data:
-        total = total + 1 
+        total += 1 
         name, address, netid, tc_type = row
         name_parts = split_string(str(name))
         if name_parts is None:
@@ -949,10 +955,12 @@ def create_winscp_ini_from_table(ini_path, data):
         if tc_type == "TC2":
             config[section_name]['FSProtocol'] = '5'
 
-
-    # Write the session to the INI file
-    with open(ini_path, 'w') as configfile:
-        config.write(configfile)
+    try:
+        with open(ini_path, 'w') as configfile:
+            config.write(configfile)
+    except Exception as e:
+        print(f"An error occurred while writing the INI file: {e}")
+        messagebox.showerror("Error", f"An error occurred while writing the INI file: {e}")
 
     messagebox.showinfo("Success", f"Session created successfully in {ini_path} with {repeated} repeated routes out of {total}")
 
@@ -1130,7 +1138,7 @@ class RouteManager:
                 print(f"Message sent to {remote_ip}. Polling for response... (Attempt {retries + 1})")
 
                 while not self.AddRouteSuccess and not self.AddRouteError and c < 80:
-                    readable, _, _ = select.select([self.UDPSocket], [], [], 0.25)
+                    readable, _, _ = select.select([self.UDPSocket], [], [], 2.0)
                     if readable:
                         await self.DataReceivedA(self.UDPSocket, state)
                     else:
