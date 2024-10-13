@@ -16,8 +16,9 @@ import socket
 import select
 import asyncio
 import struct
+import winreg
 
-__version__ = '3.3.6'
+__version__ = '3.3.7'
 
 default_file_path = os.path.join(r'C:\TwinCAT\3.1\Target', 'StaticRoutes.xml')
 
@@ -1263,6 +1264,8 @@ def create_tc_routes():
         entry = treeview.item(item)["values"]
         # Start the creation process in a new thread for each red-tagged entry
         threading.Thread(target=create_and_retest_route, args=(entry, username, password, local_ams_net_id, system_name)).start()
+        if only_tc2_installed:
+            save_route_tc2(entry)
 
 def create_and_retest_route(entry, username, password, local_ams_net_id, system_name):
     name, remote_ip, ams_net_id, type_ = entry
@@ -1316,6 +1319,65 @@ def log_failed_routes():
 def update_ui_with_result_retest(item, connection_ok):
     color = 'green' if connection_ok else 'red'
     treeview.item(item, tags=(color,))
+
+
+def save_route_tc2(entry, flags=0, timeout=0, transport_type=1):
+    route_name, address, net_id, _ = entry
+    try:
+        reg_path = r"SOFTWARE\WOW6432Node\Beckhoff\TwinCAT\Remote"
+        key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, reg_path, 0, winreg.KEY_SET_VALUE)
+
+        # Create a new subkey for the route using route_name (e.g., "CC1393_01")
+        route_key = winreg.CreateKey(key, route_name)
+        
+        # Set the route details
+        winreg.SetValueEx(route_key, "Address", 0, winreg.REG_SZ, address)
+
+        # Convert the AMS Net ID from string (e.g., "172.168.11.101.1.1") to binary format
+        net_id_bytes = struct.pack('6B', *[int(x) for x in net_id.split('.')])
+        winreg.SetValueEx(route_key, "AmsNetId", 0, winreg.REG_BINARY, net_id_bytes)
+
+        # Set other values (Flags, Timeout, TransportType)
+        winreg.SetValueEx(route_key, "Flags", 0, winreg.REG_DWORD, flags)
+        winreg.SetValueEx(route_key, "Timeout", 0, winreg.REG_DWORD, timeout)
+        winreg.SetValueEx(route_key, "TransportType", 0, winreg.REG_DWORD, transport_type)
+        
+        winreg.CloseKey(route_key)
+        winreg.CloseKey(key)
+        print(f"Route {route_name} added to TwinCAT2 registry.")
+    except PermissionError:
+        print("Access denied: Please run the application as administrator.")
+        messagebox.showerror("Error", "Access denied: Please run the application as administrator.")
+    except Exception as e:
+        print(f"Failed to save route: {e}")
+
+
+only_tc2_installed = False
+
+def check_twinCAT_version():
+    global only_tc2_installed
+    try:
+        # Check if TwinCAT3 is installed
+        tc3_key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\WOW6432Node\Beckhoff\TwinCAT3")
+        print("TwinCAT3 is installed.")
+        messagebox.showinfo("Attention", "TwinCAT3 is installed.")
+        winreg.CloseKey(tc3_key)
+        return "TC3"
+    except FileNotFoundError:
+        pass
+    
+    try:
+        # Check if TwinCAT2 is installed
+        tc2_key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\WOW6432Node\Beckhoff\TwinCAT")
+        print("TwinCAT2 is installed.")
+        winreg.CloseKey(tc2_key)
+        only_tc2_installed = True
+        messagebox.showinfo("Attention", "Only TwinCAT2 is installed, close and open as administrator to save routes properly")
+        return "TC2"
+    except FileNotFoundError:
+        print("Neither TwinCAT3 nor TwinCAT2 are installed.")
+        return None
+
     
 ############################################### Test Routes ##################################################################
 # Not used
@@ -1783,6 +1845,8 @@ root.bind("<Button-1>", on_click)
 
 # Create the spinner as part of the layout
 create_spinner_widget()
+
+check_twinCAT_version()
 
 root.mainloop()
 
