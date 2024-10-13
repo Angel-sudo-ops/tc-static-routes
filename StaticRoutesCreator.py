@@ -17,7 +17,7 @@ import select
 import asyncio
 import struct
 
-__version__ = '3.3.5'
+__version__ = '3.3.6'
 
 default_file_path = os.path.join(r'C:\TwinCAT\3.1\Target', 'StaticRoutes.xml')
 
@@ -1148,9 +1148,14 @@ class RouteManager:
             elif timeout_occurred:
                 self.RouteAdded = False
                 print(f"Route was not added for {remote_ip} due to timeout.")
+                print(f"No response from remote system {remote_ip}. Make sure firewall is off and check username, password, and computer name.")
+            elif self.AddRouteError:
+                self.RouteAdded = False
+                print("Error encountered while adding route.")
+                print("Error setting up remote system, check TwinCATCom for username, password, and computer name.")
             else:
                 self.RouteAdded = False
-                print(f"Failed to add route for {remote_ip}")
+                print(f"Failed to add route for {remote_ip} due to select timeout.")
 
         finally:
             self.UDPSocket.close()
@@ -1158,7 +1163,10 @@ class RouteManager:
 
     async def DataReceivedA(self, udp_socket, state_obj):
         try:
+            # Receive UDP message, block call, wait for data 
             bytes_received = udp_socket.recv(len(state_obj.data) - state_obj.CurrentIndex)
+
+            # Update buffer
             state_obj.CurrentIndex += len(bytes_received)
             state_obj.data[state_obj.CurrentIndex:state_obj.CurrentIndex + len(bytes_received)] = bytes_received
 
@@ -1169,6 +1177,7 @@ class RouteManager:
 
                 if state_obj.data[27] == 0 and state_obj.data[28] == 0 and state_obj.data[29] == 0 and state_obj.data[30] == 0:
                     self.AddRouteSuccess = True
+                    print("SUCCESS!!!!")
                     print(f"Route added successfully. Remote AMSNetID: {self._remoteAMSNetID}")
                 else:
                     self.AddRouteError = True
@@ -1177,7 +1186,14 @@ class RouteManager:
                 udp_socket.close()
 
             else:
+                # Continue receiving asynchronously until enough data is received
                 await self.DataReceivedA(udp_socket, state_obj)
+
+        except socket.timeout:
+            print("Socket timed out waiting for a response")
+        
+        except BlockingIOError:
+            print("No data available right now, try again later")
 
         except Exception as e:
             print(f"Error receiving data: {e}")
@@ -1223,10 +1239,7 @@ def create_tc_routes():
         return
     
     local_ams_net_id = get_local_ams_netid()
-    local_net_id = local_ams_net_id.split('.')
-    local_netid_ip = '.'.join(local_net_id[:4])
-    ams_net_id_bit = string_to_byte_format(local_ams_net_id)
-
+    
     system_name = platform.node()
 
     # Clear previous failed routes log
@@ -1241,17 +1254,21 @@ def create_tc_routes():
     for item in red_items:
         entry = treeview.item(item)["values"]
         # Start the creation process in a new thread for each red-tagged entry
-        threading.Thread(target=create_and_retest_route, args=(entry, username, password, local_netid_ip, ams_net_id_bit, system_name)).start()
+        threading.Thread(target=create_and_retest_route, args=(entry, username, password, local_ams_net_id, system_name)).start()
 
-def create_and_retest_route(entry, username, password, netid_ip, ams_net_id_bit, system_name):
+def create_and_retest_route(entry, username, password, local_ams_net_id, system_name):
     name, remote_ip, ams_net_id, type_ = entry
+
+    local_net_id = local_ams_net_id.split('.')
+    local_netid_ip = '.'.join(local_net_id[:4])
+    ams_net_id_bit = string_to_byte_format(local_ams_net_id)
 
     port = 851 if type_ == 'TC3' else 801
 
     try:
         # Create route using the route manager
         route_manager = RouteManager()
-        asyncio.run(route_manager.EZRegisterToRemote(system_name, netid_ip, ams_net_id_bit, username, password, remote_ip, use_static_route=True))
+        asyncio.run(route_manager.EZRegisterToRemote(system_name, local_netid_ip, ams_net_id_bit, username, password, remote_ip, use_static_route=True))
 
         if route_manager.AddRouteSuccess:
             # After route creation, retest the connection
@@ -1275,8 +1292,6 @@ def create_and_retest_route(entry, username, password, netid_ip, ams_net_id_bit,
             global active_route_creation_threads
             active_route_creation_threads -= 1
             if active_route_creation_threads == 0:
-                # Once all threads finish, enable the "Create Routes" button
-                # treeview.after(0, lambda: enable_create_routes_button())
                 treeview.after(0, lambda: stop_spinner())
                 treeview.after(0, lambda: treeview.selection_remove(treeview.selection()))
                 treeview.after(0, lambda: log_failed_routes())  # Log the failed routes

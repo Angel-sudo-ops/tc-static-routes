@@ -196,7 +196,7 @@ class RouteManager:
                     else:
                         print("Timeout while waiting for data")
                         timeout_occurred = True  # Set the timeout flag
-                        # break  # Exit the loop if the timeout occurs
+                        break  # Exit the loop if the timeout occurs
 
                     c += 1
 
