@@ -272,6 +272,7 @@ async def main():
     print(ams_net_id)
     ams_net_id_bit = string_to_byte_format(ams_net_id)
     print(ams_net_id_bit)
+
     ams_net_id_array = string_to_int_array(ams_net_id)
     print(ams_net_id_array)
 
@@ -289,6 +290,7 @@ async def main():
 
     system_name = platform.node()
     print(system_name)
+    
     await route_manager.EZRegisterToRemote(system_name, local_ip, ams_net_id_bit, user, pass_, remote_ip, use_static_route=True)
 
 # Run the async main function
