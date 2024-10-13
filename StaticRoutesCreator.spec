@@ -5,7 +5,7 @@ a = Analysis(
     ['StaticRoutesCreator.py'],
     pathex=[],
     binaries=[],
-    datas=[('route.ico', '.'), ('CRADSDriver.dll', '.')],
+    datas=[('route.ico', '.')],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},
