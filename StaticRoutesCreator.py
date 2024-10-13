@@ -18,7 +18,7 @@ import asyncio
 import struct
 import winreg
 
-__version__ = '3.3.7'
+__version__ = '3.3.8'
 
 default_file_path = os.path.join(r'C:\TwinCAT\3.1\Target', 'StaticRoutes.xml')
 
@@ -594,6 +594,28 @@ def save_routes_xml():
                                              filetypes=[("XML files", "*.xml")])
     if file_path:
         create_routes_xml_from_table(file_path)
+
+
+def save_routes():
+    if only_tc2_installed:
+        save_routes_registry()
+    else:
+        save_routes_xml()
+
+def save_routes_registry():
+    data = get_table_data()
+    i = 0
+    total = len(data)
+    for item in data:
+        i+=1
+        if not save_route_tc2(item):
+            break
+
+    if i==total:
+        messagebox.showinfo("Success", "All routes added to the registry")
+    else:
+        messagebox.showerror("Attention", "Unable to add some routes to the registry")
+    
 
 ######################################## Create Control Center xml file from table ################################
 def create_cc_xml_from_table(file_path):
@@ -1230,6 +1252,7 @@ failed_routes = []
 
 # Modified to create routes for red-tagged entries (failed connections)
 def create_tc_routes():
+
     # This gets either the user selection or the whole table
     items = get_items_for_routes()
     print(items)
@@ -1264,8 +1287,6 @@ def create_tc_routes():
         entry = treeview.item(item)["values"]
         # Start the creation process in a new thread for each red-tagged entry
         threading.Thread(target=create_and_retest_route, args=(entry, username, password, local_ams_net_id, system_name)).start()
-        if only_tc2_installed:
-            save_route_tc2(entry)
 
 def create_and_retest_route(entry, username, password, local_ams_net_id, system_name):
     name, remote_ip, ams_net_id, type_ = entry
@@ -1345,11 +1366,14 @@ def save_route_tc2(entry, flags=0, timeout=0, transport_type=1):
         winreg.CloseKey(route_key)
         winreg.CloseKey(key)
         print(f"Route {route_name} added to TwinCAT2 registry.")
+        return True
     except PermissionError:
         print("Access denied: Please run the application as administrator.")
         messagebox.showerror("Error", "Access denied: Please run the application as administrator.")
+        return False
     except Exception as e:
         print(f"Failed to save route: {e}")
+        return False
 
 
 only_tc2_installed = False
@@ -1360,7 +1384,7 @@ def check_twinCAT_version():
         # Check if TwinCAT3 is installed
         tc3_key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\WOW6432Node\Beckhoff\TwinCAT3")
         print("TwinCAT3 is installed.")
-        messagebox.showinfo("Attention", "TwinCAT3 is installed.")
+        # messagebox.showinfo("Attention", "TwinCAT3 is installed.")
         winreg.CloseKey(tc3_key)
         return "TC3"
     except FileNotFoundError:
@@ -1372,7 +1396,7 @@ def check_twinCAT_version():
         print("TwinCAT2 is installed.")
         winreg.CloseKey(tc2_key)
         only_tc2_installed = True
-        messagebox.showinfo("Attention", "Only TwinCAT2 is installed, close and open as administrator to save routes properly")
+        messagebox.showinfo("Attention", "Only TwinCAT2 is installed, make sure app is running as administrator to save routes properly")
         return "TC2"
     except FileNotFoundError:
         print("Neither TwinCAT3 nor TwinCAT2 are installed.")
@@ -1811,9 +1835,9 @@ frame_save_file.grid(row=6, column=0, columnspan=3, padx=15, pady=5, sticky='w')
 # save_label = tk.Label(frame_save_file, text="Save", font=italic_font)
 # save_label.grid(row=0, column=0, padx=5, pady=0, sticky='w')
 # Button to save the StaticRoutes.xml file
-save_xml_button = ttk.Button(frame_save_file, text=" StaticRoutes.xml ", 
+save_xml_button = ttk.Button(frame_save_file, text="     StaticRoutes     ", 
                         style="TButton", 
-                        command=save_routes_xml)
+                        command=save_routes)
 save_xml_button.grid(row=1, column=0, padx=5, pady=5)
 # button_design(save_xml_button)
 
