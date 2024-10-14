@@ -18,7 +18,7 @@ import asyncio
 import struct
 import winreg
 
-__version__ = '3.3.8'
+__version__ = '3.3.9'
 
 default_file_path = os.path.join(r'C:\TwinCAT\3.1\Target', 'StaticRoutes.xml')
 
@@ -1307,7 +1307,7 @@ def create_and_retest_route(entry, username, password, local_ams_net_id, system_
             connection_ok = test_connection(ams_net_id, port, name)
 
             # Update the UI with the result
-            update_ui_with_result_retest(name, connection_ok)
+            treeview.after(0, lambda: update_ui_with_result_retest(name, connection_ok))
         else:
             # Log is route was not successfully added
             raise Exception(f"Route was not added for {remote_ip}")
@@ -1337,9 +1337,12 @@ def log_failed_routes():
         print("All routes were created successfully.")
 
 # Function to update the UI with the result
-def update_ui_with_result_retest(item, connection_ok):
-    color = 'green' if connection_ok else 'red'
-    treeview.item(item, tags=(color,))
+def update_ui_with_result_retest(name, connection_ok):
+    for item in treeview.get_children():
+        if treeview.item(item, 'values')[0] == name:
+            color = 'green' if connection_ok else 'red'
+            treeview.item(item, tags=(color,))
+            break
 
 
 def save_route_tc2(entry, flags=0, timeout=0, transport_type=1):
@@ -1472,7 +1475,7 @@ def test_route_and_update_ui(entry):
     port = 851 if type_ == 'TC3' else 801
 
     connection_ok = test_connection(ams_net_id, port, name)
-    update_ui_with_result(name, connection_ok)
+    treeview.after(0, lambda: update_ui_with_result(name, connection_ok))
 
     # Decrement the thread counter and check if all threads are done
     with lock:
@@ -1494,10 +1497,10 @@ def test_connection(ams_net_id, port, name):
 
         # Check if the PLC is in RUN state (state[0] == 5)
         if state[0] == 5:
-            print("Connection to PLC established successfully.")
+            print(f"Connection to {name} established successfully.")
             return True
         else:
-            print("PLC is not in RUN state.")
+            print(f"{name} is not in RUN state.")
             return False
 
     except pyads.ADSError as ads_error:
@@ -1639,7 +1642,7 @@ def set_icon():
 
 ################################################################# Set up the GUI ######################################################################
 root = tk.Tk()
-root.title(f"Static Routes Creator {__version__}")
+root.title(f"Super Routes Creator {__version__}")
 
 spinner_window = None
 # Check if running as a script or frozen executable
