@@ -18,7 +18,7 @@ import asyncio
 import struct
 import winreg
 
-__version__ = '3.3.9'
+__version__ = '3.4.1'
 
 default_file_path = os.path.join(r'C:\TwinCAT\3.1\Target', 'StaticRoutes.xml')
 
@@ -612,7 +612,7 @@ def save_routes_registry():
             break
 
     if i==total:
-        messagebox.showinfo("Success", "All routes added to the registry")
+        messagebox.showinfo("Success", "All routes added to the registry. \nRemember to restart TwinCAT!!")
     else:
         messagebox.showerror("Attention", "Unable to add some routes to the registry")
     
