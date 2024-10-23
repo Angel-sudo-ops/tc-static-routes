@@ -904,22 +904,19 @@ def split_string(input_string):
 
 
 def parse_route_name(input_name):
-    # Regex pattern to match valid inputs starting with 'CC' and ending with a name/number
-    pattern = r"^(?P<section>CC\d+(_[\w\-]*)?)_?(?P<name>[A-Za-z]*\d{1,3})?$"
+    # Updated regex to capture the section correctly and ensure the last part is treated as the name
+    pattern = r"^(?P<section>CC\d+(?:_[\w\-]*)?)_(?P<name>[A-Za-z]+\d{1,3})$"
 
     match = re.match(pattern, input_name)
     if match:
         section = match.group("section")
         name = match.group("name")
 
-        # Error: Missing section or invalid format (e.g., only 'LGV02')
+        # Error: Missing section or invalid format (e.g., 'LGV02')
         if not section or not section.startswith("CC"):
-            messagebox.showerror("Invalid Input", f"Missing or invalid section in '{input_name}'. Please provide a valid section starting with 'CC'.")
-            return None, None
-
-        # Error: Missing name (e.g., 'CC1842')
-        if not name:
-            messagebox.showerror("Invalid Input", f"Missing name in '{input_name}'. Please provide a valid name.")
+            messagebox.showerror(
+                "Invalid Input", f"Missing or invalid section in '{input_name}'. Please provide a valid section starting with 'CC'."
+            )
             return None, None
 
         # Handle names that are just numbers by defaulting to 'LGV'
@@ -934,6 +931,7 @@ def parse_route_name(input_name):
     else:
         messagebox.showerror("Invalid Input", f"'{input_name}' is not in a valid format.")
         return None, None
+    
 ################################### Create ini file for WinSCP connections ##########################
 # Function to set the custom INI path in the Windows Registry
 def set_custom_ini_path(ini_path):
