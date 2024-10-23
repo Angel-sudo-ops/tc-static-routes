@@ -882,7 +882,7 @@ def populate_table_from_db3():
     for item in routes_data:
         treeview.insert("", "end", values=item)
 
-################################# Slipt project and LGV numer ######################################
+################################# Slipt project and LGV number ######################################
 def split_string(input_string):
     # Regular expression pattern for CCxxxxLGVxx or CCxxxx_LGVxx
     pattern_with_underscore = r"^CC\d{4}_(LGV|CB|BC)\d{2,3}$"
@@ -901,6 +901,39 @@ def split_string(input_string):
         messagebox.showerror("Error", f"Route name '{input_string}' does not match the expected format: CCxxxxLGV/CB/BCxx or CCxxxx_LGV/CB/BCxx")
         parts = None
     return parts
+
+
+def parse_route_name(input_name):
+    # Regex pattern to match valid inputs starting with 'CC' and ending with a name/number
+    pattern = r"^(?P<section>CC\d+(_[\w\-]*)?)_?(?P<name>[A-Za-z]*\d{1,3})?$"
+
+    match = re.match(pattern, input_name)
+    if match:
+        section = match.group("section")
+        name = match.group("name")
+
+        # Error: Missing section or invalid format (e.g., only 'LGV02')
+        if not section or not section.startswith("CC"):
+            messagebox.showerror("Invalid Input", f"Missing or invalid section in '{input_name}'. Please provide a valid section starting with 'CC'.")
+            return None, None
+
+        # Error: Missing name (e.g., 'CC1842')
+        if not name:
+            messagebox.showerror("Invalid Input", f"Missing name in '{input_name}'. Please provide a valid name.")
+            return None, None
+
+        # Handle names that are just numbers by defaulting to 'LGV'
+        if name.isdigit():
+            name = f"LGV{name.zfill(2)}"
+        else:
+            # Pad single-digit names with leading zeros if necessary
+            if re.search(r'\d$', name) and len(re.search(r'\d+$', name).group()) == 1:
+                name = name[:-1] + f"0{name[-1]}"
+        
+        return section, name
+    else:
+        messagebox.showerror("Invalid Input", f"'{input_name}' is not in a valid format.")
+        return None, None
 ################################### Create ini file for WinSCP connections ##########################
 # Function to set the custom INI path in the Windows Registry
 def set_custom_ini_path(ini_path):
@@ -952,7 +985,7 @@ def create_winscp_ini_from_table(ini_path, data):
     for row in data:
         total += 1 
         name, address, netid, tc_type = row
-        name_parts = split_string(str(name))
+        name_parts = parse_route_name(str(name))
         if name_parts is None:
             return
         folder_name = name_parts[0]
