@@ -18,7 +18,7 @@ import asyncio
 import struct
 import winreg
 
-__version__ = '3.4.1'
+__version__ = '3.4.2'
 
 default_file_path = os.path.join(r'C:\TwinCAT\3.1\Target', 'StaticRoutes.xml')
 
@@ -882,7 +882,7 @@ def populate_table_from_db3():
     for item in routes_data:
         treeview.insert("", "end", values=item)
 
-################################# Slipt project and LGV number ######################################
+################################# Split project and LGV number ######################################
 def split_string(input_string):
     # Regular expression pattern for CCxxxxLGVxx or CCxxxx_LGVxx
     pattern_with_underscore = r"^CC\d{4}_(LGV|CB|BC)\d{2,3}$"
@@ -905,7 +905,7 @@ def split_string(input_string):
 
 def parse_route_name(input_name):
     # Updated regex to capture the section correctly and ensure the last part is treated as the name
-    pattern = r"^(?P<section>CC\d+(?:_[\w\-]*)?)_(?P<name>[A-Za-z]+\d{1,3})$"
+    pattern = r"^(?P<section>CC\d+(?:_[\w\-]*)?)_(?P<name>[A-Za-z]*\d{1,3})$"
 
     match = re.match(pattern, input_name)
     if match:
@@ -936,15 +936,37 @@ def parse_route_name(input_name):
 # Function to set the custom INI path in the Windows Registry
 def set_custom_ini_path(ini_path):
     key_path = r'Software\Martin Prikryl\WinSCP 2\Configuration'
-    
+
     try:
+        # Open the key for reading
+        key = reg.OpenKey(reg.HKEY_CURRENT_USER, key_path, 0, reg.KEY_READ)
+        try:
+            config_storage, _ = reg.QueryValueEx(key, "ConfigurationStorage")
+            custom_ini_file, _ = reg.QueryValueEx(key, "CustomIniFile")
+
+            # Check if the values are already set correctly
+            if config_storage == 1 and custom_ini_file == ini_path:
+                print("Registry keys are already set correctly.")
+                reg.CloseKey(key)
+                return True
+        except FileNotFoundError:
+            # Values not set, proceed to create/update them
+            pass
+
+        reg.CloseKey(key)
+
+        # Open the key for writing
         key = reg.OpenKey(reg.HKEY_CURRENT_USER, key_path, 0, reg.KEY_SET_VALUE)
-        reg.SetValueEx(key, "ConfigurationStorage", 0, reg.REG_DWORD, 2)
+        reg.SetValueEx(key, "ConfigurationStorage", 0, reg.REG_DWORD, 1)
         reg.SetValueEx(key, "CustomIniFile", 0, reg.REG_SZ, ini_path)
         reg.CloseKey(key)
+
+        print("Registry keys updated successfully.")
         return True
+
     except Exception as e:
         print(f"Failed to set registry key: {e}")
+        messagebox.showerror("Error", f"Failed to set path {ini_path}, run app as administrator")
         return False
     
 # Function to check if a HostName already exists in the INI file
@@ -959,10 +981,6 @@ def create_winscp_ini_from_table(ini_path, data):
     # Ensure the directory for the INI file exists
     ini_dir = os.path.dirname(ini_path)
     os.makedirs(ini_dir, exist_ok=True)
-
-    # Set the custom INI path in the registry
-    if not set_custom_ini_path(ini_path):
-        return "Failed to set the custom INI path in the registry."
 
     # Create config parser and read the INI file (if it exists)
     config = configparser.ConfigParser()
@@ -1015,6 +1033,10 @@ def create_winscp_ini_from_table(ini_path, data):
     except Exception as e:
         print(f"An error occurred while writing the INI file: {e}")
         messagebox.showerror("Error", f"An error occurred while writing the INI file: {e}")
+    
+    # Set the custom INI path in the registry
+    if not set_custom_ini_path(ini_path):
+        return "Failed to set the custom INI path in the registry."
 
     messagebox.showinfo("Success", f"Session created successfully in {ini_path} with {repeated} repeated routes out of {total}")
 
