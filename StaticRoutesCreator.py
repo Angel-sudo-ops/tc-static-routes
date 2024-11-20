@@ -18,7 +18,7 @@ import asyncio
 import struct
 import winreg
 
-__version__ = '3.4.2'
+__version__ = '3.4.3'
 
 default_file_path = os.path.join(r'C:\TwinCAT\3.1\Target', 'StaticRoutes.xml')
 
@@ -360,11 +360,18 @@ def validate_and_create_xml():
 
 ################################### Get StaticRoutes.xml and create table #########################
 
-def populate_table_from_xml():
-    # Ask the user to select an XML file
-    file_path = filedialog.askopenfilename(title="Select StaticRoutes file", 
-                                           initialdir="C:\\TwinCAT\\3.1\\Target",
-                                           filetypes=[("XML files", "*.xml")])
+def populate_table_from_xml(path=None):
+    if not path:
+        # Ask the user to select an XML file
+        file_path = filedialog.askopenfilename(title="Select StaticRoutes file", 
+                                            initialdir="C:\\TwinCAT\\3.1\\Target",
+                                            filetypes=[("XML files", "*.xml")])
+    else:
+        file_path = path
+
+    if file_path and not os.path.exists(file_path):
+        print(f"The file {path} does not exist.")
+        return
     
     if file_path:
         try:
@@ -383,7 +390,7 @@ def populate_table_from_xml():
         # Clear the existing table data
         for i in treeview.get_children():
             treeview.delete(i)
-        
+            
         # Initialize an empty list to hold the data
         routes_data = []
         
@@ -1031,7 +1038,7 @@ def create_winscp_ini_from_table(ini_path, data):
         with open(ini_path, 'w') as configfile:
             config.write(configfile)
     except Exception as e:
-        print(f"An error occurred while writing the INI file: {e}")
+        print(f"An error occurred while writing the INI file: {e}") 
         messagebox.showerror("Error", f"An error occurred while writing the INI file: {e}")
     
     # Set the custom INI path in the registry
@@ -1616,6 +1623,11 @@ def get_table_data():
         rows.append(treeview.item(item)["values"])
     return rows
 
+def create_ssh_tunnel():
+    selected_item = treeview.selection()
+    lgv = treeview.item(selected_item)["values"][0]
+    print(f"SSH Tunnel created for {lgv}")
+
 ################################### Button design ##########################################
 def on_enter(e):
     if e.widget['state']== "normal":
@@ -1915,6 +1927,7 @@ save_winscp_button.grid(row=1, column=3, padx=5, pady=5)
 # Create the context menu
 context_menu = tk.Menu(treeview, tearoff=0)
 context_menu.add_command(label="Delete", command=delete_selected_record_from_menu)
+context_menu.add_command(label="SSH Tunnel", command=create_ssh_tunnel)
 
 # Bind right-click to show the context menu
 treeview.bind("<Button-3>", show_context_menu)
@@ -1927,6 +1940,9 @@ root.bind("<Button-1>", on_click)
 create_spinner_widget()
 
 check_twinCAT_version()
+
+# Pupulate table the first time with current StaticRoutes.xml file
+populate_table_from_xml("C:\\TwinCAT\\3.1\\Target\\StaticRoutes.xml")
 
 root.mainloop()
 
@@ -1944,3 +1960,7 @@ root.mainloop()
 # Tener la posibilidad de borrar más rows al seleccionar shift o control
 
 # Routes can be created even if static routes file is not updated (TwinCAT is not restarted yet). But after routes are created TwinCAT should be restarted to have the comm
+
+
+
+# Add PuTTY sessions, first check if it is installed, if not, popup to show is not installed, if yes, create all the sessions on the registry
