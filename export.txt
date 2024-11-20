@@ -1,1 +1,1 @@
-pyinstaller --onefile --icon=route.ico --windowed StaticRoutesCreator.py
+pyinstaller --onefile --icon=route.ico --windowed --add-data "route.ico;." StaticRoutesCreator.py
