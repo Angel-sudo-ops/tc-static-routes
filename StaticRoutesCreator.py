@@ -1061,6 +1061,24 @@ def save_winscp_ini():
     if file_path:
         create_winscp_ini_from_table(file_path, data)
 
+############################################################## SSH tunneling config #################################################################
+def create_ssh_tunnel():
+    if not username_entry.get():
+        messagebox.showwarning("Attention", "Input username")
+        print("Input user")
+        return
+    if not password_entry.get():
+        messagebox.showwarning("Attention", "Input password")
+        print("Input password")
+        return
+    
+    selected_item = treeview.selection()
+    lgv = treeview.item(selected_item)["values"][0]
+    print(f"SSH Tunnel created for {lgv}")
+
+def save_ssh_config():
+    print("SSH tunnel configuration saved")
+
 ######################################################## Create TC Routes ############################################################################
 
 def string_to_byte_format(ip_string):
@@ -1623,11 +1641,6 @@ def get_table_data():
         rows.append(treeview.item(item)["values"])
     return rows
 
-def create_ssh_tunnel():
-    selected_item = treeview.selection()
-    lgv = treeview.item(selected_item)["values"][0]
-    print(f"SSH Tunnel created for {lgv}")
-
 ################################### Button design ##########################################
 def on_enter(e):
     if e.widget['state']== "normal":
@@ -1899,34 +1912,39 @@ treeview.bind('<Double-1>', on_double_click)
 
 
 frame_save_file = ttk.Labelframe(root, text="Save", labelanchor='nw', style="Custom.TLabelframe")
-frame_save_file.grid(row=6, column=0, columnspan=3, padx=15, pady=5, sticky='w')
+frame_save_file.grid(row=6, column=0, columnspan=4, padx=15, pady=5, sticky='w')
 # save_label = tk.Label(frame_save_file, text="Save", font=italic_font)
 # save_label.grid(row=0, column=0, padx=5, pady=0, sticky='w')
 # Button to save the StaticRoutes.xml file
-save_xml_button = ttk.Button(frame_save_file, text="     StaticRoutes     ", 
+save_xml_button = ttk.Button(frame_save_file, text="  StaticRoutes  ", 
                         style="TButton", 
                         command=save_routes)
 save_xml_button.grid(row=1, column=0, padx=5, pady=5)
 # button_design(save_xml_button)
 
 # Button to save the ControlCenter.xml file
-save_cc_button = ttk.Button(frame_save_file, text=" ControlCenter.xml ", 
+save_cc_button = ttk.Button(frame_save_file, text="  ControlCenter  ", 
                             style="TButton", 
                             command=save_cc_xml)
-save_cc_button.grid(row=1, column=2, padx=5, pady=5)
+save_cc_button.grid(row=1, column=1, padx=5, pady=5)
 # button_design(save_cc_button)
 
 # Button to save WinSCP.ini file
-save_winscp_button = ttk.Button(frame_save_file, text="      WinSCP.ini      ", 
+save_winscp_button = ttk.Button(frame_save_file, text="  WinSCP.ini  ", 
                             style="TButton", 
                             command=save_winscp_ini)
-save_winscp_button.grid(row=1, column=3, padx=5, pady=5)
+save_winscp_button.grid(row=1, column=2, padx=5, pady=5)
 # button_design(save_winscp_button)
+
+save_tunnel_button = ttk.Button(frame_save_file, text="  Set up SSH  ", 
+                            style="TButton", 
+                            command=save_ssh_config)
+save_tunnel_button.grid(row=1, column=3, padx=5, pady=5)
 
 
 # Create the context menu
 context_menu = tk.Menu(treeview, tearoff=0)
-context_menu.add_command(label="Delete", command=delete_selected_record_from_menu)
+# context_menu.add_command(label="Delete", command=delete_selected_record_from_menu)
 context_menu.add_command(label="SSH Tunnel", command=create_ssh_tunnel)
 
 # Bind right-click to show the context menu
