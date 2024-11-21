@@ -18,7 +18,7 @@ import asyncio
 import struct
 import winreg
 
-__version__ = '3.4.3'
+__version__ = '3.4.4'
 
 default_file_path = os.path.join(r'C:\TwinCAT\3.1\Target', 'StaticRoutes.xml')
 
@@ -388,8 +388,8 @@ def populate_table_from_xml(path=None):
             return
         
         # Clear the existing table data
-        for i in treeview.get_children():
-            treeview.delete(i)
+        for i in routes_table.get_children():
+            routes_table.delete(i)
             
         # Initialize an empty list to hold the data
         routes_data = []
@@ -414,8 +414,10 @@ def populate_table_from_xml(path=None):
         
         # Populate the Treeview with the data
         for item in routes_data:
-            treeview.insert("", "end", values=item)
+            routes_table.insert("", "end", values=item)
         # messagebox.showinfo("Success", "Data loaded successfully from the XML file.")
+
+    update_tunnel_button_status()
 
 ############################# Populate table based on inputs ##############################
 
@@ -444,8 +446,8 @@ def populate_table_from_inputs():
     ip_list = parse_ip(base_ip, lgvs)
 
     # Clear existing table data
-    # for i in treeview.get_children():
-    #     treeview.delete(i)
+    # for i in routes_table.get_children():
+    #     routes_table.delete(i)
 
     # Loop through the parsed IPs and add to the table
     for i, current_ip in enumerate(ip_list):
@@ -454,8 +456,8 @@ def populate_table_from_inputs():
         
         # Check if the record already exists in the table, ignoring the TC type and name
         record_exists = False
-        for row in treeview.get_children():
-            existing_values = treeview.item(row)["values"]
+        for row in routes_table.get_children():
+            existing_values = routes_table.item(row)["values"]
             if (existing_values[1] == current_ip and 
                 existing_values[2] == net_id):
                 record_exists = True
@@ -464,18 +466,20 @@ def populate_table_from_inputs():
 
         # Only add the record if it doesn't already exist
         if not record_exists:
-            treeview.insert("", "end", values=(
+            routes_table.insert("", "end", values=(
                 route_name,
                 current_ip,
                 net_id,
                 "TC3" if is_tc3 else "TC2"
             ))
+    
+    update_tunnel_button_status()
 
 ##################### Function to check for duplicates in the Treeview ######################
 #Check for duplicates when input is the entry fields
 # def is_duplicate(name, address, netid, type_tc):
-#     for item in treeview.get_children():
-#         existing_values = treeview.item(item, 'values')
+#     for item in routes_table.get_children():
+#         existing_values = routes_table.item(item, 'values')
 #         if (name, address, netid, type_tc) == existing_values:
 #             return True
 #     return False
@@ -483,9 +487,9 @@ def populate_table_from_inputs():
 #Check for duplicates when input is the table directly
 def is_duplicate(col_index, new_value, current_row):
     # Check for duplicates in the column except for the current editing row
-    for item in treeview.get_children():
+    for item in routes_table.get_children():
         if item != current_row:
-            if treeview.item(item, 'values')[col_index] == new_value:
+            if routes_table.item(item, 'values')[col_index] == new_value:
                 return True
     return False
 
@@ -520,38 +524,38 @@ def parse_range(range_str):
 ############################### Delete selected record ####################################
 # With a button
 def delete_selected():
-    selected_item = treeview.selection()
+    selected_item = routes_table.selection()
     if selected_item:
-        treeview.delete(selected_item)
+        routes_table.delete(selected_item)
     else:
         messagebox.showwarning("Selection Error", "Please select a record to delete.")
 
 # With right click
 def delete_selected_record_from_menu():
-    selected_item = treeview.selection()
+    selected_item = routes_table.selection()
     if selected_item:
-        treeview.delete(selected_item)
+        routes_table.delete(selected_item)
 
 # Function to show the context menu
 def show_context_menu(event):
     # Check if a record is selected
-    selected_item = treeview.identify_row(event.y)
+    selected_item = routes_table.identify_row(event.y)
     if selected_item:
-        treeview.selection_set(selected_item)
+        routes_table.selection_set(selected_item)
         context_menu.post(event.x_root, event.y_root)
 
 # With DEL key
 def delete_selected_record(event):
-    selected_items = treeview.selection()
+    selected_items = routes_table.selection()
     for item in selected_items:
         if item:
-            treeview.delete(item)
+            routes_table.delete(item)
 
 ################################### Delete whole table ########################################
 
 def delete_whole_table():
-    for i in treeview.get_children():
-        treeview.delete(i)
+    for i in routes_table.get_children():
+        routes_table.delete(i)
 
 ################################## Create StaticRoutes.xml from table ##########################
     
@@ -671,12 +675,12 @@ def save_cc_xml():
 ######################################## Modify data directly on table ############################################
 
 def on_double_click(event):
-    region = treeview.identify("region", event.x, event.y)
+    region = routes_table.identify("region", event.x, event.y)
     if region == "cell":
-        column = treeview.identify_column(event.x)
-        row = treeview.identify_row(event.y)
+        column = routes_table.identify_column(event.x)
+        row = routes_table.identify_row(event.y)
         col_index = int(column.replace("#", "")) - 1
-        current_value = treeview.item(row, 'values')[col_index]
+        current_value = routes_table.item(row, 'values')[col_index]
 
         if col_index == 3:  # Assuming column 3 is the Type column
             create_combobox_for_type(column, row)
@@ -685,17 +689,17 @@ def on_double_click(event):
 
 
 def create_combobox_for_type(column, row):
-    bbox = treeview.bbox(row, column)
+    bbox = routes_table.bbox(row, column)
     if not bbox:
         return
     
-    combo_edit = ttk.Combobox(treeview, values=["TC2", "TC3"], state="readonly")
-    x, y, width, height = treeview.bbox(row, column)
+    combo_edit = ttk.Combobox(routes_table, values=["TC2", "TC3"], state="readonly")
+    x, y, width, height = routes_table.bbox(row, column)
     combo_edit.place(x=x, y=y, width=width, height=height)
 
     def on_select(event):
         if combo_edit.winfo_exists():
-            treeview.set(row, column=column, value=combo_edit.get())
+            routes_table.set(row, column=column, value=combo_edit.get())
             combo_edit.destroy()
     
     def check_focus(event):
@@ -709,13 +713,13 @@ def create_combobox_for_type(column, row):
 
 
 def create_entry_for_editing(column, row, col_index, current_value):
-    bbox = treeview.bbox(row, column)
+    bbox = routes_table.bbox(row, column)
     if not bbox:
         return
     
-    entry_edit = tk.Entry(treeview, border=0)
+    entry_edit = tk.Entry(routes_table, border=0)
     entry_edit.insert(0, current_value)
-    x, y, width, height = treeview.bbox(row, column)
+    x, y, width, height = routes_table.bbox(row, column)
     entry_edit.place(x=x, y=y, width=width, height=height)
     entry_edit.focus()
     entry_edit.select_range(0, tk.END)
@@ -724,7 +728,7 @@ def create_entry_for_editing(column, row, col_index, current_value):
         if entry_edit.winfo_exists():
             new_value = entry_edit.get()
             if is_duplicate(col_index, new_value, row):
-                messagebox.showerror("Invalid Input", f"Duplicate value found for {treeview.heading(col_index, 'text')}.")
+                messagebox.showerror("Invalid Input", f"Duplicate value found for {routes_table.heading(col_index, 'text')}.")
                 return  # Do not destroy the Entry, allow user to correct it
             if col_index == 0:  # Assuming the "Name" column is the first column (index 0)
                 if not new_value.strip():  # Check if the name is not empty
@@ -737,7 +741,7 @@ def create_entry_for_editing(column, row, col_index, current_value):
                 return
             entry_edit.destroy()
             
-            treeview.set(row, column=column, value=new_value)
+            routes_table.set(row, column=column, value=new_value)
 
     def cancel_edit(event=None):
         if entry_edit.winfo_exists():
@@ -749,7 +753,7 @@ def create_entry_for_editing(column, row, col_index, current_value):
 
 
 ################################## Sorting ################################################
-def setup_treeview():
+def setup_routes_table():
     # Initialize the headings with custom names
     headings = {
         'Name': 'Route Name',
@@ -758,11 +762,11 @@ def setup_treeview():
         'Type': 'Type'
     }
     
-    for col in treeview['columns']:
-        treeview.heading(col, text=headings[col], command=lambda _col=col: treeview_sort_column(treeview, _col, False), anchor='w')
+    for col in routes_table['columns']:
+        routes_table.heading(col, text=headings[col], command=lambda _col=col: routes_table_sort_column(routes_table, _col, False), anchor='w')
 
-def treeview_sort_column(tv, col, reverse):
-    # Retrieve all data from the treeview
+def routes_table_sort_column(tv, col, reverse):
+    # Retrieve all data from the routes_table
     l = [(tv.set(k, col), k) for k in tv.get_children('')]
     
     # Sort the data
@@ -783,7 +787,7 @@ def treeview_sort_column(tv, col, reverse):
     # Change the heading to show the sort direction
     for column in tv['columns']:
         heading_text = headings[column] + (' ↓' if reverse and column == col else ' ↑' if not reverse and column == col else '')
-        tv.heading(column, text=heading_text, command=lambda _col=column: treeview_sort_column(tv, _col, not reverse))
+        tv.heading(column, text=heading_text, command=lambda _col=column: routes_table_sort_column(tv, _col, not reverse))
 
 def natural_keys(text):
     """
@@ -852,8 +856,8 @@ def populate_table_from_db3():
     # # print(columns, rows)
     
     # Clear the existing table data
-    for i in treeview.get_children():
-        treeview.delete(i)
+    for i in routes_table.get_children():
+        routes_table.delete(i)
     
     # Default type_tc based on the transfer mode
     default_type_tc = "TC2"  # Assume TC2 unless specified otherwise
@@ -887,7 +891,7 @@ def populate_table_from_db3():
     
     # Populate the Treeview with the data
     for item in routes_data:
-        treeview.insert("", "end", values=item)
+        routes_table.insert("", "end", values=item)
 
 ################################# Split project and LGV number ######################################
 def split_string(input_string):
@@ -1062,6 +1066,41 @@ def save_winscp_ini():
         create_winscp_ini_from_table(file_path, data)
 
 ############################################################## SSH tunneling config #################################################################
+def update_tunnel_button_status():
+    """
+    Enable the tunnel setup button if at least one element in the table is TC3.
+    Disable it otherwise.
+    """
+    # Get all items in the static routes table
+    all_items = routes_table.get_children()
+    has_tc3 = any(routes_table.item(item)["values"][3] == "TC3" for item in all_items)  # Assuming "Type" is in the 4th column
+    
+    if has_tc3:
+        setup_tunnel_button.config(state=tk.NORMAL)
+    else:
+        setup_tunnel_button.config(state=tk.DISABLED)
+
+    # Call this method every time the static routes table is updated
+    # Example: after loading new data or modifying entries
+    # update_tunnel_button_status()
+
+def update_ssh_menu_status():
+    """
+    Enable SSH option only if selected element is TC3
+    """
+    selection = routes_table.selection()
+    if routes_table.item(selection)["values"][3] == "TC3":
+        context_menu.entryconfig("SSH Tunnel", state="normal")
+    else:
+        context_menu.entryconfig("SSH Tunnel", state="disabled")
+
+def update_ssh_state(*args):
+    update_tunnel_button_status()
+    update_ssh_menu_status()
+
+
+
+
 def create_ssh_tunnel():
     if not username_entry.get():
         messagebox.showwarning("Attention", "Input username")
@@ -1072,12 +1111,14 @@ def create_ssh_tunnel():
         print("Input password")
         return
     
-    selected_item = treeview.selection()
-    lgv = treeview.item(selected_item)["values"][0]
+    selected_item = routes_table.selection()
+    lgv = routes_table.item(selected_item)["values"][0]
     print(f"SSH Tunnel created for {lgv}")
 
-def save_ssh_config():
+def setup_ssh_config():
     print("SSH tunnel configuration saved")
+
+    
 
 ######################################################## Create TC Routes ############################################################################
 
@@ -1310,7 +1351,7 @@ class RouteManager:
 
 def get_items_for_routes():
     items = []
-    selected_items = treeview.selection()
+    selected_items = routes_table.selection()
 
     if selected_items: 
         for item in selected_items:
@@ -1318,7 +1359,7 @@ def get_items_for_routes():
             items.append(item)
     else:
         # If no selection, return all items
-        items = treeview.get_children()
+        items = routes_table.get_children()
     
     return items
 
@@ -1334,7 +1375,7 @@ def create_tc_routes():
     # This gets either the user selection or the whole table
     items = get_items_for_routes()
     print(items)
-    red_items = [item for item in items if 'red' in treeview.item(item, 'tags')]
+    red_items = [item for item in items if 'red' in routes_table.item(item, 'tags')]
     print(red_items)
     
     if not red_items:
@@ -1362,7 +1403,7 @@ def create_tc_routes():
     start_spinner(190, 133)
 
     for item in red_items:
-        entry = treeview.item(item)["values"]
+        entry = routes_table.item(item)["values"]
         # Start the creation process in a new thread for each red-tagged entry
         threading.Thread(target=create_and_retest_route, args=(entry, username, password, local_ams_net_id, system_name)).start()
 
@@ -1385,7 +1426,7 @@ def create_and_retest_route(entry, username, password, local_ams_net_id, system_
             connection_ok = test_connection(ams_net_id, port, name)
 
             # Update the UI with the result
-            treeview.after(0, lambda: update_ui_with_result_retest(name, connection_ok))
+            routes_table.after(0, lambda: update_ui_with_result_retest(name, connection_ok))
         else:
             # Log is route was not successfully added
             raise Exception(f"Route was not added for {remote_ip}")
@@ -1402,9 +1443,9 @@ def create_and_retest_route(entry, username, password, local_ams_net_id, system_
             global active_route_creation_threads
             active_route_creation_threads -= 1
             if active_route_creation_threads == 0:
-                treeview.after(0, lambda: stop_spinner())
-                treeview.after(0, lambda: treeview.selection_remove(treeview.selection()))
-                treeview.after(0, lambda: log_failed_routes())  # Log the failed routes
+                routes_table.after(0, lambda: stop_spinner())
+                routes_table.after(0, lambda: routes_table.selection_remove(routes_table.selection()))
+                routes_table.after(0, lambda: log_failed_routes())  # Log the failed routes
 
 def log_failed_routes():
     if failed_routes:
@@ -1416,10 +1457,10 @@ def log_failed_routes():
 
 # Function to update the UI with the result
 def update_ui_with_result_retest(name, connection_ok):
-    for item in treeview.get_children():
-        if treeview.item(item, 'values')[0] == name:
+    for item in routes_table.get_children():
+        if routes_table.item(item, 'values')[0] == name:
             color = 'green' if connection_ok else 'red'
-            treeview.item(item, tags=(color,))
+            routes_table.item(item, tags=(color,))
             break
 
 
@@ -1517,14 +1558,14 @@ def test_tc_routes():
     
     # Set back to black when testing again
     # only tested routes if selected, if not all of them
-    # for item in treeview.get_children():
-    selected = treeview.selection()
+    # for item in routes_table.get_children():
+    selected = routes_table.selection()
     if selected:
         for item in selected:
-            treeview.item(item, tags=("black"))
+            routes_table.item(item, tags=("black"))
     else:
-        for item in treeview.get_children():
-            treeview.item(item, tags=("black"))
+        for item in routes_table.get_children():
+            routes_table.item(item, tags=("black"))
 
     start_spinner(190, 133)
     
@@ -1544,7 +1585,7 @@ def start_thread_for_route(data):
     threading.Thread(target=test_route_and_update_ui, args=(entry,)).start()
 
     # Schedule the next thread execution
-    treeview.after(100, lambda: start_thread_for_route(data))
+    routes_table.after(100, lambda: start_thread_for_route(data))
 
 
 def test_route_and_update_ui(entry):
@@ -1553,16 +1594,16 @@ def test_route_and_update_ui(entry):
     port = 851 if type_ == 'TC3' else 801
 
     connection_ok = test_connection(ams_net_id, port, name)
-    treeview.after(0, lambda: update_ui_with_result(name, connection_ok))
+    routes_table.after(0, lambda: update_ui_with_result(name, connection_ok))
 
     # Decrement the thread counter and check if all threads are done
     with lock:
         active_threads -= 1
         if active_threads == 0:
             # Ensure that the spinner stops and the selection is removed after the UI update
-            treeview.after(0, lambda: stop_spinner())
-            treeview.after(0, lambda: treeview.selection_remove(treeview.selection()))
-            treeview.after(0, lambda: create_routes_button.config(state="normal"))
+            routes_table.after(0, lambda: stop_spinner())
+            routes_table.after(0, lambda: routes_table.selection_remove(routes_table.selection()))
+            routes_table.after(0, lambda: create_routes_button.config(state="normal"))
 
 
 def test_connection(ams_net_id, port, name):
@@ -1599,14 +1640,14 @@ def test_connection(ams_net_id, port, name):
 def update_ui_with_result(name, connection_ok):
     # Make sure to update the UI from the main thread
     def update():
-        for item in treeview.get_children():
-            if treeview.item(item, 'values')[0] == name:  # Assuming 'name' is in the first column
+        for item in routes_table.get_children():
+            if routes_table.item(item, 'values')[0] == name:  # Assuming 'name' is in the first column
                 color = 'green' if connection_ok else 'red'
-                treeview.item(item, tags=(color,))
+                routes_table.item(item, tags=(color,))
                 break
 
     # Use the `after` method to safely update the UI from the main thread
-    treeview.after(0, update)
+    routes_table.after(0, update)
 
 def check_inputs():
     username = username_entry.get()
@@ -1626,10 +1667,10 @@ def check_inputs():
 
 def get_data_for_routes():
     data = []
-    selected_items = treeview.selection()
+    selected_items = routes_table.selection()
     if selected_items: 
         for item in selected_items:
-            data.append(treeview.item(item)["values"])
+            data.append(routes_table.item(item)["values"])
     else:
         data = get_table_data()
     print(data)
@@ -1637,8 +1678,8 @@ def get_data_for_routes():
     
 def get_table_data():
     rows = []
-    for item in treeview.get_children():
-        rows.append(treeview.item(item)["values"])
+    for item in routes_table.get_children():
+        rows.append(routes_table.item(item)["values"])
     return rows
 
 ################################### Button design ##########################################
@@ -1667,7 +1708,7 @@ def on_click(event):
     # print(f"x: {root.winfo_pointerx()}, y: {root.winfo_pointery()}")
     widget = event.widget
     if widget not in exceptions and not any(is_descendant(widget, exception) for exception in exceptions):
-        treeview.selection_remove(treeview.selection())
+        routes_table.selection_remove(routes_table.selection())
 
 
 ############################# Spinner ###########################################3
@@ -1884,31 +1925,32 @@ frame_table = tk.Frame(root)
 frame_table.grid(row=5, columnspan=3, padx=15, pady=10)
 
 # Add a Treeview to display the data
-treeview = ttk.Treeview(frame_table, columns=("Name", "Address", "NetId", "Type"), show="headings", height=10)
-treeview.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+routes_table = ttk.Treeview(frame_table, columns=("Name", "Address", "NetId", "Type"), show="headings", height=10)
+routes_table.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
 # Define tags in your Treeview setup
-treeview.tag_configure('green', foreground='green')
-treeview.tag_configure('red', foreground='red')
-treeview.tag_configure('black', foreground='black')
+routes_table.tag_configure('green', foreground='green')
+routes_table.tag_configure('red', foreground='red')
+routes_table.tag_configure('black', foreground='black')
 
-setup_treeview()
+setup_routes_table()
 
 # Add a vertical scrollbar to the Treeview
-vsb = ttk.Scrollbar(frame_table, orient="vertical", command=treeview.yview)
+vsb = ttk.Scrollbar(frame_table, orient="vertical", command=routes_table.yview)
 vsb.pack(side=tk.RIGHT, fill=tk.Y)
 
 # Configure the Treeview to use the scrollbar
-treeview.configure(yscrollcommand=vsb.set)
+routes_table.configure(yscrollcommand=vsb.set)
 
 # Define the column widths
-treeview.column("Name", width=110, anchor='w')
-treeview.column("Address", width=110, anchor='w')
-treeview.column("NetId", width=120, anchor='w')
-treeview.column("Type", width=50, anchor='w')
+routes_table.column("Name", width=110, anchor='w')
+routes_table.column("Address", width=110, anchor='w')
+routes_table.column("NetId", width=120, anchor='w')
+routes_table.column("Type", width=50, anchor='w')
 
-treeview.bind('<Delete>', delete_selected_record)
-treeview.bind('<Double-1>', on_double_click)
+routes_table.bind('<Delete>', delete_selected_record)
+routes_table.bind('<Double-1>', on_double_click)
+routes_table.bind('<<TreeviewSelect>>',  update_ssh_state)
 
 
 frame_save_file = ttk.Labelframe(root, text="Save", labelanchor='nw', style="Custom.TLabelframe")
@@ -1936,21 +1978,21 @@ save_winscp_button = ttk.Button(frame_save_file, text="  WinSCP.ini  ",
 save_winscp_button.grid(row=1, column=2, padx=5, pady=5)
 # button_design(save_winscp_button)
 
-save_tunnel_button = ttk.Button(frame_save_file, text="  Set up SSH  ", 
+setup_tunnel_button = ttk.Button(frame_save_file, text="  Set up SSH  ", 
                             style="TButton", 
-                            command=save_ssh_config)
-save_tunnel_button.grid(row=1, column=3, padx=5, pady=5)
+                            command=setup_ssh_config)
+setup_tunnel_button.grid(row=1, column=3, padx=5, pady=5)
 
 
 # Create the context menu
-context_menu = tk.Menu(treeview, tearoff=0)
+context_menu = tk.Menu(routes_table, tearoff=0)
 # context_menu.add_command(label="Delete", command=delete_selected_record_from_menu)
 context_menu.add_command(label="SSH Tunnel", command=create_ssh_tunnel)
 
 # Bind right-click to show the context menu
-treeview.bind("<Button-3>", show_context_menu)
+routes_table.bind("<Button-3>", show_context_menu)
 
-exceptions = [treeview, vsb, frame_login]
+exceptions = [routes_table, vsb, frame_login]
 root.bind("<Button-1>", on_click)
 
 
