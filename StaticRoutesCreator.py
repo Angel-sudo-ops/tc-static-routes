@@ -1099,8 +1099,6 @@ def update_ssh_state(*args):
     update_ssh_menu_status()
 
 
-
-
 def create_ssh_tunnel():
     if not username_entry.get():
         messagebox.showwarning("Attention", "Input username")
@@ -1115,10 +1113,191 @@ def create_ssh_tunnel():
     lgv = routes_table.item(selected_item)["values"][0]
     print(f"SSH Tunnel created for {lgv}")
 
-def setup_ssh_config():
-    print("SSH tunnel configuration saved")
+##################################################### Setup SSH window #############################################################################
+ssh_config_window = None
 
+def open_ssh_config_window_cond():
+    global ssh_config_window
+
+    if ssh_config_window is not None and ssh_config_window.winfo_exists():
+        ssh_config_window.lift()
+        ssh_config_window.focus_force()
+    else:
+        open_ssh_config_window()
+
+def open_ssh_config_window():
+    global ssh_config_window
+
+    ssh_config_window = tk.Toplevel(root)
+    ssh_config_window.title("Setup SSH")
+
+    window_width = 500
+    window_lenght = 300
+    ssh_config_window.geometry(f"{window_width}x{window_lenght}")
+    ssh_config_window.minsize(window_width, window_lenght)
+
+    SSH_CONFIG_FILE = "ssh_config.xml"
+
+    # Dictionary to maintain custom headings
+    headings = {
+        'Local Port' : 'Local Port',
+        'Remote IP'  : 'Remote IP',
+        'Remote Port': 'Remote Port',
+        'Description': 'Description'
+    }
+
+    def setup_tunnel_table():
+        for col in tunnel_table['columns']:
+            tunnel_table.heading(col, text=headings[col], command=lambda _col=col: table_sort_column(tunnel_table, _col, False), anchor='w')
+
+    def table_sort_column(tv, col, reverse):
+        # Retrieve all data from the treeview
+        l = [(tv.set(k, col), k) for k in tv.get_children('')]
+        
+        # Sort the data
+        l.sort(reverse=reverse, key=lambda t: natural_keys(t[0]))
+
+        # Rearrange items in sorted positions
+        for index, (val, k) in enumerate(l):
+            tv.move(k, '', index)
+
+        # Change the heading to show the sort direction
+        for column in tv['columns']:
+            heading_text = headings[column] + (' ↓' if reverse and column == col else ' ↑' if not reverse and column == col else '')
+            tv.heading(column, text=heading_text, command=lambda _col=column: table_sort_column(tv, _col, not reverse))
+
+    def natural_keys(text):
+        """
+        Alphanumeric (natural) sort to handle numbers within strings correctly
+        """
+        return [int(c) if c.isdigit() else c for c in re.split(r'(\d+)', text)]
+
+
+    def init_tunnel_table():
+        """Initialize the table with default values."""
+        default_data = [
+            ("40101", "192.168.11.61", "2122", "Example Tunnel 1"),
+            ("40102", "192.168.11.62", "2122", "Example Tunnel 2"),
+        ]
+        for row in default_data:
+            add_row(tunnel_table, *row)
+
+    def save_table_to_xml(filename=SSH_CONFIG_FILE):
+        """Save table data to an XML file."""
+        root = ET.Element("Tunnels")
+        for row_id in tunnel_table.get_children():
+            values = tunnel_table.item(row_id)["values"]
+            tunnel = ET.SubElement(root, "Tunnel")
+            ET.SubElement(tunnel, "LocalPort").text = values[0]
+            ET.SubElement(tunnel, "RemoteIP").text = values[1]
+            ET.SubElement(tunnel, "RemotePort").text = values[2]
+            ET.SubElement(tunnel, "Description").text = values[3]
+
+        tree = ET.ElementTree(root)
+        tree.write(filename)
+        messagebox.showinfo("Save Successful", f"Table data saved to {filename}")
+
+    def load_table_from_xml(filename=SSH_CONFIG_FILE):
+        """Load table data from an XML file."""
+        try:
+            tree = ET.parse(filename)
+            root = tree.getroot()
+
+            for tunnel in root.findall("Tunnel"):
+                local_port = tunnel.find("LocalPort").text
+                remote_ip = tunnel.find("RemoteIP").text
+                remote_port = tunnel.find("RemotePort").text
+                description = tunnel.find("Description").text
+                add_row(tunnel_table, local_port, remote_ip, remote_port, description)
+        except FileNotFoundError:
+            print(f"{filename} not found. Starting with an empty table.")
+
+
+    # Input frame for adding data
+    input_button_frame = tk.Frame(ssh_config_window)
+    input_button_frame.pack(fill=tk.X, pady=5, padx=5)
+
+    # Use grid for input fields and buttons
+    ttk.Label(input_button_frame, text="Local Port:").grid(row=0, column=0, padx=5, pady=5, sticky="w")
+    local_port_entry = ttk.Entry(input_button_frame, width=8)
+    local_port_entry.grid(row=0, column=1, padx=5, pady=5, sticky="w")
+
+    ttk.Label(input_button_frame, text="Remote Port:").grid(row=1, column=0, padx=5, pady=5, sticky="w")
+    remote_port_entry = ttk.Entry(input_button_frame, width=8)
+    remote_port_entry.grid(row=1, column=1, padx=5, pady=5, sticky="w")
+
+    ttk.Label(input_button_frame, text="Remote IP:").grid(row=0, column=2, padx=5, pady=5, sticky="w")
+    remote_ip_entry = ttk.Entry(input_button_frame, width=25)
+    remote_ip_entry.grid(row=0, column=3, padx=5, pady=5, sticky="w")
+
+    ttk.Label(input_button_frame, text="Description:").grid(row=1, column=2, padx=5, pady=5, sticky="w")
+    description_entry = ttk.Entry(input_button_frame, width=25)
+    description_entry.grid(row=1, column=3, padx=5, pady=5, sticky="w")
+
+    def add_row_from_inputs():
+        """Add a row to the table using data from the input fields."""
+        local_port = local_port_entry.get()
+        remote_ip = remote_ip_entry.get()
+        remote_port = remote_port_entry.get()
+        description = description_entry.get()
+
+        if not (local_port and remote_ip and remote_port and description):
+            messagebox.showwarning("Input Error", "All fields must be filled.")
+            return
+
+        add_row(tunnel_table, local_port, remote_ip, remote_port, description)
+
+        # Clear the input fields
+        local_port_entry.delete(0, tk.END)
+        remote_ip_entry.delete(0, tk.END)
+        remote_port_entry.delete(0, tk.END)
+        description_entry.delete(0, tk.END)
+
+    add_button = ttk.Button(input_button_frame, text="Add Data", command=add_row_from_inputs)
+    add_button.grid(rowspan=2, row=0, column=4, columnspan=4, pady=10, padx=10)
+
+    table_frame = tk.Frame(ssh_config_window)
+    table_frame.pack(fill=tk.Y, expand=True, pady=10)
+    # Create the Treeview widget (tunnel_table)
+    columns = ("Local Port", "Remote IP", "Remote Port", "Description")
+    tunnel_table = ttk.Treeview(table_frame, columns=columns, show="headings", height=5)
     
+    tunnel_table.column("Local Port", width=70, anchor='w')
+    tunnel_table.column("Remote IP", width=100, anchor='w')
+    tunnel_table.column("Remote Port", width=80, anchor='w')
+    tunnel_table.column("Description", width=210, anchor='w')
+
+    setup_tunnel_table()
+
+    tunnel_table.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(10,0))
+
+    vsb = ttk.Scrollbar(table_frame, orient="vertical", command=tunnel_table.yview)
+    vsb.pack(side=tk.RIGHT, fill=tk.Y)
+    tunnel_table.configure(yscrollcommand=vsb.set)
+
+    # Bind the DEL key to delete rows
+    tunnel_table.bind("<Delete>", lambda event: delete_selected_row(tunnel_table))
+
+    save_table_button = ttk.Button(ssh_config_window, text="  Save Table  ", command=save_table_to_xml)
+    save_table_button.pack(side=tk.TOP, fill=tk.Y, pady=(0,10), padx=10)
+
+    def add_row(tunnel_table, local_port="", remote_ip="", remote_port="", description=""):
+        """Add a row with specified data to the table."""
+        tunnel_table.insert("", "end", values=(local_port, remote_ip, remote_port, description))
+
+    def delete_selected_row(tunnel_table):
+        """Delete the selected row(s) from the table."""
+        selected_items = tunnel_table.selection()
+        if selected_items:
+            for item in selected_items:
+                tunnel_table.delete(item)
+        else:
+            messagebox.showwarning("Delete Row", "No row selected to delete.")
+
+
+    init_tunnel_table()
+
+    load_table_from_xml()
 
 ######################################################## Create TC Routes ############################################################################
 
@@ -1958,29 +2137,29 @@ frame_save_file.grid(row=6, column=0, columnspan=4, padx=15, pady=5, sticky='w')
 # save_label = tk.Label(frame_save_file, text="Save", font=italic_font)
 # save_label.grid(row=0, column=0, padx=5, pady=0, sticky='w')
 # Button to save the StaticRoutes.xml file
-save_xml_button = ttk.Button(frame_save_file, text="  StaticRoutes  ", 
+save_xml_button = ttk.Button(frame_save_file, text="   StaticRoutes   ", 
                         style="TButton", 
                         command=save_routes)
 save_xml_button.grid(row=1, column=0, padx=5, pady=5)
 # button_design(save_xml_button)
 
 # Button to save the ControlCenter.xml file
-save_cc_button = ttk.Button(frame_save_file, text="  ControlCenter  ", 
+save_cc_button = ttk.Button(frame_save_file, text="  ControlCenter   ", 
                             style="TButton", 
                             command=save_cc_xml)
 save_cc_button.grid(row=1, column=1, padx=5, pady=5)
 # button_design(save_cc_button)
 
 # Button to save WinSCP.ini file
-save_winscp_button = ttk.Button(frame_save_file, text="  WinSCP.ini  ", 
+save_winscp_button = ttk.Button(frame_save_file, text="  WinSCP.ini   ", 
                             style="TButton", 
                             command=save_winscp_ini)
 save_winscp_button.grid(row=1, column=2, padx=5, pady=5)
 # button_design(save_winscp_button)
 
-setup_tunnel_button = ttk.Button(frame_save_file, text="  Set up SSH  ", 
+setup_tunnel_button = ttk.Button(frame_save_file, text="  Setup SSH   ", 
                             style="TButton", 
-                            command=setup_ssh_config)
+                            command=open_ssh_config_window_cond)
 setup_tunnel_button.grid(row=1, column=3, padx=5, pady=5)
 
 
