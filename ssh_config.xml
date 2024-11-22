@@ -1,0 +1,51 @@
+<?xml version="1.0" ?>
+<Tunnels>
+    <Tunnel>
+        <LocalPort>40101</LocalPort>
+        <RemoteIP>192.168.11.61</RemoteIP>
+        <RemotePort>2122</RemotePort>
+        <Description>PLS Front ETH</Description>
+    </Tunnel>
+    <Tunnel>
+        <LocalPort>40102</LocalPort>
+        <RemoteIP>192.168.11.62</RemoteIP>
+        <RemotePort>2122</RemotePort>
+        <Description>PLS Rear ETH</Description>
+    </Tunnel>
+    <Tunnel>
+        <LocalPort>40105</LocalPort>
+        <RemoteIP>192.168.11.65</RemoteIP>
+        <RemotePort>2122</RemotePort>
+        <Description>PLS Lateral Left ETH</Description>
+    </Tunnel>
+    <Tunnel>
+        <LocalPort>40106</LocalPort>
+        <RemoteIP>192.168.11.66</RemoteIP>
+        <RemotePort>2122</RemotePort>
+        <Description>PLS Lateral Right ETH</Description>
+    </Tunnel>
+    <Tunnel>
+        <LocalPort>5900</LocalPort>
+        <RemoteIP>192.168.11.6</RemoteIP>
+        <RemotePort>5900</RemotePort>
+        <Description>Exor OnBoard VNC</Description>
+    </Tunnel>
+    <Tunnel>
+        <LocalPort>54545</LocalPort>
+        <RemoteIP>192.168.11.5</RemoteIP>
+        <RemotePort>54545</RemotePort>
+        <Description>Flash Battery</Description>
+    </Tunnel>
+    <Tunnel>
+        <LocalPort>8000</LocalPort>
+        <RemoteIP>192.168.11.5</RemoteIP>
+        <RemotePort>8000</RemotePort>
+        <Description>Flash Battery</Description>
+    </Tunnel>
+    <Tunnel>
+        <LocalPort>8002</LocalPort>
+        <RemoteIP>192.168.11.5</RemoteIP>
+        <RemotePort>8002</RemotePort>
+        <Description>Flash Battery</Description>
+    </Tunnel>
+</Tunnels>

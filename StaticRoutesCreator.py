@@ -1172,29 +1172,48 @@ def open_ssh_config_window():
         """
         return [int(c) if c.isdigit() else c for c in re.split(r'(\d+)', text)]
 
+    def initialize_tunnel_table():
+        """Initialize the tunnel table based on the presence of the XML file."""
+        if os.path.exists(SSH_CONFIG_FILE):
+            load_table_from_xml(SSH_CONFIG_FILE)
+        else:
+            init_tunnel_table()
 
     def init_tunnel_table():
         """Initialize the table with default values."""
         default_data = [
-            ("40101", "192.168.11.61", "2122", "Example Tunnel 1"),
-            ("40102", "192.168.11.62", "2122", "Example Tunnel 2"),
+            ("40101", "192.168.11.61", "2122", "PLS Front ETH"),
+            ("40102", "192.168.11.62", "2122", "PLS Rear ETH"),
+            ("40105", "192.168.11.65", "2122", "PLS Lateral Left ETH"),
+            ("40106", "192.168.11.66", "2122", "PLS Lateral Right ETH"),
+            ("5900",  "192.168.11.6",  "5900", "Exor OnBoard VNC")
         ]
         for row in default_data:
             add_row(tunnel_table, *row)
 
+    
     def save_table_to_xml(filename=SSH_CONFIG_FILE):
-        """Save table data to an XML file."""
+        """Save table data to an XML file with pretty formatting."""
+        # Create the root element
         root = ET.Element("Tunnels")
+
+        # Add data from the table to the XML structure
         for row_id in tunnel_table.get_children():
             values = tunnel_table.item(row_id)["values"]
             tunnel = ET.SubElement(root, "Tunnel")
-            ET.SubElement(tunnel, "LocalPort").text = values[0]
-            ET.SubElement(tunnel, "RemoteIP").text = values[1]
-            ET.SubElement(tunnel, "RemotePort").text = values[2]
-            ET.SubElement(tunnel, "Description").text = values[3]
+            ET.SubElement(tunnel, "LocalPort").text   = str(values[0])
+            ET.SubElement(tunnel, "RemoteIP").text    = str(values[1])
+            ET.SubElement(tunnel, "RemotePort").text  = str(values[2])
+            ET.SubElement(tunnel, "Description").text = str(values[3])
 
-        tree = ET.ElementTree(root)
-        tree.write(filename)
+        # Convert the XML structure to a string and prettify it
+        xml_str = ET.tostring(root, encoding="unicode")
+        pretty_xml = minidom.parseString(xml_str).toprettyxml(indent="    ")
+
+        # Write the pretty XML to the file
+        with open(filename, "w") as file:
+            file.write(pretty_xml)
+
         messagebox.showinfo("Save Successful", f"Table data saved to {filename}")
 
     def load_table_from_xml(filename=SSH_CONFIG_FILE):
@@ -1247,11 +1266,11 @@ def open_ssh_config_window():
 
         add_row(tunnel_table, local_port, remote_ip, remote_port, description)
 
-        # Clear the input fields
-        local_port_entry.delete(0, tk.END)
-        remote_ip_entry.delete(0, tk.END)
-        remote_port_entry.delete(0, tk.END)
-        description_entry.delete(0, tk.END)
+        # # Clear the input fields
+        # local_port_entry.delete(0, tk.END)
+        # remote_ip_entry.delete(0, tk.END)
+        # remote_port_entry.delete(0, tk.END)
+        # description_entry.delete(0, tk.END)
 
     add_button = ttk.Button(input_button_frame, text="Add Data", command=add_row_from_inputs)
     add_button.grid(rowspan=2, row=0, column=4, columnspan=4, pady=10, padx=10)
@@ -1294,10 +1313,8 @@ def open_ssh_config_window():
         else:
             messagebox.showwarning("Delete Row", "No row selected to delete.")
 
+    initialize_tunnel_table()
 
-    init_tunnel_table()
-
-    load_table_from_xml()
 
 ######################################################## Create TC Routes ############################################################################
 
