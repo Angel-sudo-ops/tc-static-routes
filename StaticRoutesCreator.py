@@ -1070,6 +1070,9 @@ def save_winscp_ini():
 ############################################################## SSH tunneling config #################################################################
 SSH_CONFIG_FILE = "ssh_config.xml"
 
+# Global variable to track active SSH client
+active_ssh_client = None
+
 default_tunnel_data = [
             ("40101", "192.168.11.61", "2122", "PLS Front ETH"),
             ("40102", "192.168.11.62", "2122", "PLS Rear ETH"),
@@ -1110,10 +1113,16 @@ def update_ssh_state(*args):
     update_tunnel_button_status()
     update_ssh_menu_status()
 
-
+tunnel_connection_in_progress = False
 def create_ssh_tunnel():
     """Create SSH tunnels for the selected LGV."""
-    # Retrieve tunnel data from XML or defaults
+    global active_ssh_client, tunnel_connection_in_progress
+
+    # Check if a tunnel is already active
+    if active_ssh_client and active_ssh_client.get_transport() and active_ssh_client.get_transport().is_active():
+        messagebox.showwarning("Tunnel Active", "An SSH tunnel is already active. Close it before creating a new one.")
+        return
+
     tunnels = get_tunnels()
 
     ssh_username = username_entry.get()
@@ -1134,18 +1143,26 @@ def create_ssh_tunnel():
         print("Input password")
         return
     
-    
+    if tunnel_connection_in_progress:
+        print("Tunnel connection in progress")
+        return
+
     lgv = routes_table.item(selected_item)["values"][0]
     print(f"SSH Tunnel created for {lgv}")
 
     ssh_host = routes_table.item(selected_item)["values"][1]
 
+    tunnel_connection_in_progress = True
+    
     def establish_tunnels():
         """Establish SSH tunnels."""
+        global active_ssh_client, tunnel_connection_in_progress
         try:
             client = paramiko.SSHClient()
             client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
             client.connect(ssh_host, port=20022, username=ssh_username, password=ssh_password, timeout=5)
+
+            active_ssh_client = client
 
             transport = client.get_transport()
             transport.set_keepalive(30)  # Send a keepalive packet every 30 seconds
@@ -1161,7 +1178,7 @@ def create_ssh_tunnel():
 
             # Open confirmation window
             show_tunnel_window(client, active_tunnels, lgv)
-
+            
         except paramiko.AuthenticationException:
             messagebox.showerror("Authentication Error", "Invalid username or password for SSH.")
         except paramiko.SSHException as e:
@@ -1169,16 +1186,17 @@ def create_ssh_tunnel():
         except Exception as e:
             print(f"Error creating tunnels: {e}")
             messagebox.showerror("Error", f"Failed to create SSH tunnels: {e}")
+        finally:
+            tunnel_connection_in_progress = False
 
     # Run tunnel creation in a thread to avoid blocking the UI
-    try:
-        tunnel_thread = Thread(target=establish_tunnels, daemon=True)
-        tunnel_thread.start()
-    except Exception as e:
-        messagebox.showerror("Thread Error", f"Failed to start the tunnel creation thread: {e}")
+    tunnel_thread = Thread(target=establish_tunnels, daemon=True)
+    tunnel_thread.start()
 
 def show_tunnel_window(client, active_tunnels, host):
     """Display a window showing active tunnels and allow closing them."""
+    global active_ssh_client
+
     tunnel_window = tk.Toplevel(root)
     tunnel_window.title("Active Tunnels")
     tunnel_window.geometry("400x300")
@@ -1196,12 +1214,20 @@ def show_tunnel_window(client, active_tunnels, host):
 
     def close_tunnels():
         """Close all active tunnels and destroy the window."""
+        global active_ssh_client
         try:
-            client.close()
-            messagebox.showinfo("Tunnels Closed", "All tunnels have been closed.")
-            tunnel_window.destroy()
+           if client and client.get_transport() and client.get_transport().is_active():
+                client.close()
+                print(f"All tunnels for {lgv} have been closed.")
+                messagebox.showinfo("Tunnels Closed", f"All tunnels for {lgv} have been closed.")
+                active_ssh_client = None  # Reset active client
         except Exception as e:
             messagebox.showerror("Error", f"Failed to close tunnels: {e}")
+        finally:
+            tunnel_window.destroy()
+    
+    # Bind the tunnel window close event to cleanup
+    tunnel_window.protocol("WM_DELETE_WINDOW", close_tunnels)
 
     close_button = ttk.Button(tunnel_window, text="Close Tunnels", command=close_tunnels)
     close_button.pack(pady=10)
@@ -1233,6 +1259,19 @@ def get_tunnels():
         ]
     
     return tunnels
+
+
+"""
+def on_main_app_close():
+    Handle the main application close event.
+    try:
+        if client and client.get_transport() and client.get_transport().is_active():
+            client.close()
+            print("All tunnels closed as the main app is closing.")
+    except Exception as e:
+        print(f"Error closing tunnels during app exit: {e}")
+    root.destroy()
+"""
 ##################################################### Setup SSH window #############################################################################
 ssh_config_window = None
 
