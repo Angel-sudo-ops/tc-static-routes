@@ -1153,7 +1153,7 @@ def create_ssh_tunnel():
     ssh_host = routes_table.item(selected_item)["values"][1]
 
     tunnel_connection_in_progress = True
-    
+
     def establish_tunnels():
         """Establish SSH tunnels."""
         global active_ssh_client, tunnel_connection_in_progress
@@ -1182,12 +1182,13 @@ def create_ssh_tunnel():
         except paramiko.AuthenticationException:
             messagebox.showerror("Authentication Error", "Invalid username or password for SSH.")
         except paramiko.SSHException as e:
-            messagebox.showerror("SSH Error", f"SSH connection failed: {e}")
+            messagebox.showerror("SSH Error", f"SSH connection to {lgv} failed: {e}")
         except Exception as e:
-            print(f"Error creating tunnels: {e}")
-            messagebox.showerror("Error", f"Failed to create SSH tunnels: {e}")
+            print(f"Error creating tunnels for {lgv}: {e}")
+            messagebox.showerror("Error", f"Failed to create SSH tunnels for {lgv}: {e}")
         finally:
-            tunnel_connection_in_progress = False
+            if tunnel_connection_in_progress:
+                tunnel_connection_in_progress = False
 
     # Run tunnel creation in a thread to avoid blocking the UI
     tunnel_thread = Thread(target=establish_tunnels, daemon=True)
