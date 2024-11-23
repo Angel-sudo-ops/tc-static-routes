@@ -20,7 +20,7 @@ import winreg
 import paramiko
 from threading import Thread
 
-__version__ = '3.4.4'
+__version__ = '3.4.5'
 
 default_file_path = os.path.join(r'C:\TwinCAT\3.1\Target', 'StaticRoutes.xml')
 
