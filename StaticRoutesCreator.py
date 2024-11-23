@@ -17,6 +17,8 @@ import select
 import asyncio
 import struct
 import winreg
+import paramiko
+from threading import Thread
 
 __version__ = '3.4.4'
 
@@ -1066,6 +1068,16 @@ def save_winscp_ini():
         create_winscp_ini_from_table(file_path, data)
 
 ############################################################## SSH tunneling config #################################################################
+SSH_CONFIG_FILE = "ssh_config.xml"
+
+default_tunnel_data = [
+            ("40101", "192.168.11.61", "2122", "PLS Front ETH"),
+            ("40102", "192.168.11.62", "2122", "PLS Rear ETH"),
+            ("40105", "192.168.11.65", "2122", "PLS Lateral Left ETH"),
+            ("40106", "192.168.11.66", "2122", "PLS Lateral Right ETH"),
+            ("5900",  "192.168.11.6",  "5900", "Exor OnBoard VNC")
+        ]
+
 def update_tunnel_button_status():
     """
     Enable the tunnel setup button if at least one element in the table is TC3.
@@ -1100,21 +1112,130 @@ def update_ssh_state(*args):
 
 
 def create_ssh_tunnel():
-    if not username_entry.get():
+    """Create SSH tunnels for the selected LGV."""
+    # Retrieve tunnel data from XML or defaults
+    tunnels = get_tunnels()
+
+    ssh_username = username_entry.get()
+    ssh_password = password_entry.get()
+
+    selected_item = routes_table.selection()
+
+    if not tunnels:
+        messagebox.showinfo("No Tunnels", "No tunnels found to create.")
+        return
+
+    if not ssh_username:
         messagebox.showwarning("Attention", "Input username")
         print("Input user")
         return
-    if not password_entry.get():
+    if not ssh_password:
         messagebox.showwarning("Attention", "Input password")
         print("Input password")
         return
     
-    selected_item = routes_table.selection()
+    
     lgv = routes_table.item(selected_item)["values"][0]
     print(f"SSH Tunnel created for {lgv}")
 
+    ssh_host = routes_table.item(selected_item)["values"][1]
+
+    def establish_tunnels():
+        """Establish SSH tunnels."""
+        try:
+            client = paramiko.SSHClient()
+            client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+            client.connect(ssh_host, port=20022, username=ssh_username, password=ssh_password, timeout=5)
+
+            transport = client.get_transport()
+            transport.set_keepalive(30)  # Send a keepalive packet every 30 seconds
+            active_tunnels = []
+
+            for tunnel in tunnels:
+                local_port = int(tunnel["Local Port"])
+                remote_ip = tunnel["Remote IP"]
+                remote_port = int(tunnel["Remote Port"])
+
+                transport.request_port_forward("127.0.0.1", local_port, remote_ip, remote_port)
+                active_tunnels.append(f"{local_port} -> {remote_ip}:{remote_port}")
+
+            # Open confirmation window
+            show_tunnel_window(client, active_tunnels, lgv)
+
+        except paramiko.AuthenticationException:
+            messagebox.showerror("Authentication Error", "Invalid username or password for SSH.")
+        except paramiko.SSHException as e:
+            messagebox.showerror("SSH Error", f"SSH connection failed: {e}")
+        except Exception as e:
+            print(f"Error creating tunnels: {e}")
+            messagebox.showerror("Error", f"Failed to create SSH tunnels: {e}")
+
+    # Run tunnel creation in a thread to avoid blocking the UI
+    try:
+        tunnel_thread = Thread(target=establish_tunnels, daemon=True)
+        tunnel_thread.start()
+    except Exception as e:
+        messagebox.showerror("Thread Error", f"Failed to start the tunnel creation thread: {e}")
+
+def show_tunnel_window(client, active_tunnels, host):
+    """Display a window showing active tunnels and allow closing them."""
+    tunnel_window = tk.Toplevel(root)
+    tunnel_window.title("Active Tunnels")
+    tunnel_window.geometry("400x300")
+
+    # Show LGV information
+    tk.Label(tunnel_window, text=f"Tunnels are active for {host}:", font=("Arial", 14)).pack(pady=10)
+    
+    # Show tunnel status
+    tunnel_list = tk.Text(tunnel_window, wrap="word", height=10, width=40)
+    tunnel_list.pack(pady=10)
+
+    for tunnel in active_tunnels:
+        tunnel_list.insert("end", f"{tunnel}\n")
+    tunnel_list.configure(state="disabled")
+
+    def close_tunnels():
+        """Close all active tunnels and destroy the window."""
+        try:
+            client.close()
+            messagebox.showinfo("Tunnels Closed", "All tunnels have been closed.")
+            tunnel_window.destroy()
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to close tunnels: {e}")
+
+    close_button = ttk.Button(tunnel_window, text="Close Tunnels", command=close_tunnels)
+    close_button.pack(pady=10)
+
+def get_tunnels():
+    """Load tunnels from XML file or use default ones"""
+    global default_tunnel_data
+
+    tunnels = []
+
+    if os.path.exists(SSH_CONFIG_FILE):
+        try:
+            tree = ET.parse(SSH_CONFIG_FILE)
+            root = tree.getroot()
+
+            for tunnel in root.findall("Tunnel"):
+                tunnels.append({
+                    "Local Port" : tunnel.find("LocalPort").text,
+                    "Remote IP"  : tunnel.find("RemoteIP").text,
+                    "Remote Port": tunnel.find("RemotePort").text,
+                })
+        except Exception as e:
+            print(f"Error reading XML file {e}")
+    
+    if not tunnels:
+        tunnels = [
+            {"Local Port" : row[0], "Remote IP"  : row[1], "Remote Port": row[2]}
+            for row in default_tunnel_data
+        ]
+    
+    return tunnels
 ##################################################### Setup SSH window #############################################################################
 ssh_config_window = None
+
 
 def open_ssh_config_window_cond():
     global ssh_config_window
@@ -1126,7 +1247,10 @@ def open_ssh_config_window_cond():
         open_ssh_config_window()
 
 def open_ssh_config_window():
-    global ssh_config_window
+    global ssh_config_window, is_saved
+
+    # Track if the table data has been saved
+    is_saved = False
 
     ssh_config_window = tk.Toplevel(root)
     ssh_config_window.title("Setup SSH")
@@ -1135,8 +1259,6 @@ def open_ssh_config_window():
     window_lenght = 300
     ssh_config_window.geometry(f"{window_width}x{window_lenght}")
     ssh_config_window.minsize(window_width, window_lenght)
-
-    SSH_CONFIG_FILE = "ssh_config.xml"
 
     # Dictionary to maintain custom headings
     headings = {
@@ -1181,19 +1303,15 @@ def open_ssh_config_window():
 
     def init_tunnel_table():
         """Initialize the table with default values."""
-        default_data = [
-            ("40101", "192.168.11.61", "2122", "PLS Front ETH"),
-            ("40102", "192.168.11.62", "2122", "PLS Rear ETH"),
-            ("40105", "192.168.11.65", "2122", "PLS Lateral Left ETH"),
-            ("40106", "192.168.11.66", "2122", "PLS Lateral Right ETH"),
-            ("5900",  "192.168.11.6",  "5900", "Exor OnBoard VNC")
-        ]
-        for row in default_data:
+        global default_tunnel_data
+
+        for row in default_tunnel_data:
             add_row(tunnel_table, *row)
 
     
     def save_table_to_xml(filename=SSH_CONFIG_FILE):
-        """Save table data to an XML file with pretty formatting."""
+        """Save table data to an XML file."""
+        global is_saved
         # Create the root element
         root = ET.Element("Tunnels")
 
@@ -1211,10 +1329,12 @@ def open_ssh_config_window():
         pretty_xml = minidom.parseString(xml_str).toprettyxml(indent="    ")
 
         # Write the pretty XML to the file
-        with open(filename, "w") as file:
+        full_path = os.path.abspath(filename)
+        with open(full_path, "w") as file:
             file.write(pretty_xml)
 
-        messagebox.showinfo("Save Successful", f"Table data saved to {filename}")
+        is_saved = True
+        messagebox.showinfo("Save Successful", f"Table data saved to:\n{full_path}")
 
     def load_table_from_xml(filename=SSH_CONFIG_FILE):
         """Load table data from an XML file."""
@@ -1231,6 +1351,25 @@ def open_ssh_config_window():
         except FileNotFoundError:
             print(f"{filename} not found. Starting with an empty table.")
 
+    def on_window_close():
+        """Handle the window close event"""
+        if not is_saved:
+            result  = messagebox.askyesnocancel(
+                "Unsaved Changes",
+                "You have unsaved changes. Do you want to save them before closing?"
+            )
+            if result is None:
+                return
+            elif result:
+                save_table_to_xml()
+        ssh_config_window.destroy()
+
+    ssh_config_window.protocol("WM_DELETE_WINDOW", on_window_close)
+
+    def mark_as_unsaved(event=None):
+        global is_saved
+        is_saved = False
+    
 
     # Input frame for adding data
     input_button_frame = tk.Frame(ssh_config_window)
@@ -1275,6 +1414,8 @@ def open_ssh_config_window():
     add_button = ttk.Button(input_button_frame, text="Add Data", command=add_row_from_inputs)
     add_button.grid(rowspan=2, row=0, column=4, columnspan=4, pady=10, padx=10)
 
+    add_button.bind("<Button-1>", mark_as_unsaved)
+
     table_frame = tk.Frame(ssh_config_window)
     table_frame.pack(fill=tk.Y, expand=True, pady=10)
     # Create the Treeview widget (tunnel_table)
@@ -1296,6 +1437,7 @@ def open_ssh_config_window():
 
     # Bind the DEL key to delete rows
     tunnel_table.bind("<Delete>", lambda event: delete_selected_row(tunnel_table))
+    tunnel_table.bind("<Key>", mark_as_unsaved)
 
     save_table_button = ttk.Button(ssh_config_window, text="  Save Table  ", command=save_table_to_xml)
     save_table_button.pack(side=tk.TOP, fill=tk.Y, pady=(0,10), padx=10)
