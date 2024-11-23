@@ -1200,7 +1200,11 @@ def show_tunnel_window(client, active_tunnels, host):
 
     tunnel_window = tk.Toplevel(root)
     tunnel_window.title("Active Tunnels")
-    tunnel_window.geometry("400x300")
+    
+    window_width = 400
+    window_lenght = 300
+    tunnel_window.geometry(f"{window_width}x{window_lenght}")
+    tunnel_window.minsize(window_width, window_lenght)
 
     # Show LGV information
     tk.Label(tunnel_window, text=f"Tunnels are active for {host}:", font=("Arial", 14)).pack(pady=10)
