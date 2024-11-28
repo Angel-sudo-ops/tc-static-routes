@@ -19,6 +19,7 @@ import struct
 import winreg
 import paramiko
 from threading import Thread
+import logging
 
 __version__ = '3.4.5'
 
@@ -1104,14 +1105,17 @@ def update_ssh_menu_status():
     Enable SSH option only if selected element is TC3
     """
     selection = routes_table.selection()
-    if routes_table.item(selection)["values"][3] == "TC3":
-        context_menu.entryconfig("SSH Tunnel", state="normal")
-    else:
-        context_menu.entryconfig("SSH Tunnel", state="disabled")
+    if selection:
+        if routes_table.item(selection)["values"][3] == "TC3":
+            context_menu.entryconfig("SSH Tunnel", state="normal")
+        else:
+            context_menu.entryconfig("SSH Tunnel", state="disabled")
 
 def update_ssh_state(*args):
     update_tunnel_button_status()
     update_ssh_menu_status()
+
+logging.basicConfig(level=logging.DEBUG)
 
 tunnel_connection_in_progress = False
 def create_ssh_tunnel():
@@ -1162,7 +1166,7 @@ def create_ssh_tunnel():
             client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
             client.connect(ssh_host, port=20022, username=ssh_username, password=ssh_password, timeout=5)
 
-            active_ssh_client = client
+            active_ssh_client = client  # Set the global active client
 
             transport = client.get_transport()
             transport.set_keepalive(30)  # Send a keepalive packet every 30 seconds
@@ -1173,12 +1177,24 @@ def create_ssh_tunnel():
                 remote_ip = tunnel["Remote IP"]
                 remote_port = int(tunnel["Remote Port"])
 
-                transport.request_port_forward("127.0.0.1", local_port, remote_ip, remote_port)
-                active_tunnels.append(f"{local_port} -> {remote_ip}:{remote_port}")
+                try:
+                    # Establish forwarding
+                    channel = transport.open_channel(
+                        "direct-tcpip",
+                        (remote_ip, remote_port),  # Remote target
+                        ("127.0.0.1", local_port)  # Local source
+                    )
+                    active_tunnels.append(f"{local_port} -> {remote_ip}:{remote_port}")
+                    print(f"Tunnel created: {local_port} -> {remote_ip}:{remote_port}")
+                except Exception as tunnel_error:
+                    print(f"Error creating tunnel {local_port} -> {remote_ip}:{remote_port}: {tunnel_error}")
+
+            if not active_tunnels:
+                raise Exception("No tunnels could be established.")
 
             # Open confirmation window
             show_tunnel_window(client, active_tunnels, lgv)
-            
+
         except paramiko.AuthenticationException:
             messagebox.showerror("Authentication Error", "Invalid username or password for SSH.")
         except paramiko.SSHException as e:
@@ -1186,9 +1202,16 @@ def create_ssh_tunnel():
         except Exception as e:
             print(f"Error creating tunnels for {lgv}: {e}")
             messagebox.showerror("Error", f"Failed to create SSH tunnels for {lgv}: {e}")
+            if active_ssh_client:
+                try:
+                    active_ssh_client.close()
+                    print("Closed active SSH client due to errors.")
+                except Exception as cleanup_error:
+                    print(f"Error during cleanup: {cleanup_error}")
+                active_ssh_client = None
         finally:
-            if tunnel_connection_in_progress:
-                tunnel_connection_in_progress = False
+            tunnel_connection_in_progress = False
+
 
     # Run tunnel creation in a thread to avoid blocking the UI
     tunnel_thread = Thread(target=establish_tunnels, daemon=True)
@@ -1223,8 +1246,8 @@ def show_tunnel_window(client, active_tunnels, host):
         try:
            if client and client.get_transport() and client.get_transport().is_active():
                 client.close()
-                print(f"All tunnels for {lgv} have been closed.")
-                messagebox.showinfo("Tunnels Closed", f"All tunnels for {lgv} have been closed.")
+                print(f"All tunnels for {host} have been closed.")
+                messagebox.showinfo("Tunnels Closed", f"All tunnels for {host} have been closed.")
                 active_ssh_client = None  # Reset active client
         except Exception as e:
             messagebox.showerror("Error", f"Failed to close tunnels: {e}")
