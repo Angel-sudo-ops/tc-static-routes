@@ -1071,7 +1071,7 @@ def save_winscp_ini():
 
 ############################################################## RDP connection #################################################################
 def open_rdp_connection():
-    """Open Remote Desktop to the selected LGV."""
+    """Open Remote Desktop to the selected LGV using provided credentials."""
     selected_item = routes_table.selection()
     if not selected_item:
         messagebox.showwarning("No Selection", "Please select an LGV first.")
@@ -1080,10 +1080,26 @@ def open_rdp_connection():
     # Get the IP address from the selected LGV (assuming it's in column 2)
     target_ip = routes_table.item(selected_item)["values"][1]  # Adjust index if needed
 
+    # Get credentials from user inputs
+    ssh_username = username_entry.get()
+    ssh_password = password_entry.get()
+
+    # Check if username and password are provided
+    if not ssh_username:
+        messagebox.showwarning("Attention", "Username is required for Remote Desktop.")
+        return
+    if not ssh_password:
+        messagebox.showwarning("Attention", "Password is required for Remote Desktop.")
+        return
+
     try:
-        # Launch Remote Desktop using mstsc
-        subprocess.run(["mstsc", "/v:" + target_ip], check=True)
-        print(f"Opening Remote Desktop for {target_ip}")
+        # Launch Remote Desktop using mstsc with credentials
+        subprocess.run(
+            ["cmd", "/c", f"echo {ssh_password} | mstsc /v:{target_ip} /u:{ssh_username}"],
+            shell=True,
+            check=True,
+        )
+        print(f"Opening Remote Desktop for {target_ip} with user {ssh_username}")
     except Exception as e:
         messagebox.showerror("Error", f"Failed to open Remote Desktop: {e}")
 
