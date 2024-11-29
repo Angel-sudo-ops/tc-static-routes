@@ -20,6 +20,7 @@ import winreg
 import paramiko
 from threading import Thread
 import logging
+import subprocess
 
 __version__ = '3.4.5'
 
@@ -1070,7 +1071,21 @@ def save_winscp_ini():
 
 ############################################################## RDP connection #################################################################
 def open_rdp_connection():
-    print("Set RDP connection")
+    """Open Remote Desktop to the selected LGV."""
+    selected_item = routes_table.selection()
+    if not selected_item:
+        messagebox.showwarning("No Selection", "Please select an LGV first.")
+        return
+
+    # Get the IP address from the selected LGV (assuming it's in column 2)
+    target_ip = routes_table.item(selected_item)["values"][1]  # Adjust index if needed
+
+    try:
+        # Launch Remote Desktop using mstsc
+        subprocess.run(["mstsc", "/v:" + target_ip], check=True)
+        print(f"Opening Remote Desktop for {target_ip}")
+    except Exception as e:
+        messagebox.showerror("Error", f"Failed to open Remote Desktop: {e}")
 
 ############################################################## SSH tunneling config #################################################################
 SSH_CONFIG_FILE = "ssh_config.xml"
