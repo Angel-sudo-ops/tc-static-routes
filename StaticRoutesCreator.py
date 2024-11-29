@@ -1068,6 +1068,10 @@ def save_winscp_ini():
     if file_path:
         create_winscp_ini_from_table(file_path, data)
 
+############################################################## RDP connection #################################################################
+def open_rdp_connection():
+    print("Set RDP connection")
+
 ############################################################## SSH tunneling config #################################################################
 SSH_CONFIG_FILE = "ssh_config.xml"
 
@@ -2393,6 +2397,7 @@ setup_tunnel_button.grid(row=1, column=3, padx=5, pady=5)
 context_menu = tk.Menu(routes_table, tearoff=0)
 # context_menu.add_command(label="Delete", command=delete_selected_record_from_menu)
 context_menu.add_command(label="SSH Tunnel", command=create_ssh_tunnel)
+context_menu.add_command(label="Open RDP", command=open_rdp_connection)
 
 # Bind right-click to show the context menu
 routes_table.bind("<Button-3>", show_context_menu)
