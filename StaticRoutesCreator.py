@@ -22,7 +22,7 @@ from threading import Thread
 import logging
 import subprocess
 
-__version__ = '3.4.5'
+__version__ = '3.4.6'
 
 default_file_path = os.path.join(r'C:\TwinCAT\3.1\Target', 'StaticRoutes.xml')
 
@@ -1071,37 +1071,46 @@ def save_winscp_ini():
 
 ############################################################## RDP connection #################################################################
 def open_rdp_connection():
-    """Open Remote Desktop to the selected LGV using provided credentials."""
+    """Open Remote Desktop using an .rdp file."""
     selected_item = routes_table.selection()
     if not selected_item:
         messagebox.showwarning("No Selection", "Please select an LGV first.")
         return
 
-    # Get the IP address from the selected LGV (assuming it's in column 2)
-    target_ip = routes_table.item(selected_item)["values"][1]  # Adjust index if needed
-
-    # Get credentials from user inputs
+    target_ip = routes_table.item(selected_item)["values"][1]
     ssh_username = username_entry.get()
     ssh_password = password_entry.get()
 
-    # Check if username and password are provided
-    if not ssh_username:
-        messagebox.showwarning("Attention", "Username is required for Remote Desktop.")
-        return
-    if not ssh_password:
-        messagebox.showwarning("Attention", "Password is required for Remote Desktop.")
+    if not ssh_username or not ssh_password:
+        messagebox.showwarning("Attention", "Username and Password are required for Remote Desktop.")
         return
 
-    try:
-        # Launch Remote Desktop using mstsc with credentials
-        subprocess.run(
-            ["cmd", "/c", f"echo {ssh_password} | mstsc /v:{target_ip} /u:{ssh_username}"],
-            shell=True,
-            check=True,
-        )
-        print(f"Opening Remote Desktop for {target_ip} with user {ssh_username}")
-    except Exception as e:
-        messagebox.showerror("Error", f"Failed to open Remote Desktop: {e}")
+    def launch_rdp():
+        try:
+            rdp_file = create_rdp_file(target_ip, ssh_username, ssh_password)
+            subprocess.run(["mstsc", rdp_file], check=True)
+            print(f"Opening Remote Desktop for {target_ip} with user {ssh_username}")
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to open Remote Desktop: {e}")
+        finally:
+            if os.path.exists(rdp_file):
+                os.remove(rdp_file)
+
+    Thread(target=launch_rdp, daemon=True).start()
+
+def create_rdp_file(target_ip, username, password):
+    """Create a temporary .rdp file with credentials."""
+    rdp_content = f"""
+    full address:s:{target_ip}
+    username:s:{username}
+    password 51:b:{password.encode('utf-16le').hex()}
+    authentication level:i:0
+    prompt for credentials:i:0
+    enablecredsspsupport:i:0
+    """
+    with open("temp.rdp", "w") as file:
+        file.write(rdp_content.strip())
+    return "temp.rdp"
 
 ############################################################## SSH tunneling config #################################################################
 SSH_CONFIG_FILE = "ssh_config.xml"
