@@ -1070,28 +1070,54 @@ def save_winscp_ini():
         create_winscp_ini_from_table(file_path, data)
 
 ############################################################## RDP connection #################################################################
-def detect_connection_type(ip_address):
+def is_host_reachable(host, timeout=2):
+    """Ping the host to check if it is reachable."""
+    # Define the ping command based on the OS
+    if platform.system().lower() == "windows":
+        ping_cmd = ["ping", "-n", "1", "-w", str(timeout * 1000), host]
+    else:
+        ping_cmd = ["ping", "-c", "1", "-W", str(timeout), host]
+
+    try:
+        subprocess.run(ping_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True, timeout=timeout + 1)
+        return True
+    except subprocess.TimeoutExpired:
+        print(f"Ping to {host} timed out.")
+        return False
+    except subprocess.CalledProcessError:
+        print(f"Ping to {host} failed.")
+        return False
+
+def is_port_open(host, port, timeout=3):
+    """Check if a specific port is open on the host."""
+    try:
+        with socket.create_connection((host, port), timeout=timeout):
+            return True
+    except Exception as e:
+        print(f"Exception at is_port_open: {e}")
+        return False
+
+def detect_connection_type(ip_address, tc_type):
     """Detect whether the LGV supports RDP or Cerhost."""
     RDP_PORT = 3389
-    CERHOST_PORT = 987  # Update to match your Cerhost port
+    CERHOST_PORT = 987 
 
-    def is_port_open(host, port):
-        """Check if a specific port is open on the host."""
-        try:
-            with socket.create_connection((host, port), timeout=3):
-                return True
-        except Exception:
-            return False
+    # Step 1: Ping the host
+    if not is_host_reachable(ip_address):
+        print(f"Host {ip_address} is unreachable.")
+        messagebox.showerror("Connection Error", f"Host {ip_address} is unreachable")
+        return "Unreachable"
 
-    # Check for RDP support
+    # Step 2: Directly return RDP for TC3
+    if tc_type == "TC3":
+        return "RDP"
+
+    # Step 3: Check for RDP or Cerhost only if TC2
     if is_port_open(ip_address, RDP_PORT):
         return "RDP"
-    
-    # Check for Cerhost support
     if is_port_open(ip_address, CERHOST_PORT):
         return "Cerhost"
-    
-    # If neither is available
+
     return "Unknown"
 
 def open_remote_connection():
@@ -1102,22 +1128,26 @@ def open_remote_connection():
         return
 
     target_ip = routes_table.item(selected_item)["values"][1]
+    lgv_type = routes_table.item(selected_item)["values"][3]
     rdp_username = username_entry.get()
     rdp_password = password_entry.get()
 
     if not rdp_username or not rdp_password:
-        messagebox.showwarning("Attention", "Username and Password are required for Remote Desktop.")
+        messagebox.showwarning("Attention", "Username and Password are required.")
         return
 
     def detect_and_connect():
-        connection_type = detect_connection_type(target_ip)
-
-        if connection_type == "RDP":
-            open_rdp_connection(target_ip, rdp_username, rdp_password)
-        elif connection_type == "Cerhost":
-            launch_cerhost(target_ip)
-        else:
-            messagebox.showerror("Connection Error", f"Unable to determine connection type for {target_ip}.")
+        try:
+            connection_type = detect_connection_type(target_ip, lgv_type)
+            if connection_type == "RDP":
+                open_rdp_connection(target_ip, rdp_username, rdp_password)
+            elif connection_type == "Cerhost":
+                launch_cerhost(target_ip)
+            else:
+                # messagebox.showerror("Connection Error", f"Unable to determine connection type for {target_ip}.")
+                print(f"Unable to determine connection type for {target_ip}.")
+        except Exception as e:
+            messagebox.showerror("Error", f"An error occurred during connection: {e}")
 
     # Run detection in a separate thread to keep the UI responsive
     Thread(target=detect_and_connect, daemon=True).start()
@@ -1127,6 +1157,10 @@ def open_rdp_connection(target_ip, username, password):
         rdp_file = create_rdp_file(target_ip, username, password)
         subprocess.run(["mstsc", rdp_file], check=True)
         print(f"Opening Remote Desktop for {target_ip}")
+    except FileNotFoundError:
+        messagebox.showerror("Error", "Remote Desktop (mstsc) is not available on this system.")
+    except subprocess.CalledProcessError:
+        messagebox.showerror("Error", "Failed to open Remote Desktop. Check your credentials or target system.")
     except Exception as e:
         messagebox.showerror("Error", f"Failed to open Remote Desktop: {e}")
     finally:
@@ -1150,14 +1184,66 @@ def create_rdp_file(target_ip, username, password):
 
 cerhost_path = None  # Will hold the Cerhost executable path
 
+def prompt_for_cerhost_path():
+    """Prompt the user to select the Cerhost executable path."""
+    global cerhost_path
+    
+    # Open file dialog directly for the user to select the Cerhost executable
+    cerhost_path = filedialog.askopenfilename(
+        title="Select Cerhost Executable",
+        filetypes=[("Executable Files", "*.exe"), ("All Files", "*.*")]
+    )
+    
+    if not cerhost_path:  # User cancelled the dialog
+        messagebox.showwarning("Path Required", "Cerhost path is required to proceed.")
+        return None
+    
+    # Validate the selected file
+    if not os.path.isfile(cerhost_path):
+        messagebox.showerror("Invalid Path", "The selected file is not valid.")
+        cerhost_path = None
+        return None
+    
+    # Save the selected path to a configuration file
+    save_cerhost_path_to_file(cerhost_path)
+    print(f"Cerhost path selected: {cerhost_path}")
+    return cerhost_path
+
 def launch_cerhost(device_ip):
     """Launch Cerhost for the given IP address."""
-    cerhost_path = "path_to_cerhost_executable"  # Update this path
+    global cerhost_path
+
+    # Attempt to load the path from the configuration file
+    load_cerhost_path_from_file()  # Load path if not already loaded
+
+    if not cerhost_path:
+        path = prompt_for_cerhost_path()
+        if not path:  # User may cancel the popup
+            print("Cerhost path not provided. Aborting.")
+            return
+
     try:
         subprocess.Popen([cerhost_path, device_ip])
         print(f"Cerhost launched for {device_ip}")
     except Exception as e:
         messagebox.showerror("Error", f"Failed to launch Cerhost: {e}")
+
+config = configparser.ConfigParser()
+config_file = "config.ini"
+
+def save_cerhost_path_to_file(path):
+    config["Settings"] = {"CerhostPath": path}
+    with open(config_file, "w") as file:
+        config.write(file)
+
+def load_cerhost_path_from_file():
+    global cerhost_path
+
+    if os.path.exists(config_file):
+        config.read(config_file)
+        cerhost_path = config["Settings"].get("CerhostPath", None)
+        if cerhost_path:
+            print(f"Cerhost path loaded: {cerhost_path}")
 
 
 
