@@ -2536,6 +2536,18 @@ routes_table.bind('<Delete>', delete_selected_record)
 routes_table.bind('<Double-1>', on_double_click)
 routes_table.bind('<<TreeviewSelect>>',  update_ssh_state)
 
+# Create the context menu
+context_menu = tk.Menu(routes_table, tearoff=0)
+# context_menu.add_command(label="Delete", command=delete_selected_record_from_menu)
+context_menu.add_command(label="SSH Tunnel", command=create_ssh_tunnel)
+context_menu.add_command(label="Open RDP", command=open_remote_connection)
+
+# Bind right-click to show the context menu
+routes_table.bind("<Button-3>", show_context_menu)
+
+exceptions = [routes_table, vsb, frame_login]
+root.bind("<Button-1>", on_click)
+
 
 frame_save_file = ttk.Labelframe(root, text="Save", labelanchor='nw', style="Custom.TLabelframe")
 frame_save_file.grid(row=6, column=0, columnspan=4, padx=15, pady=5, sticky='w')
@@ -2566,20 +2578,6 @@ setup_tunnel_button = ttk.Button(frame_save_file, text="  Setup SSH   ",
                             style="TButton", 
                             command=open_ssh_config_window_cond)
 setup_tunnel_button.grid(row=1, column=3, padx=5, pady=5)
-
-
-# Create the context menu
-context_menu = tk.Menu(routes_table, tearoff=0)
-# context_menu.add_command(label="Delete", command=delete_selected_record_from_menu)
-context_menu.add_command(label="SSH Tunnel", command=create_ssh_tunnel)
-context_menu.add_command(label="Open RDP", command=open_remote_connection)
-
-# Bind right-click to show the context menu
-routes_table.bind("<Button-3>", show_context_menu)
-
-exceptions = [routes_table, vsb, frame_login]
-root.bind("<Button-1>", on_click)
-
 
 # Create the spinner as part of the layout
 create_spinner_widget()
