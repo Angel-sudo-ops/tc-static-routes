@@ -359,8 +359,8 @@ def validate_and_create_xml():
             else:
                 lgv_list.append(r)
     
-    create_routes_xml(project, lgv_list, base_ip, file_path, is_tc3)
-    toggle_cc()
+    # create_routes_xml(project, lgv_list, base_ip, file_path, is_tc3)
+    # toggle_cc()
 
 ################################### Get StaticRoutes.xml and create table #########################
 
