@@ -1070,7 +1070,31 @@ def save_winscp_ini():
         create_winscp_ini_from_table(file_path, data)
 
 ############################################################## RDP connection #################################################################
-def open_rdp_connection():
+def detect_connection_type(ip_address):
+    """Detect whether the LGV supports RDP or Cerhost."""
+    RDP_PORT = 3389
+    CERHOST_PORT = 987  # Update to match your Cerhost port
+
+    def is_port_open(host, port):
+        """Check if a specific port is open on the host."""
+        try:
+            with socket.create_connection((host, port), timeout=3):
+                return True
+        except Exception:
+            return False
+
+    # Check for RDP support
+    if is_port_open(ip_address, RDP_PORT):
+        return "RDP"
+    
+    # Check for Cerhost support
+    if is_port_open(ip_address, CERHOST_PORT):
+        return "Cerhost"
+    
+    # If neither is available
+    return "Unknown"
+
+def open_remote_connection():
     """Open Remote Desktop using an .rdp file."""
     selected_item = routes_table.selection()
     if not selected_item:
@@ -1078,25 +1102,36 @@ def open_rdp_connection():
         return
 
     target_ip = routes_table.item(selected_item)["values"][1]
-    ssh_username = username_entry.get()
-    ssh_password = password_entry.get()
+    rdp_username = username_entry.get()
+    rdp_password = password_entry.get()
 
-    if not ssh_username or not ssh_password:
+    if not rdp_username or not rdp_password:
         messagebox.showwarning("Attention", "Username and Password are required for Remote Desktop.")
         return
 
-    def launch_rdp():
-        try:
-            rdp_file = create_rdp_file(target_ip, ssh_username, ssh_password)
-            subprocess.run(["mstsc", rdp_file], check=True)
-            print(f"Opening Remote Desktop for {target_ip} with user {ssh_username}")
-        except Exception as e:
-            messagebox.showerror("Error", f"Failed to open Remote Desktop: {e}")
-        finally:
-            if os.path.exists(rdp_file):
-                os.remove(rdp_file)
+    def detect_and_connect():
+        connection_type = detect_connection_type(target_ip)
 
-    Thread(target=launch_rdp, daemon=True).start()
+        if connection_type == "RDP":
+            open_rdp_connection(target_ip, rdp_username, rdp_password)
+        elif connection_type == "Cerhost":
+            launch_cerhost(target_ip)
+        else:
+            messagebox.showerror("Connection Error", f"Unable to determine connection type for {target_ip}.")
+
+    # Run detection in a separate thread to keep the UI responsive
+    Thread(target=detect_and_connect, daemon=True).start()
+
+def open_rdp_connection(target_ip, username, password):
+    try:
+        rdp_file = create_rdp_file(target_ip, username, password)
+        subprocess.run(["mstsc", rdp_file], check=True)
+        print(f"Opening Remote Desktop for {target_ip}")
+    except Exception as e:
+        messagebox.showerror("Error", f"Failed to open Remote Desktop: {e}")
+    finally:
+        if os.path.exists(rdp_file):
+            os.remove(rdp_file)
 
 def create_rdp_file(target_ip, username, password):
     """Create a temporary .rdp file with credentials."""
@@ -1111,6 +1146,20 @@ def create_rdp_file(target_ip, username, password):
     with open("temp.rdp", "w") as file:
         file.write(rdp_content.strip())
     return "temp.rdp"
+
+
+cerhost_path = None  # Will hold the Cerhost executable path
+
+def launch_cerhost(device_ip):
+    """Launch Cerhost for the given IP address."""
+    cerhost_path = "path_to_cerhost_executable"  # Update this path
+    try:
+        subprocess.Popen([cerhost_path, device_ip])
+        print(f"Cerhost launched for {device_ip}")
+    except Exception as e:
+        messagebox.showerror("Error", f"Failed to launch Cerhost: {e}")
+
+
 
 ############################################################## SSH tunneling config #################################################################
 SSH_CONFIG_FILE = "ssh_config.xml"
@@ -2437,7 +2486,7 @@ setup_tunnel_button.grid(row=1, column=3, padx=5, pady=5)
 context_menu = tk.Menu(routes_table, tearoff=0)
 # context_menu.add_command(label="Delete", command=delete_selected_record_from_menu)
 context_menu.add_command(label="SSH Tunnel", command=create_ssh_tunnel)
-context_menu.add_command(label="Open RDP", command=open_rdp_connection)
+context_menu.add_command(label="Open RDP", command=open_remote_connection)
 
 # Bind right-click to show the context menu
 routes_table.bind("<Button-3>", show_context_menu)
