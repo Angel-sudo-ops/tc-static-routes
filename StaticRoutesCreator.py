@@ -597,7 +597,7 @@ def create_routes_xml_from_table(file_path):
     with open(file_path, "w", encoding='utf-8') as f:
         f.write(xmlstr)
 
-    messagebox.showinfo("Success", "StaticRoutes file has been created successfully. \nRemember to restart TwinCAT!!")
+    messagebox.showinfo("Success", "StaticRoutes file has been created successfully. \nRemember to RESTART TwinCAT!!")
 
 def save_routes_xml():
     if not get_table_data():
@@ -1140,7 +1140,8 @@ def open_remote_connection():
         try:
             connection_type = detect_connection_type(target_ip, lgv_type)
             if connection_type == "RDP":
-                open_rdp_connection(target_ip, rdp_username, rdp_password)
+                # open_rdp_connection(target_ip, rdp_username, rdp_password)
+                open_rdp_connection_with_credentials(target_ip, rdp_username, rdp_password)
             elif connection_type == "Cerhost":
                 launch_cerhost(target_ip)
             else:
@@ -1151,6 +1152,31 @@ def open_remote_connection():
 
     # Run detection in a separate thread to keep the UI responsive
     Thread(target=detect_and_connect, daemon=True).start()
+
+def open_rdp_connection_with_credentials(target_ip, username, password):
+    """
+    Open Remote Desktop Connection using pre-stored credentials via cmdkey.
+    """
+    try:
+        # Step 1: Store credentials using cmdkey
+        cmdkey_command = f'cmdkey /generic:TERMSRV/{target_ip} /user:{username} /pass:{password}'
+        subprocess.run(cmdkey_command, shell=True, check=True)
+        print(f"Credentials stored for {target_ip}")
+
+        # Step 2: Open Remote Desktop Connection
+        rdp_command = f'mstsc /v:{target_ip}'
+        subprocess.run(rdp_command, shell=True)
+        print(f"RDP connection launched for {target_ip}")
+
+    except subprocess.CalledProcessError as e:
+        print(f"Error: {e}")
+        messagebox.showerror("Error", f"Failed to launch Remote Desktop: {e}")
+
+    finally:
+        # Step 3: Clean up credentials after the RDP session
+        cleanup_command = f'cmdkey /delete:TERMSRV/{target_ip}'
+        subprocess.run(cleanup_command, shell=True)
+        print(f"Credentials removed for {target_ip}")
 
 def open_rdp_connection(target_ip, username, password):
     try:
@@ -1172,10 +1198,6 @@ def create_rdp_file(target_ip, username, password):
     rdp_content = f"""
     full address:s:{target_ip}
     username:s:{username}
-    password 51:b:{password.encode('utf-16le').hex()}
-    authentication level:i:0
-    prompt for credentials:i:0
-    enablecredsspsupport:i:0
     """
     with open("temp.rdp", "w") as file:
         file.write(rdp_content.strip())
@@ -2485,7 +2507,7 @@ frame_password.grid(row=1, column=0, padx=5, pady=0)
 password_label = ttk.Label(frame_password, text="Password:")
 password_label.grid(row=0, column=0, padx=0, pady=5, sticky='e')
 
-password_entry = ttk.Entry(frame_password, show="*", width=15)
+password_entry = ttk.Entry(frame_password, width=15)
 password_entry.grid(row=0, column=1, padx=5, pady=5)
 
 test_routes_button = ttk.Button(frame_login, text="  Test Routes  ",
@@ -2584,7 +2606,7 @@ create_spinner_widget()
 
 check_twinCAT_version()
 
-# Pupulate table the first time with current StaticRoutes.xml file
+# Populate table the first time with current StaticRoutes.xml file
 populate_table_from_xml("C:\\TwinCAT\\3.1\\Target\\StaticRoutes.xml")
 
 root.mainloop()
@@ -2607,3 +2629,4 @@ root.mainloop()
 
 
 # Add PuTTY sessions, first check if it is installed, if not, popup to show is not installed, if yes, create all the sessions on the registry
+# Exploring option to use the ssh tunnels with python module paramiko
