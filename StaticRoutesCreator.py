@@ -17,8 +17,12 @@ import select
 import asyncio
 import struct
 import winreg
+import paramiko
+from threading import Thread
+import logging
+import subprocess
 
-__version__ = '3.4.2'
+__version__ = '3.4.6'
 
 default_file_path = os.path.join(r'C:\TwinCAT\3.1\Target', 'StaticRoutes.xml')
 
@@ -355,16 +359,23 @@ def validate_and_create_xml():
             else:
                 lgv_list.append(r)
     
-    create_routes_xml(project, lgv_list, base_ip, file_path, is_tc3)
-    toggle_cc()
+    # create_routes_xml(project, lgv_list, base_ip, file_path, is_tc3)
+    # toggle_cc()
 
 ################################### Get StaticRoutes.xml and create table #########################
 
-def populate_table_from_xml():
-    # Ask the user to select an XML file
-    file_path = filedialog.askopenfilename(title="Select StaticRoutes file", 
-                                           initialdir="C:\\TwinCAT\\3.1\\Target",
-                                           filetypes=[("XML files", "*.xml")])
+def populate_table_from_xml(path=None):
+    if not path:
+        # Ask the user to select an XML file
+        file_path = filedialog.askopenfilename(title="Select StaticRoutes file", 
+                                            initialdir="C:\\TwinCAT\\3.1\\Target",
+                                            filetypes=[("XML files", "*.xml")])
+    else:
+        file_path = path
+
+    if file_path and not os.path.exists(file_path):
+        print(f"The file {path} does not exist.")
+        return
     
     if file_path:
         try:
@@ -381,9 +392,9 @@ def populate_table_from_xml():
             return
         
         # Clear the existing table data
-        for i in treeview.get_children():
-            treeview.delete(i)
-        
+        for i in routes_table.get_children():
+            routes_table.delete(i)
+            
         # Initialize an empty list to hold the data
         routes_data = []
         
@@ -407,8 +418,10 @@ def populate_table_from_xml():
         
         # Populate the Treeview with the data
         for item in routes_data:
-            treeview.insert("", "end", values=item)
+            routes_table.insert("", "end", values=item)
         # messagebox.showinfo("Success", "Data loaded successfully from the XML file.")
+
+    update_tunnel_button_status()
 
 ############################# Populate table based on inputs ##############################
 
@@ -437,8 +450,8 @@ def populate_table_from_inputs():
     ip_list = parse_ip(base_ip, lgvs)
 
     # Clear existing table data
-    # for i in treeview.get_children():
-    #     treeview.delete(i)
+    # for i in routes_table.get_children():
+    #     routes_table.delete(i)
 
     # Loop through the parsed IPs and add to the table
     for i, current_ip in enumerate(ip_list):
@@ -447,8 +460,8 @@ def populate_table_from_inputs():
         
         # Check if the record already exists in the table, ignoring the TC type and name
         record_exists = False
-        for row in treeview.get_children():
-            existing_values = treeview.item(row)["values"]
+        for row in routes_table.get_children():
+            existing_values = routes_table.item(row)["values"]
             if (existing_values[1] == current_ip and 
                 existing_values[2] == net_id):
                 record_exists = True
@@ -457,18 +470,20 @@ def populate_table_from_inputs():
 
         # Only add the record if it doesn't already exist
         if not record_exists:
-            treeview.insert("", "end", values=(
+            routes_table.insert("", "end", values=(
                 route_name,
                 current_ip,
                 net_id,
                 "TC3" if is_tc3 else "TC2"
             ))
+    
+    update_tunnel_button_status()
 
 ##################### Function to check for duplicates in the Treeview ######################
 #Check for duplicates when input is the entry fields
 # def is_duplicate(name, address, netid, type_tc):
-#     for item in treeview.get_children():
-#         existing_values = treeview.item(item, 'values')
+#     for item in routes_table.get_children():
+#         existing_values = routes_table.item(item, 'values')
 #         if (name, address, netid, type_tc) == existing_values:
 #             return True
 #     return False
@@ -476,9 +491,9 @@ def populate_table_from_inputs():
 #Check for duplicates when input is the table directly
 def is_duplicate(col_index, new_value, current_row):
     # Check for duplicates in the column except for the current editing row
-    for item in treeview.get_children():
+    for item in routes_table.get_children():
         if item != current_row:
-            if treeview.item(item, 'values')[col_index] == new_value:
+            if routes_table.item(item, 'values')[col_index] == new_value:
                 return True
     return False
 
@@ -513,38 +528,38 @@ def parse_range(range_str):
 ############################### Delete selected record ####################################
 # With a button
 def delete_selected():
-    selected_item = treeview.selection()
+    selected_item = routes_table.selection()
     if selected_item:
-        treeview.delete(selected_item)
+        routes_table.delete(selected_item)
     else:
         messagebox.showwarning("Selection Error", "Please select a record to delete.")
 
 # With right click
 def delete_selected_record_from_menu():
-    selected_item = treeview.selection()
+    selected_item = routes_table.selection()
     if selected_item:
-        treeview.delete(selected_item)
+        routes_table.delete(selected_item)
 
 # Function to show the context menu
 def show_context_menu(event):
     # Check if a record is selected
-    selected_item = treeview.identify_row(event.y)
+    selected_item = routes_table.identify_row(event.y)
     if selected_item:
-        treeview.selection_set(selected_item)
+        routes_table.selection_set(selected_item)
         context_menu.post(event.x_root, event.y_root)
 
 # With DEL key
 def delete_selected_record(event):
-    selected_items = treeview.selection()
+    selected_items = routes_table.selection()
     for item in selected_items:
         if item:
-            treeview.delete(item)
+            routes_table.delete(item)
 
 ################################### Delete whole table ########################################
 
 def delete_whole_table():
-    for i in treeview.get_children():
-        treeview.delete(i)
+    for i in routes_table.get_children():
+        routes_table.delete(i)
 
 ################################## Create StaticRoutes.xml from table ##########################
     
@@ -582,7 +597,7 @@ def create_routes_xml_from_table(file_path):
     with open(file_path, "w", encoding='utf-8') as f:
         f.write(xmlstr)
 
-    messagebox.showinfo("Success", "StaticRoutes file has been created successfully. \nRemember to restart TwinCAT!!")
+    messagebox.showinfo("Success", "StaticRoutes file has been created successfully. \nRemember to RESTART TwinCAT!!")
 
 def save_routes_xml():
     if not get_table_data():
@@ -664,12 +679,12 @@ def save_cc_xml():
 ######################################## Modify data directly on table ############################################
 
 def on_double_click(event):
-    region = treeview.identify("region", event.x, event.y)
+    region = routes_table.identify("region", event.x, event.y)
     if region == "cell":
-        column = treeview.identify_column(event.x)
-        row = treeview.identify_row(event.y)
+        column = routes_table.identify_column(event.x)
+        row = routes_table.identify_row(event.y)
         col_index = int(column.replace("#", "")) - 1
-        current_value = treeview.item(row, 'values')[col_index]
+        current_value = routes_table.item(row, 'values')[col_index]
 
         if col_index == 3:  # Assuming column 3 is the Type column
             create_combobox_for_type(column, row)
@@ -678,17 +693,17 @@ def on_double_click(event):
 
 
 def create_combobox_for_type(column, row):
-    bbox = treeview.bbox(row, column)
+    bbox = routes_table.bbox(row, column)
     if not bbox:
         return
     
-    combo_edit = ttk.Combobox(treeview, values=["TC2", "TC3"], state="readonly")
-    x, y, width, height = treeview.bbox(row, column)
+    combo_edit = ttk.Combobox(routes_table, values=["TC2", "TC3"], state="readonly")
+    x, y, width, height = routes_table.bbox(row, column)
     combo_edit.place(x=x, y=y, width=width, height=height)
 
     def on_select(event):
         if combo_edit.winfo_exists():
-            treeview.set(row, column=column, value=combo_edit.get())
+            routes_table.set(row, column=column, value=combo_edit.get())
             combo_edit.destroy()
     
     def check_focus(event):
@@ -702,13 +717,13 @@ def create_combobox_for_type(column, row):
 
 
 def create_entry_for_editing(column, row, col_index, current_value):
-    bbox = treeview.bbox(row, column)
+    bbox = routes_table.bbox(row, column)
     if not bbox:
         return
     
-    entry_edit = tk.Entry(treeview, border=0)
+    entry_edit = tk.Entry(routes_table, border=0)
     entry_edit.insert(0, current_value)
-    x, y, width, height = treeview.bbox(row, column)
+    x, y, width, height = routes_table.bbox(row, column)
     entry_edit.place(x=x, y=y, width=width, height=height)
     entry_edit.focus()
     entry_edit.select_range(0, tk.END)
@@ -717,7 +732,7 @@ def create_entry_for_editing(column, row, col_index, current_value):
         if entry_edit.winfo_exists():
             new_value = entry_edit.get()
             if is_duplicate(col_index, new_value, row):
-                messagebox.showerror("Invalid Input", f"Duplicate value found for {treeview.heading(col_index, 'text')}.")
+                messagebox.showerror("Invalid Input", f"Duplicate value found for {routes_table.heading(col_index, 'text')}.")
                 return  # Do not destroy the Entry, allow user to correct it
             if col_index == 0:  # Assuming the "Name" column is the first column (index 0)
                 if not new_value.strip():  # Check if the name is not empty
@@ -730,7 +745,7 @@ def create_entry_for_editing(column, row, col_index, current_value):
                 return
             entry_edit.destroy()
             
-            treeview.set(row, column=column, value=new_value)
+            routes_table.set(row, column=column, value=new_value)
 
     def cancel_edit(event=None):
         if entry_edit.winfo_exists():
@@ -742,7 +757,7 @@ def create_entry_for_editing(column, row, col_index, current_value):
 
 
 ################################## Sorting ################################################
-def setup_treeview():
+def setup_routes_table():
     # Initialize the headings with custom names
     headings = {
         'Name': 'Route Name',
@@ -751,11 +766,11 @@ def setup_treeview():
         'Type': 'Type'
     }
     
-    for col in treeview['columns']:
-        treeview.heading(col, text=headings[col], command=lambda _col=col: treeview_sort_column(treeview, _col, False), anchor='w')
+    for col in routes_table['columns']:
+        routes_table.heading(col, text=headings[col], command=lambda _col=col: routes_table_sort_column(routes_table, _col, False), anchor='w')
 
-def treeview_sort_column(tv, col, reverse):
-    # Retrieve all data from the treeview
+def routes_table_sort_column(tv, col, reverse):
+    # Retrieve all data from the routes_table
     l = [(tv.set(k, col), k) for k in tv.get_children('')]
     
     # Sort the data
@@ -776,7 +791,7 @@ def treeview_sort_column(tv, col, reverse):
     # Change the heading to show the sort direction
     for column in tv['columns']:
         heading_text = headings[column] + (' ↓' if reverse and column == col else ' ↑' if not reverse and column == col else '')
-        tv.heading(column, text=heading_text, command=lambda _col=column: treeview_sort_column(tv, _col, not reverse))
+        tv.heading(column, text=heading_text, command=lambda _col=column: routes_table_sort_column(tv, _col, not reverse))
 
 def natural_keys(text):
     """
@@ -845,8 +860,8 @@ def populate_table_from_db3():
     # # print(columns, rows)
     
     # Clear the existing table data
-    for i in treeview.get_children():
-        treeview.delete(i)
+    for i in routes_table.get_children():
+        routes_table.delete(i)
     
     # Default type_tc based on the transfer mode
     default_type_tc = "TC2"  # Assume TC2 unless specified otherwise
@@ -880,7 +895,7 @@ def populate_table_from_db3():
     
     # Populate the Treeview with the data
     for item in routes_data:
-        treeview.insert("", "end", values=item)
+        routes_table.insert("", "end", values=item)
 
 ################################# Split project and LGV number ######################################
 def split_string(input_string):
@@ -1031,7 +1046,7 @@ def create_winscp_ini_from_table(ini_path, data):
         with open(ini_path, 'w') as configfile:
             config.write(configfile)
     except Exception as e:
-        print(f"An error occurred while writing the INI file: {e}")
+        print(f"An error occurred while writing the INI file: {e}") 
         messagebox.showerror("Error", f"An error occurred while writing the INI file: {e}")
     
     # Set the custom INI path in the registry
@@ -1053,6 +1068,663 @@ def save_winscp_ini():
     #                                          filetypes=[("INI files", "*.ini")])
     if file_path:
         create_winscp_ini_from_table(file_path, data)
+
+############################################################## RDP connection #################################################################
+def is_host_reachable(host, timeout=2):
+    """Ping the host to check if it is reachable."""
+    # Define the ping command based on the OS
+    if platform.system().lower() == "windows":
+        ping_cmd = ["ping", "-n", "1", "-w", str(timeout * 1000), host]
+    else:
+        ping_cmd = ["ping", "-c", "1", "-W", str(timeout), host]
+
+    try:
+        subprocess.run(ping_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True, timeout=timeout + 1)
+        return True
+    except subprocess.TimeoutExpired:
+        print(f"Ping to {host} timed out.")
+        return False
+    except subprocess.CalledProcessError:
+        print(f"Ping to {host} failed.")
+        return False
+
+def is_port_open(host, port, timeout=3):
+    """Check if a specific port is open on the host."""
+    try:
+        with socket.create_connection((host, port), timeout=timeout):
+            return True
+    except Exception as e:
+        print(f"Exception at is_port_open: {e}")
+        return False
+
+def detect_connection_type(ip_address, tc_type):
+    """Detect whether the LGV supports RDP or Cerhost."""
+    RDP_PORT = 3389
+    CERHOST_PORT = 987 
+
+    # Step 1: Ping the host
+    if not is_host_reachable(ip_address):
+        print(f"Host {ip_address} is unreachable.")
+        messagebox.showerror("Connection Error", f"Host {ip_address} is unreachable")
+        return "Unreachable"
+
+    # Step 2: Directly return RDP for TC3
+    if tc_type == "TC3":
+        return "RDP"
+
+    # Step 3: Check for RDP or Cerhost only if TC2
+    if is_port_open(ip_address, RDP_PORT):
+        return "RDP"
+    if is_port_open(ip_address, CERHOST_PORT):
+        return "Cerhost"
+
+    return "Unknown"
+
+def open_remote_connection():
+    """Open Remote Desktop using an .rdp file."""
+    selected_item = routes_table.selection()
+    if not selected_item:
+        messagebox.showwarning("No Selection", "Please select an LGV first.")
+        return
+
+    target_ip = routes_table.item(selected_item)["values"][1]
+    lgv_type = routes_table.item(selected_item)["values"][3]
+    rdp_username = username_entry.get()
+    rdp_password = password_entry.get()
+
+    if not rdp_username or not rdp_password:
+        messagebox.showwarning("Attention", "Username and Password are required.")
+        return
+
+    def detect_and_connect():
+        try:
+            connection_type = detect_connection_type(target_ip, lgv_type)
+            if connection_type == "RDP":
+                # open_rdp_connection(target_ip, rdp_username, rdp_password)
+                open_rdp_connection_with_credentials(target_ip, rdp_username, rdp_password)
+            elif connection_type == "Cerhost":
+                launch_cerhost(target_ip)
+            else:
+                # messagebox.showerror("Connection Error", f"Unable to determine connection type for {target_ip}.")
+                print(f"Unable to determine connection type for {target_ip}.")
+        except Exception as e:
+            messagebox.showerror("Error", f"An error occurred during connection: {e}")
+
+    # Run detection in a separate thread to keep the UI responsive
+    Thread(target=detect_and_connect, daemon=True).start()
+
+def open_rdp_connection_with_credentials(target_ip, username, password):
+    """
+    Open Remote Desktop Connection using pre-stored credentials via cmdkey.
+    """
+    try:
+        # Step 1: Store credentials using cmdkey
+        cmdkey_command = f'cmdkey /generic:TERMSRV/{target_ip} /user:{username} /pass:{password}'
+        subprocess.run(cmdkey_command, shell=True, check=True)
+        print(f"Credentials stored for {target_ip}")
+
+        # Step 2: Open Remote Desktop Connection
+        rdp_command = f'mstsc /v:{target_ip}'
+        subprocess.run(rdp_command, shell=True)
+        print(f"RDP connection launched for {target_ip}")
+
+    except subprocess.CalledProcessError as e:
+        print(f"Error: {e}")
+        messagebox.showerror("Error", f"Failed to launch Remote Desktop: {e}")
+
+    finally:
+        # Step 3: Clean up credentials after the RDP session
+        cleanup_command = f'cmdkey /delete:TERMSRV/{target_ip}'
+        subprocess.run(cleanup_command, shell=True)
+        print(f"Credentials removed for {target_ip}")
+
+def open_rdp_connection(target_ip, username, password):
+    try:
+        rdp_file = create_rdp_file(target_ip, username, password)
+        subprocess.run(["mstsc", rdp_file], check=True)
+        print(f"Opening Remote Desktop for {target_ip}")
+    except FileNotFoundError:
+        messagebox.showerror("Error", "Remote Desktop (mstsc) is not available on this system.")
+    except subprocess.CalledProcessError:
+        messagebox.showerror("Error", "Failed to open Remote Desktop. Check your credentials or target system.")
+    except Exception as e:
+        messagebox.showerror("Error", f"Failed to open Remote Desktop: {e}")
+    finally:
+        if os.path.exists(rdp_file):
+            os.remove(rdp_file)
+
+def create_rdp_file(target_ip, username, password):
+    """Create a temporary .rdp file with credentials."""
+    rdp_content = f"""
+    full address:s:{target_ip}
+    username:s:{username}
+    """
+    with open("temp.rdp", "w") as file:
+        file.write(rdp_content.strip())
+    return "temp.rdp"
+
+
+cerhost_path = None  # Will hold the Cerhost executable path
+
+def prompt_for_cerhost_path():
+    """Prompt the user to select the Cerhost executable path."""
+    global cerhost_path
+    
+    # Open file dialog directly for the user to select the Cerhost executable
+    cerhost_path = filedialog.askopenfilename(
+        title="Select Cerhost Executable",
+        filetypes=[("Executable Files", "*.exe"), ("All Files", "*.*")]
+    )
+    
+    if not cerhost_path:  # User cancelled the dialog
+        messagebox.showwarning("Path Required", "Cerhost path is required to proceed.")
+        return None
+    
+    # Validate the selected file
+    if not os.path.isfile(cerhost_path):
+        messagebox.showerror("Invalid Path", "The selected file is not valid.")
+        cerhost_path = None
+        return None
+    
+    # Save the selected path to a configuration file
+    save_cerhost_path_to_file(cerhost_path)
+    print(f"Cerhost path selected: {cerhost_path}")
+    return cerhost_path
+
+def launch_cerhost(device_ip):
+    """Launch Cerhost for the given IP address."""
+    global cerhost_path
+
+    # Attempt to load the path from the configuration file
+    load_cerhost_path_from_file()  # Load path if not already loaded
+
+    if not cerhost_path:
+        path = prompt_for_cerhost_path()
+        if not path:  # User may cancel the popup
+            print("Cerhost path not provided. Aborting.")
+            return
+
+    try:
+        subprocess.Popen([cerhost_path, device_ip])
+        print(f"Cerhost launched for {device_ip}")
+    except Exception as e:
+        messagebox.showerror("Error", f"Failed to launch Cerhost: {e}")
+
+config = configparser.ConfigParser()
+config_file = "config.ini"
+
+def save_cerhost_path_to_file(path):
+    config["Settings"] = {"CerhostPath": path}
+    with open(config_file, "w") as file:
+        config.write(file)
+
+def load_cerhost_path_from_file():
+    global cerhost_path
+
+    if os.path.exists(config_file):
+        config.read(config_file)
+        cerhost_path = config["Settings"].get("CerhostPath", None)
+        if cerhost_path:
+            print(f"Cerhost path loaded: {cerhost_path}")
+
+
+
+############################################################## SSH tunneling config #################################################################
+SSH_CONFIG_FILE = "ssh_config.xml"
+
+# Global variable to track active SSH client
+active_ssh_client = None
+
+default_tunnel_data = [
+            ("40101", "192.168.11.61", "2122", "PLS Front ETH"),
+            ("40102", "192.168.11.62", "2122", "PLS Rear ETH"),
+            ("40105", "192.168.11.65", "2122", "PLS Lateral Left ETH"),
+            ("40106", "192.168.11.66", "2122", "PLS Lateral Right ETH"),
+            ("5900",  "192.168.11.6",  "5900", "Exor OnBoard VNC")
+        ]
+
+def update_tunnel_button_status():
+    """
+    Enable the tunnel setup button if at least one element in the table is TC3.
+    Disable it otherwise.
+    """
+    # Get all items in the static routes table
+    all_items = routes_table.get_children()
+    has_tc3 = any(routes_table.item(item)["values"][3] == "TC3" for item in all_items)  # Assuming "Type" is in the 4th column
+    
+    if has_tc3:
+        setup_tunnel_button.config(state=tk.NORMAL)
+    else:
+        setup_tunnel_button.config(state=tk.DISABLED)
+
+    # Call this method every time the static routes table is updated
+    # Example: after loading new data or modifying entries
+    # update_tunnel_button_status()
+
+def update_ssh_menu_status():
+    """
+    Enable SSH option only if selected element is TC3
+    """
+    selection = routes_table.selection()
+    if selection:
+        if routes_table.item(selection)["values"][3] == "TC3":
+            context_menu.entryconfig("SSH Tunnel", state="normal")
+        else:
+            context_menu.entryconfig("SSH Tunnel", state="disabled")
+
+def update_ssh_state(*args):
+    update_tunnel_button_status()
+    update_ssh_menu_status()
+
+logging.basicConfig(level=logging.DEBUG)
+
+tunnel_connection_in_progress = False
+def create_ssh_tunnel():
+    """Create SSH tunnels for the selected LGV."""
+    global active_ssh_client, tunnel_connection_in_progress
+
+    # Check if a tunnel is already active
+    if active_ssh_client and active_ssh_client.get_transport() and active_ssh_client.get_transport().is_active():
+        messagebox.showwarning("Tunnel Active", "An SSH tunnel is already active. Close it before creating a new one.")
+        return
+
+    tunnels = get_tunnels()
+
+    ssh_username = username_entry.get()
+    ssh_password = password_entry.get()
+
+    selected_item = routes_table.selection()
+
+    if not tunnels:
+        messagebox.showinfo("No Tunnels", "No tunnels found to create.")
+        return
+
+    if not ssh_username:
+        messagebox.showwarning("Attention", "Input username")
+        print("Input user")
+        return
+    if not ssh_password:
+        messagebox.showwarning("Attention", "Input password")
+        print("Input password")
+        return
+    
+    if tunnel_connection_in_progress:
+        print("Tunnel connection in progress")
+        return
+
+    lgv = routes_table.item(selected_item)["values"][0]
+    print(f"SSH Tunnel created for {lgv}")
+
+    ssh_host = routes_table.item(selected_item)["values"][1]
+
+    tunnel_connection_in_progress = True
+
+    def establish_tunnels():
+        """Establish SSH tunnels."""
+        global active_ssh_client, tunnel_connection_in_progress
+        try:
+            client = paramiko.SSHClient()
+            client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+            client.connect(ssh_host, port=20022, username=ssh_username, password=ssh_password, timeout=5)
+
+            active_ssh_client = client  # Set the global active client
+
+            transport = client.get_transport()
+            transport.set_keepalive(30)  # Send a keepalive packet every 30 seconds
+            active_tunnels = []
+
+            for tunnel in tunnels:
+                local_port = int(tunnel["Local Port"])
+                remote_ip = tunnel["Remote IP"]
+                remote_port = int(tunnel["Remote Port"])
+
+                try:
+                    # Establish forwarding
+                    channel = transport.open_channel(
+                        "direct-tcpip",
+                        (remote_ip, remote_port),  # Remote target
+                        ("127.0.0.1", local_port)  # Local source
+                    )
+                    active_tunnels.append(f"{local_port} -> {remote_ip}:{remote_port}")
+                    print(f"Tunnel created: {local_port} -> {remote_ip}:{remote_port}")
+                except Exception as tunnel_error:
+                    print(f"Error creating tunnel {local_port} -> {remote_ip}:{remote_port}: {tunnel_error}")
+
+            if not active_tunnels:
+                raise Exception("No tunnels could be established.")
+
+            # Open confirmation window
+            show_tunnel_window(client, active_tunnels, lgv)
+
+        except paramiko.AuthenticationException:
+            messagebox.showerror("Authentication Error", "Invalid username or password for SSH.")
+        except paramiko.SSHException as e:
+            messagebox.showerror("SSH Error", f"SSH connection to {lgv} failed: {e}")
+        except Exception as e:
+            print(f"Error creating tunnels for {lgv}: {e}")
+            messagebox.showerror("Error", f"Failed to create SSH tunnels for {lgv}: {e}")
+            if active_ssh_client:
+                try:
+                    active_ssh_client.close()
+                    print("Closed active SSH client due to errors.")
+                except Exception as cleanup_error:
+                    print(f"Error during cleanup: {cleanup_error}")
+                active_ssh_client = None
+        finally:
+            tunnel_connection_in_progress = False
+
+
+    # Run tunnel creation in a thread to avoid blocking the UI
+    tunnel_thread = Thread(target=establish_tunnels, daemon=True)
+    tunnel_thread.start()
+
+def show_tunnel_window(client, active_tunnels, host):
+    """Display a window showing active tunnels and allow closing them."""
+    global active_ssh_client
+
+    tunnel_window = tk.Toplevel(root)
+    tunnel_window.title("Active Tunnels")
+    
+    window_width = 400
+    window_lenght = 300
+    tunnel_window.geometry(f"{window_width}x{window_lenght}")
+    tunnel_window.minsize(window_width, window_lenght)
+
+    # Show LGV information
+    tk.Label(tunnel_window, text=f"Tunnels are active for {host}:", font=("Arial", 14)).pack(pady=10)
+    
+    # Show tunnel status
+    tunnel_list = tk.Text(tunnel_window, wrap="word", height=10, width=40)
+    tunnel_list.pack(pady=10)
+
+    for tunnel in active_tunnels:
+        tunnel_list.insert("end", f"{tunnel}\n")
+    tunnel_list.configure(state="disabled")
+
+    def close_tunnels():
+        """Close all active tunnels and destroy the window."""
+        global active_ssh_client
+        try:
+           if client and client.get_transport() and client.get_transport().is_active():
+                client.close()
+                print(f"All tunnels for {host} have been closed.")
+                messagebox.showinfo("Tunnels Closed", f"All tunnels for {host} have been closed.")
+                active_ssh_client = None  # Reset active client
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to close tunnels: {e}")
+        finally:
+            tunnel_window.destroy()
+    
+    # Bind the tunnel window close event to cleanup
+    tunnel_window.protocol("WM_DELETE_WINDOW", close_tunnels)
+
+    close_button = ttk.Button(tunnel_window, text="Close Tunnels", command=close_tunnels)
+    close_button.pack(pady=10)
+
+def get_tunnels():
+    """Load tunnels from XML file or use default ones"""
+    global default_tunnel_data
+
+    tunnels = []
+
+    if os.path.exists(SSH_CONFIG_FILE):
+        try:
+            tree = ET.parse(SSH_CONFIG_FILE)
+            root = tree.getroot()
+
+            for tunnel in root.findall("Tunnel"):
+                tunnels.append({
+                    "Local Port" : tunnel.find("LocalPort").text,
+                    "Remote IP"  : tunnel.find("RemoteIP").text,
+                    "Remote Port": tunnel.find("RemotePort").text,
+                })
+        except Exception as e:
+            print(f"Error reading XML file {e}")
+    
+    if not tunnels:
+        tunnels = [
+            {"Local Port" : row[0], "Remote IP"  : row[1], "Remote Port": row[2]}
+            for row in default_tunnel_data
+        ]
+    
+    return tunnels
+
+
+"""
+def on_main_app_close():
+    Handle the main application close event.
+    try:
+        if client and client.get_transport() and client.get_transport().is_active():
+            client.close()
+            print("All tunnels closed as the main app is closing.")
+    except Exception as e:
+        print(f"Error closing tunnels during app exit: {e}")
+    root.destroy()
+"""
+##################################################### Setup SSH window #############################################################################
+ssh_config_window = None
+
+
+def open_ssh_config_window_cond():
+    global ssh_config_window
+
+    if ssh_config_window is not None and ssh_config_window.winfo_exists():
+        ssh_config_window.lift()
+        ssh_config_window.focus_force()
+    else:
+        open_ssh_config_window()
+
+def open_ssh_config_window():
+    global ssh_config_window, is_saved
+
+    # Track if the table data has been saved
+    is_saved = False
+
+    ssh_config_window = tk.Toplevel(root)
+    ssh_config_window.title("Setup SSH")
+
+    window_width = 500
+    window_lenght = 300
+    ssh_config_window.geometry(f"{window_width}x{window_lenght}")
+    ssh_config_window.minsize(window_width, window_lenght)
+
+    # Dictionary to maintain custom headings
+    headings = {
+        'Local Port' : 'Local Port',
+        'Remote IP'  : 'Remote IP',
+        'Remote Port': 'Remote Port',
+        'Description': 'Description'
+    }
+
+    def setup_tunnel_table():
+        for col in tunnel_table['columns']:
+            tunnel_table.heading(col, text=headings[col], command=lambda _col=col: table_sort_column(tunnel_table, _col, False), anchor='w')
+
+    def table_sort_column(tv, col, reverse):
+        # Retrieve all data from the treeview
+        l = [(tv.set(k, col), k) for k in tv.get_children('')]
+        
+        # Sort the data
+        l.sort(reverse=reverse, key=lambda t: natural_keys(t[0]))
+
+        # Rearrange items in sorted positions
+        for index, (val, k) in enumerate(l):
+            tv.move(k, '', index)
+
+        # Change the heading to show the sort direction
+        for column in tv['columns']:
+            heading_text = headings[column] + (' ↓' if reverse and column == col else ' ↑' if not reverse and column == col else '')
+            tv.heading(column, text=heading_text, command=lambda _col=column: table_sort_column(tv, _col, not reverse))
+
+    def natural_keys(text):
+        """
+        Alphanumeric (natural) sort to handle numbers within strings correctly
+        """
+        return [int(c) if c.isdigit() else c for c in re.split(r'(\d+)', text)]
+
+    def initialize_tunnel_table():
+        """Initialize the tunnel table based on the presence of the XML file."""
+        if os.path.exists(SSH_CONFIG_FILE):
+            load_table_from_xml(SSH_CONFIG_FILE)
+        else:
+            init_tunnel_table()
+
+    def init_tunnel_table():
+        """Initialize the table with default values."""
+        global default_tunnel_data
+
+        for row in default_tunnel_data:
+            add_row(tunnel_table, *row)
+
+    
+    def save_table_to_xml(filename=SSH_CONFIG_FILE):
+        """Save table data to an XML file."""
+        global is_saved
+        # Create the root element
+        root = ET.Element("Tunnels")
+
+        # Add data from the table to the XML structure
+        for row_id in tunnel_table.get_children():
+            values = tunnel_table.item(row_id)["values"]
+            tunnel = ET.SubElement(root, "Tunnel")
+            ET.SubElement(tunnel, "LocalPort").text   = str(values[0])
+            ET.SubElement(tunnel, "RemoteIP").text    = str(values[1])
+            ET.SubElement(tunnel, "RemotePort").text  = str(values[2])
+            ET.SubElement(tunnel, "Description").text = str(values[3])
+
+        # Convert the XML structure to a string and prettify it
+        xml_str = ET.tostring(root, encoding="unicode")
+        pretty_xml = minidom.parseString(xml_str).toprettyxml(indent="    ")
+
+        # Write the pretty XML to the file
+        full_path = os.path.abspath(filename)
+        with open(full_path, "w") as file:
+            file.write(pretty_xml)
+
+        is_saved = True
+        messagebox.showinfo("Save Successful", f"Table data saved to:\n{full_path}")
+
+    def load_table_from_xml(filename=SSH_CONFIG_FILE):
+        """Load table data from an XML file."""
+        try:
+            tree = ET.parse(filename)
+            root = tree.getroot()
+
+            for tunnel in root.findall("Tunnel"):
+                local_port = tunnel.find("LocalPort").text
+                remote_ip = tunnel.find("RemoteIP").text
+                remote_port = tunnel.find("RemotePort").text
+                description = tunnel.find("Description").text
+                add_row(tunnel_table, local_port, remote_ip, remote_port, description)
+        except FileNotFoundError:
+            print(f"{filename} not found. Starting with an empty table.")
+
+    def on_window_close():
+        """Handle the window close event"""
+        if not is_saved:
+            result  = messagebox.askyesnocancel(
+                "Unsaved Changes",
+                "You have unsaved changes. Do you want to save them before closing?"
+            )
+            if result is None:
+                return
+            elif result:
+                save_table_to_xml()
+        ssh_config_window.destroy()
+
+    ssh_config_window.protocol("WM_DELETE_WINDOW", on_window_close)
+
+    def mark_as_unsaved(event=None):
+        global is_saved
+        is_saved = False
+    
+
+    # Input frame for adding data
+    input_button_frame = tk.Frame(ssh_config_window)
+    input_button_frame.pack(fill=tk.X, pady=5, padx=5)
+
+    # Use grid for input fields and buttons
+    ttk.Label(input_button_frame, text="Local Port:").grid(row=0, column=0, padx=5, pady=5, sticky="w")
+    local_port_entry = ttk.Entry(input_button_frame, width=8)
+    local_port_entry.grid(row=0, column=1, padx=5, pady=5, sticky="w")
+
+    ttk.Label(input_button_frame, text="Remote Port:").grid(row=1, column=0, padx=5, pady=5, sticky="w")
+    remote_port_entry = ttk.Entry(input_button_frame, width=8)
+    remote_port_entry.grid(row=1, column=1, padx=5, pady=5, sticky="w")
+
+    ttk.Label(input_button_frame, text="Remote IP:").grid(row=0, column=2, padx=5, pady=5, sticky="w")
+    remote_ip_entry = ttk.Entry(input_button_frame, width=25)
+    remote_ip_entry.grid(row=0, column=3, padx=5, pady=5, sticky="w")
+
+    ttk.Label(input_button_frame, text="Description:").grid(row=1, column=2, padx=5, pady=5, sticky="w")
+    description_entry = ttk.Entry(input_button_frame, width=25)
+    description_entry.grid(row=1, column=3, padx=5, pady=5, sticky="w")
+
+    def add_row_from_inputs():
+        """Add a row to the table using data from the input fields."""
+        local_port = local_port_entry.get()
+        remote_ip = remote_ip_entry.get()
+        remote_port = remote_port_entry.get()
+        description = description_entry.get()
+
+        if not (local_port and remote_ip and remote_port and description):
+            messagebox.showwarning("Input Error", "All fields must be filled.")
+            return
+
+        add_row(tunnel_table, local_port, remote_ip, remote_port, description)
+
+        # # Clear the input fields
+        # local_port_entry.delete(0, tk.END)
+        # remote_ip_entry.delete(0, tk.END)
+        # remote_port_entry.delete(0, tk.END)
+        # description_entry.delete(0, tk.END)
+
+    add_button = ttk.Button(input_button_frame, text="Add Data", command=add_row_from_inputs)
+    add_button.grid(rowspan=2, row=0, column=4, columnspan=4, pady=10, padx=10)
+
+    add_button.bind("<Button-1>", mark_as_unsaved)
+
+    table_frame = tk.Frame(ssh_config_window)
+    table_frame.pack(fill=tk.Y, expand=True, pady=10)
+    # Create the Treeview widget (tunnel_table)
+    columns = ("Local Port", "Remote IP", "Remote Port", "Description")
+    tunnel_table = ttk.Treeview(table_frame, columns=columns, show="headings", height=5)
+    
+    tunnel_table.column("Local Port", width=70, anchor='w')
+    tunnel_table.column("Remote IP", width=100, anchor='w')
+    tunnel_table.column("Remote Port", width=80, anchor='w')
+    tunnel_table.column("Description", width=210, anchor='w')
+
+    setup_tunnel_table()
+
+    tunnel_table.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(10,0))
+
+    vsb = ttk.Scrollbar(table_frame, orient="vertical", command=tunnel_table.yview)
+    vsb.pack(side=tk.RIGHT, fill=tk.Y)
+    tunnel_table.configure(yscrollcommand=vsb.set)
+
+    # Bind the DEL key to delete rows
+    tunnel_table.bind("<Delete>", lambda event: delete_selected_row(tunnel_table))
+    tunnel_table.bind("<Key>", mark_as_unsaved)
+
+    save_table_button = ttk.Button(ssh_config_window, text="  Save Table  ", command=save_table_to_xml)
+    save_table_button.pack(side=tk.TOP, fill=tk.Y, pady=(0,10), padx=10)
+
+    def add_row(tunnel_table, local_port="", remote_ip="", remote_port="", description=""):
+        """Add a row with specified data to the table."""
+        tunnel_table.insert("", "end", values=(local_port, remote_ip, remote_port, description))
+
+    def delete_selected_row(tunnel_table):
+        """Delete the selected row(s) from the table."""
+        selected_items = tunnel_table.selection()
+        if selected_items:
+            for item in selected_items:
+                tunnel_table.delete(item)
+        else:
+            messagebox.showwarning("Delete Row", "No row selected to delete.")
+
+    initialize_tunnel_table()
+
 
 ######################################################## Create TC Routes ############################################################################
 
@@ -1285,7 +1957,7 @@ class RouteManager:
 
 def get_items_for_routes():
     items = []
-    selected_items = treeview.selection()
+    selected_items = routes_table.selection()
 
     if selected_items: 
         for item in selected_items:
@@ -1293,7 +1965,7 @@ def get_items_for_routes():
             items.append(item)
     else:
         # If no selection, return all items
-        items = treeview.get_children()
+        items = routes_table.get_children()
     
     return items
 
@@ -1309,7 +1981,7 @@ def create_tc_routes():
     # This gets either the user selection or the whole table
     items = get_items_for_routes()
     print(items)
-    red_items = [item for item in items if 'red' in treeview.item(item, 'tags')]
+    red_items = [item for item in items if 'red' in routes_table.item(item, 'tags')]
     print(red_items)
     
     if not red_items:
@@ -1337,7 +2009,7 @@ def create_tc_routes():
     start_spinner(190, 133)
 
     for item in red_items:
-        entry = treeview.item(item)["values"]
+        entry = routes_table.item(item)["values"]
         # Start the creation process in a new thread for each red-tagged entry
         threading.Thread(target=create_and_retest_route, args=(entry, username, password, local_ams_net_id, system_name)).start()
 
@@ -1360,7 +2032,7 @@ def create_and_retest_route(entry, username, password, local_ams_net_id, system_
             connection_ok = test_connection(ams_net_id, port, name)
 
             # Update the UI with the result
-            treeview.after(0, lambda: update_ui_with_result_retest(name, connection_ok))
+            routes_table.after(0, lambda: update_ui_with_result_retest(name, connection_ok))
         else:
             # Log is route was not successfully added
             raise Exception(f"Route was not added for {remote_ip}")
@@ -1377,9 +2049,9 @@ def create_and_retest_route(entry, username, password, local_ams_net_id, system_
             global active_route_creation_threads
             active_route_creation_threads -= 1
             if active_route_creation_threads == 0:
-                treeview.after(0, lambda: stop_spinner())
-                treeview.after(0, lambda: treeview.selection_remove(treeview.selection()))
-                treeview.after(0, lambda: log_failed_routes())  # Log the failed routes
+                routes_table.after(0, lambda: stop_spinner())
+                routes_table.after(0, lambda: routes_table.selection_remove(routes_table.selection()))
+                routes_table.after(0, lambda: log_failed_routes())  # Log the failed routes
 
 def log_failed_routes():
     if failed_routes:
@@ -1391,10 +2063,10 @@ def log_failed_routes():
 
 # Function to update the UI with the result
 def update_ui_with_result_retest(name, connection_ok):
-    for item in treeview.get_children():
-        if treeview.item(item, 'values')[0] == name:
+    for item in routes_table.get_children():
+        if routes_table.item(item, 'values')[0] == name:
             color = 'green' if connection_ok else 'red'
-            treeview.item(item, tags=(color,))
+            routes_table.item(item, tags=(color,))
             break
 
 
@@ -1492,14 +2164,14 @@ def test_tc_routes():
     
     # Set back to black when testing again
     # only tested routes if selected, if not all of them
-    # for item in treeview.get_children():
-    selected = treeview.selection()
+    # for item in routes_table.get_children():
+    selected = routes_table.selection()
     if selected:
         for item in selected:
-            treeview.item(item, tags=("black"))
+            routes_table.item(item, tags=("black"))
     else:
-        for item in treeview.get_children():
-            treeview.item(item, tags=("black"))
+        for item in routes_table.get_children():
+            routes_table.item(item, tags=("black"))
 
     start_spinner(190, 133)
     
@@ -1519,7 +2191,7 @@ def start_thread_for_route(data):
     threading.Thread(target=test_route_and_update_ui, args=(entry,)).start()
 
     # Schedule the next thread execution
-    treeview.after(100, lambda: start_thread_for_route(data))
+    routes_table.after(100, lambda: start_thread_for_route(data))
 
 
 def test_route_and_update_ui(entry):
@@ -1528,16 +2200,16 @@ def test_route_and_update_ui(entry):
     port = 851 if type_ == 'TC3' else 801
 
     connection_ok = test_connection(ams_net_id, port, name)
-    treeview.after(0, lambda: update_ui_with_result(name, connection_ok))
+    routes_table.after(0, lambda: update_ui_with_result(name, connection_ok))
 
     # Decrement the thread counter and check if all threads are done
     with lock:
         active_threads -= 1
         if active_threads == 0:
             # Ensure that the spinner stops and the selection is removed after the UI update
-            treeview.after(0, lambda: stop_spinner())
-            treeview.after(0, lambda: treeview.selection_remove(treeview.selection()))
-            treeview.after(0, lambda: create_routes_button.config(state="normal"))
+            routes_table.after(0, lambda: stop_spinner())
+            routes_table.after(0, lambda: routes_table.selection_remove(routes_table.selection()))
+            routes_table.after(0, lambda: create_routes_button.config(state="normal"))
 
 
 def test_connection(ams_net_id, port, name):
@@ -1574,14 +2246,14 @@ def test_connection(ams_net_id, port, name):
 def update_ui_with_result(name, connection_ok):
     # Make sure to update the UI from the main thread
     def update():
-        for item in treeview.get_children():
-            if treeview.item(item, 'values')[0] == name:  # Assuming 'name' is in the first column
+        for item in routes_table.get_children():
+            if routes_table.item(item, 'values')[0] == name:  # Assuming 'name' is in the first column
                 color = 'green' if connection_ok else 'red'
-                treeview.item(item, tags=(color,))
+                routes_table.item(item, tags=(color,))
                 break
 
     # Use the `after` method to safely update the UI from the main thread
-    treeview.after(0, update)
+    routes_table.after(0, update)
 
 def check_inputs():
     username = username_entry.get()
@@ -1601,10 +2273,10 @@ def check_inputs():
 
 def get_data_for_routes():
     data = []
-    selected_items = treeview.selection()
+    selected_items = routes_table.selection()
     if selected_items: 
         for item in selected_items:
-            data.append(treeview.item(item)["values"])
+            data.append(routes_table.item(item)["values"])
     else:
         data = get_table_data()
     print(data)
@@ -1612,8 +2284,8 @@ def get_data_for_routes():
     
 def get_table_data():
     rows = []
-    for item in treeview.get_children():
-        rows.append(treeview.item(item)["values"])
+    for item in routes_table.get_children():
+        rows.append(routes_table.item(item)["values"])
     return rows
 
 ################################### Button design ##########################################
@@ -1642,7 +2314,7 @@ def on_click(event):
     # print(f"x: {root.winfo_pointerx()}, y: {root.winfo_pointery()}")
     widget = event.widget
     if widget not in exceptions and not any(is_descendant(widget, exception) for exception in exceptions):
-        treeview.selection_remove(treeview.selection())
+        routes_table.selection_remove(routes_table.selection())
 
 
 ############################# Spinner ###########################################3
@@ -1835,7 +2507,7 @@ frame_password.grid(row=1, column=0, padx=5, pady=0)
 password_label = ttk.Label(frame_password, text="Password:")
 password_label.grid(row=0, column=0, padx=0, pady=5, sticky='e')
 
-password_entry = ttk.Entry(frame_password, show="*", width=15)
+password_entry = ttk.Entry(frame_password, width=15)
 password_entry.grid(row=0, column=1, padx=5, pady=5)
 
 test_routes_button = ttk.Button(frame_login, text="  Test Routes  ",
@@ -1859,74 +2531,83 @@ frame_table = tk.Frame(root)
 frame_table.grid(row=5, columnspan=3, padx=15, pady=10)
 
 # Add a Treeview to display the data
-treeview = ttk.Treeview(frame_table, columns=("Name", "Address", "NetId", "Type"), show="headings", height=10)
-treeview.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+routes_table = ttk.Treeview(frame_table, columns=("Name", "Address", "NetId", "Type"), show="headings", height=10)
+routes_table.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
 # Define tags in your Treeview setup
-treeview.tag_configure('green', foreground='green')
-treeview.tag_configure('red', foreground='red')
-treeview.tag_configure('black', foreground='black')
+routes_table.tag_configure('green', foreground='green')
+routes_table.tag_configure('red', foreground='red')
+routes_table.tag_configure('black', foreground='black')
 
-setup_treeview()
+setup_routes_table()
 
 # Add a vertical scrollbar to the Treeview
-vsb = ttk.Scrollbar(frame_table, orient="vertical", command=treeview.yview)
+vsb = ttk.Scrollbar(frame_table, orient="vertical", command=routes_table.yview)
 vsb.pack(side=tk.RIGHT, fill=tk.Y)
 
 # Configure the Treeview to use the scrollbar
-treeview.configure(yscrollcommand=vsb.set)
+routes_table.configure(yscrollcommand=vsb.set)
 
 # Define the column widths
-treeview.column("Name", width=110, anchor='w')
-treeview.column("Address", width=110, anchor='w')
-treeview.column("NetId", width=120, anchor='w')
-treeview.column("Type", width=50, anchor='w')
+routes_table.column("Name", width=110, anchor='w')
+routes_table.column("Address", width=110, anchor='w')
+routes_table.column("NetId", width=120, anchor='w')
+routes_table.column("Type", width=50, anchor='w')
 
-treeview.bind('<Delete>', delete_selected_record)
-treeview.bind('<Double-1>', on_double_click)
+routes_table.bind('<Delete>', delete_selected_record)
+routes_table.bind('<Double-1>', on_double_click)
+routes_table.bind('<<TreeviewSelect>>',  update_ssh_state)
+
+# Create the context menu
+context_menu = tk.Menu(routes_table, tearoff=0)
+# context_menu.add_command(label="Delete", command=delete_selected_record_from_menu)
+context_menu.add_command(label="SSH Tunnel", command=create_ssh_tunnel)
+context_menu.add_command(label="Open RDP", command=open_remote_connection)
+
+# Bind right-click to show the context menu
+routes_table.bind("<Button-3>", show_context_menu)
+
+exceptions = [routes_table, vsb, frame_login]
+root.bind("<Button-1>", on_click)
 
 
 frame_save_file = ttk.Labelframe(root, text="Save", labelanchor='nw', style="Custom.TLabelframe")
-frame_save_file.grid(row=6, column=0, columnspan=3, padx=15, pady=5, sticky='w')
+frame_save_file.grid(row=6, column=0, columnspan=4, padx=15, pady=5, sticky='w')
 # save_label = tk.Label(frame_save_file, text="Save", font=italic_font)
 # save_label.grid(row=0, column=0, padx=5, pady=0, sticky='w')
 # Button to save the StaticRoutes.xml file
-save_xml_button = ttk.Button(frame_save_file, text="     StaticRoutes     ", 
+save_xml_button = ttk.Button(frame_save_file, text="   StaticRoutes   ", 
                         style="TButton", 
                         command=save_routes)
 save_xml_button.grid(row=1, column=0, padx=5, pady=5)
 # button_design(save_xml_button)
 
 # Button to save the ControlCenter.xml file
-save_cc_button = ttk.Button(frame_save_file, text=" ControlCenter.xml ", 
+save_cc_button = ttk.Button(frame_save_file, text="  ControlCenter   ", 
                             style="TButton", 
                             command=save_cc_xml)
-save_cc_button.grid(row=1, column=2, padx=5, pady=5)
+save_cc_button.grid(row=1, column=1, padx=5, pady=5)
 # button_design(save_cc_button)
 
 # Button to save WinSCP.ini file
-save_winscp_button = ttk.Button(frame_save_file, text="      WinSCP.ini      ", 
+save_winscp_button = ttk.Button(frame_save_file, text="  WinSCP.ini   ", 
                             style="TButton", 
                             command=save_winscp_ini)
-save_winscp_button.grid(row=1, column=3, padx=5, pady=5)
+save_winscp_button.grid(row=1, column=2, padx=5, pady=5)
 # button_design(save_winscp_button)
 
-
-# Create the context menu
-context_menu = tk.Menu(treeview, tearoff=0)
-context_menu.add_command(label="Delete", command=delete_selected_record_from_menu)
-
-# Bind right-click to show the context menu
-treeview.bind("<Button-3>", show_context_menu)
-
-exceptions = [treeview, vsb, frame_login]
-root.bind("<Button-1>", on_click)
-
+setup_tunnel_button = ttk.Button(frame_save_file, text="  Setup SSH   ", 
+                            style="TButton", 
+                            command=open_ssh_config_window_cond)
+setup_tunnel_button.grid(row=1, column=3, padx=5, pady=5)
 
 # Create the spinner as part of the layout
 create_spinner_widget()
 
 check_twinCAT_version()
+
+# Populate table the first time with current StaticRoutes.xml file
+populate_table_from_xml("C:\\TwinCAT\\3.1\\Target\\StaticRoutes.xml")
 
 root.mainloop()
 
@@ -1944,3 +2625,8 @@ root.mainloop()
 # Tener la posibilidad de borrar más rows al seleccionar shift o control
 
 # Routes can be created even if static routes file is not updated (TwinCAT is not restarted yet). But after routes are created TwinCAT should be restarted to have the comm
+
+
+
+# Add PuTTY sessions, first check if it is installed, if not, popup to show is not installed, if yes, create all the sessions on the registry
+# Exploring option to use the ssh tunnels with python module paramiko
