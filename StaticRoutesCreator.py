@@ -20,8 +20,9 @@ import winreg
 import paramiko
 from threading import Thread
 import logging
+import subprocess
 
-__version__ = '3.4.5'
+__version__ = '3.4.6'
 
 default_file_path = os.path.join(r'C:\TwinCAT\3.1\Target', 'StaticRoutes.xml')
 
@@ -358,8 +359,8 @@ def validate_and_create_xml():
             else:
                 lgv_list.append(r)
     
-    create_routes_xml(project, lgv_list, base_ip, file_path, is_tc3)
-    toggle_cc()
+    # create_routes_xml(project, lgv_list, base_ip, file_path, is_tc3)
+    # toggle_cc()
 
 ################################### Get StaticRoutes.xml and create table #########################
 
@@ -596,7 +597,7 @@ def create_routes_xml_from_table(file_path):
     with open(file_path, "w", encoding='utf-8') as f:
         f.write(xmlstr)
 
-    messagebox.showinfo("Success", "StaticRoutes file has been created successfully. \nRemember to restart TwinCAT!!")
+    messagebox.showinfo("Success", "StaticRoutes file has been created successfully. \nRemember to RESTART TwinCAT!!")
 
 def save_routes_xml():
     if not get_table_data():
@@ -1067,6 +1068,206 @@ def save_winscp_ini():
     #                                          filetypes=[("INI files", "*.ini")])
     if file_path:
         create_winscp_ini_from_table(file_path, data)
+
+############################################################## RDP connection #################################################################
+def is_host_reachable(host, timeout=2):
+    """Ping the host to check if it is reachable."""
+    # Define the ping command based on the OS
+    if platform.system().lower() == "windows":
+        ping_cmd = ["ping", "-n", "1", "-w", str(timeout * 1000), host]
+    else:
+        ping_cmd = ["ping", "-c", "1", "-W", str(timeout), host]
+
+    try:
+        subprocess.run(ping_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True, timeout=timeout + 1)
+        return True
+    except subprocess.TimeoutExpired:
+        print(f"Ping to {host} timed out.")
+        return False
+    except subprocess.CalledProcessError:
+        print(f"Ping to {host} failed.")
+        return False
+
+def is_port_open(host, port, timeout=3):
+    """Check if a specific port is open on the host."""
+    try:
+        with socket.create_connection((host, port), timeout=timeout):
+            return True
+    except Exception as e:
+        print(f"Exception at is_port_open: {e}")
+        return False
+
+def detect_connection_type(ip_address, tc_type):
+    """Detect whether the LGV supports RDP or Cerhost."""
+    RDP_PORT = 3389
+    CERHOST_PORT = 987 
+
+    # Step 1: Ping the host
+    if not is_host_reachable(ip_address):
+        print(f"Host {ip_address} is unreachable.")
+        messagebox.showerror("Connection Error", f"Host {ip_address} is unreachable")
+        return "Unreachable"
+
+    # Step 2: Directly return RDP for TC3
+    if tc_type == "TC3":
+        return "RDP"
+
+    # Step 3: Check for RDP or Cerhost only if TC2
+    if is_port_open(ip_address, RDP_PORT):
+        return "RDP"
+    if is_port_open(ip_address, CERHOST_PORT):
+        return "Cerhost"
+
+    return "Unknown"
+
+def open_remote_connection():
+    """Open Remote Desktop using an .rdp file."""
+    selected_item = routes_table.selection()
+    if not selected_item:
+        messagebox.showwarning("No Selection", "Please select an LGV first.")
+        return
+
+    target_ip = routes_table.item(selected_item)["values"][1]
+    lgv_type = routes_table.item(selected_item)["values"][3]
+    rdp_username = username_entry.get()
+    rdp_password = password_entry.get()
+
+    if not rdp_username or not rdp_password:
+        messagebox.showwarning("Attention", "Username and Password are required.")
+        return
+
+    def detect_and_connect():
+        try:
+            connection_type = detect_connection_type(target_ip, lgv_type)
+            if connection_type == "RDP":
+                # open_rdp_connection(target_ip, rdp_username, rdp_password)
+                open_rdp_connection_with_credentials(target_ip, rdp_username, rdp_password)
+            elif connection_type == "Cerhost":
+                launch_cerhost(target_ip)
+            else:
+                # messagebox.showerror("Connection Error", f"Unable to determine connection type for {target_ip}.")
+                print(f"Unable to determine connection type for {target_ip}.")
+        except Exception as e:
+            messagebox.showerror("Error", f"An error occurred during connection: {e}")
+
+    # Run detection in a separate thread to keep the UI responsive
+    Thread(target=detect_and_connect, daemon=True).start()
+
+def open_rdp_connection_with_credentials(target_ip, username, password):
+    """
+    Open Remote Desktop Connection using pre-stored credentials via cmdkey.
+    """
+    try:
+        # Step 1: Store credentials using cmdkey
+        cmdkey_command = f'cmdkey /generic:TERMSRV/{target_ip} /user:{username} /pass:{password}'
+        subprocess.run(cmdkey_command, shell=True, check=True)
+        print(f"Credentials stored for {target_ip}")
+
+        # Step 2: Open Remote Desktop Connection
+        rdp_command = f'mstsc /v:{target_ip}'
+        subprocess.run(rdp_command, shell=True)
+        print(f"RDP connection launched for {target_ip}")
+
+    except subprocess.CalledProcessError as e:
+        print(f"Error: {e}")
+        messagebox.showerror("Error", f"Failed to launch Remote Desktop: {e}")
+
+    finally:
+        # Step 3: Clean up credentials after the RDP session
+        cleanup_command = f'cmdkey /delete:TERMSRV/{target_ip}'
+        subprocess.run(cleanup_command, shell=True)
+        print(f"Credentials removed for {target_ip}")
+
+def open_rdp_connection(target_ip, username, password):
+    try:
+        rdp_file = create_rdp_file(target_ip, username, password)
+        subprocess.run(["mstsc", rdp_file], check=True)
+        print(f"Opening Remote Desktop for {target_ip}")
+    except FileNotFoundError:
+        messagebox.showerror("Error", "Remote Desktop (mstsc) is not available on this system.")
+    except subprocess.CalledProcessError:
+        messagebox.showerror("Error", "Failed to open Remote Desktop. Check your credentials or target system.")
+    except Exception as e:
+        messagebox.showerror("Error", f"Failed to open Remote Desktop: {e}")
+    finally:
+        if os.path.exists(rdp_file):
+            os.remove(rdp_file)
+
+def create_rdp_file(target_ip, username, password):
+    """Create a temporary .rdp file with credentials."""
+    rdp_content = f"""
+    full address:s:{target_ip}
+    username:s:{username}
+    """
+    with open("temp.rdp", "w") as file:
+        file.write(rdp_content.strip())
+    return "temp.rdp"
+
+
+cerhost_path = None  # Will hold the Cerhost executable path
+
+def prompt_for_cerhost_path():
+    """Prompt the user to select the Cerhost executable path."""
+    global cerhost_path
+    
+    # Open file dialog directly for the user to select the Cerhost executable
+    cerhost_path = filedialog.askopenfilename(
+        title="Select Cerhost Executable",
+        filetypes=[("Executable Files", "*.exe"), ("All Files", "*.*")]
+    )
+    
+    if not cerhost_path:  # User cancelled the dialog
+        messagebox.showwarning("Path Required", "Cerhost path is required to proceed.")
+        return None
+    
+    # Validate the selected file
+    if not os.path.isfile(cerhost_path):
+        messagebox.showerror("Invalid Path", "The selected file is not valid.")
+        cerhost_path = None
+        return None
+    
+    # Save the selected path to a configuration file
+    save_cerhost_path_to_file(cerhost_path)
+    print(f"Cerhost path selected: {cerhost_path}")
+    return cerhost_path
+
+def launch_cerhost(device_ip):
+    """Launch Cerhost for the given IP address."""
+    global cerhost_path
+
+    # Attempt to load the path from the configuration file
+    load_cerhost_path_from_file()  # Load path if not already loaded
+
+    if not cerhost_path:
+        path = prompt_for_cerhost_path()
+        if not path:  # User may cancel the popup
+            print("Cerhost path not provided. Aborting.")
+            return
+
+    try:
+        subprocess.Popen([cerhost_path, device_ip])
+        print(f"Cerhost launched for {device_ip}")
+    except Exception as e:
+        messagebox.showerror("Error", f"Failed to launch Cerhost: {e}")
+
+config = configparser.ConfigParser()
+config_file = "config.ini"
+
+def save_cerhost_path_to_file(path):
+    config["Settings"] = {"CerhostPath": path}
+    with open(config_file, "w") as file:
+        config.write(file)
+
+def load_cerhost_path_from_file():
+    global cerhost_path
+
+    if os.path.exists(config_file):
+        config.read(config_file)
+        cerhost_path = config["Settings"].get("CerhostPath", None)
+        if cerhost_path:
+            print(f"Cerhost path loaded: {cerhost_path}")
+
+
 
 ############################################################## SSH tunneling config #################################################################
 SSH_CONFIG_FILE = "ssh_config.xml"
@@ -2306,7 +2507,7 @@ frame_password.grid(row=1, column=0, padx=5, pady=0)
 password_label = ttk.Label(frame_password, text="Password:")
 password_label.grid(row=0, column=0, padx=0, pady=5, sticky='e')
 
-password_entry = ttk.Entry(frame_password, show="*", width=15)
+password_entry = ttk.Entry(frame_password, width=15)
 password_entry.grid(row=0, column=1, padx=5, pady=5)
 
 test_routes_button = ttk.Button(frame_login, text="  Test Routes  ",
@@ -2357,6 +2558,18 @@ routes_table.bind('<Delete>', delete_selected_record)
 routes_table.bind('<Double-1>', on_double_click)
 routes_table.bind('<<TreeviewSelect>>',  update_ssh_state)
 
+# Create the context menu
+context_menu = tk.Menu(routes_table, tearoff=0)
+# context_menu.add_command(label="Delete", command=delete_selected_record_from_menu)
+context_menu.add_command(label="SSH Tunnel", command=create_ssh_tunnel)
+context_menu.add_command(label="Open RDP", command=open_remote_connection)
+
+# Bind right-click to show the context menu
+routes_table.bind("<Button-3>", show_context_menu)
+
+exceptions = [routes_table, vsb, frame_login]
+root.bind("<Button-1>", on_click)
+
 
 frame_save_file = ttk.Labelframe(root, text="Save", labelanchor='nw', style="Custom.TLabelframe")
 frame_save_file.grid(row=6, column=0, columnspan=4, padx=15, pady=5, sticky='w')
@@ -2388,25 +2601,12 @@ setup_tunnel_button = ttk.Button(frame_save_file, text="  Setup SSH   ",
                             command=open_ssh_config_window_cond)
 setup_tunnel_button.grid(row=1, column=3, padx=5, pady=5)
 
-
-# Create the context menu
-context_menu = tk.Menu(routes_table, tearoff=0)
-# context_menu.add_command(label="Delete", command=delete_selected_record_from_menu)
-context_menu.add_command(label="SSH Tunnel", command=create_ssh_tunnel)
-
-# Bind right-click to show the context menu
-routes_table.bind("<Button-3>", show_context_menu)
-
-exceptions = [routes_table, vsb, frame_login]
-root.bind("<Button-1>", on_click)
-
-
 # Create the spinner as part of the layout
 create_spinner_widget()
 
 check_twinCAT_version()
 
-# Pupulate table the first time with current StaticRoutes.xml file
+# Populate table the first time with current StaticRoutes.xml file
 populate_table_from_xml("C:\\TwinCAT\\3.1\\Target\\StaticRoutes.xml")
 
 root.mainloop()
@@ -2429,3 +2629,4 @@ root.mainloop()
 
 
 # Add PuTTY sessions, first check if it is installed, if not, popup to show is not installed, if yes, create all the sessions on the registry
+# Exploring option to use the ssh tunnels with python module paramiko
