@@ -22,7 +22,7 @@ from threading import Thread
 import logging
 import subprocess
 
-__version__ = '3.4.6'
+__version__ = '3.4.7'
 
 default_file_path = os.path.join(r'C:\TwinCAT\3.1\Target', 'StaticRoutes.xml')
 
@@ -430,7 +430,7 @@ def populate_table_from_inputs():
     lgv_range = entry_lgv_range.get()
     base_ip = entry_base_ip.get()
     is_tc3 = optionTC.get() == "TC3"
-    # is_lgv = optionLGV.get() == "LGV"
+    # is_lgv = deviceType.get() == "LGV"
 
     if not validate_project():
         messagebox.showerror("Invalid input", "Project number must be a 4 digit number")
@@ -456,7 +456,7 @@ def populate_table_from_inputs():
     # Loop through the parsed IPs and add to the table
     for i, current_ip in enumerate(ip_list):
         net_id = f"{current_ip}.1.1"
-        route_name = f"CC{project}_{optionLGV.get()}{str(lgvs[i]).zfill(2)}"
+        route_name = f"CC{project}_{deviceType.get()}{str(lgvs[i]).zfill(2)}"
         
         # Check if the record already exists in the table, ignoring the TC type and name
         record_exists = False
@@ -587,8 +587,9 @@ def create_routes_xml_from_table(file_path):
         ET.SubElement(route_element, "Type").text = "TCP_IP"
 
         if tc_type == "TC3":
-            netid_element.set("RemoteNetId", "192.168.11.2.1.1")
             ET.SubElement(route_element, "Flags").text = "32"
+            if "LGV" in name:
+                netid_element.set("RemoteNetId", "192.168.11.2.1.1")
 
     # Convert to a pretty XML string
     xmlstr = minidom.parseString(ET.tostring(config, 'utf-8')).toprettyxml(indent="    ")
@@ -1109,8 +1110,9 @@ def detect_connection_type(ip_address, tc_type):
         return "Unreachable"
 
     # Step 2: Directly return RDP for TC3
-    if tc_type == "TC3":
-        return "RDP"
+    # There could be Cerhost with TC3, so this condition is removed
+    # if tc_type == "TC3":
+    #     return "RDP"
 
     # Step 3: Check for RDP or Cerhost only if TC2
     if is_port_open(ip_address, RDP_PORT):
@@ -2424,11 +2426,18 @@ frame_range = tk.Frame(root)
 frame_range.grid(row=1, column=0, padx=5, pady=5, sticky='e')
 frame_lgv = tk.Frame(frame_range)
 frame_lgv.grid(row=0, column=0, padx=1, pady=1)
-optionLGV = tk.StringVar(value="LGV")
-cb_radio = ttk.Radiobutton(frame_lgv, text="CB", variable=optionLGV, value="CB")
-cb_radio.grid(row=0, column=0, padx=1, pady=1, sticky='w')
-lgv_radio = ttk.Radiobutton(frame_lgv, text="LGV: ", variable=optionLGV, value="LGV")
-lgv_radio.grid(row=0, column=1, padx=1, pady=1, sticky='w')
+
+deviceType = tk.StringVar(value="LGV")
+
+device_type_combobox = ttk.Combobox(frame_range, textvariable=deviceType, width=6, state="readonly")
+device_type_combobox['values'] = ("LGV", "CB", "EC")
+device_type_combobox.set(deviceType.get())
+device_type_combobox.grid(row=0, column=0, padx=1, pady=1, sticky='w')
+
+# cb_radio = ttk.Radiobutton(frame_lgv, text="CB", variable=deviceType, value="CB")
+# cb_radio.grid(row=0, column=0, padx=1, pady=1, sticky='w')
+# lgv_radio = ttk.Radiobutton(frame_lgv, text="LGV: ", variable=deviceType, value="LGV")
+# lgv_radio.grid(row=0, column=1, padx=1, pady=1, sticky='w')
 
 entry_lgv_range = ttk.Entry(frame_range, style="Range.TEntry")#, fg="grey")
 entry_lgv_range.grid(row=0, column=1, padx=5, pady=5)
