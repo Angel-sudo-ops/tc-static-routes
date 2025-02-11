@@ -920,33 +920,37 @@ def split_string(input_string):
 
 
 def parse_route_name(input_name):
-    # Updated regex to capture the section correctly and ensure the last part is treated as the name
-    pattern = r"^(?P<section>CC\d+(?:_[\w\-]*)?)_(?P<name>[A-Za-z]*\d{1,3})$"
+    """
+    Parses the input route name into (section, name). 
+    If invalid, returns an error message instead of showing a messagebox.
+    """
+    pattern = (
+        r"^(?P<section>CC\d+(?:_[\w\-]*)?)_(?P<name>.+)$|"  # CCxxxx first
+        r"^(?P<name_alt>.+)_(?P<section_alt>CC\d+(?:_[\w\-]*)?)$|"  # CCxxxx last
+        r"^(?P<section_general>[^_]+)_(?P<middle>LGV\d+|\d+)_(?P<suffix>.+)$"  # General section + LGV or number + suffix
+    )
 
     match = re.match(pattern, input_name)
     if match:
-        section = match.group("section")
-        name = match.group("name")
+        # Extract values, considering different patterns
+        section = (
+            match.group("section") or 
+            match.group("section_alt") or 
+            match.group("section_general")
+        )
+        middle = match.group("middle")  # Could be LGVxx or a number
+        suffix = match.group("suffix")  # Remaining part of the name
 
-        # Error: Missing section or invalid format (e.g., 'LGV02')
-        if not section or not section.startswith("CC"):
-            messagebox.showerror(
-                "Invalid Input", f"Missing or invalid section in '{input_name}'. Please provide a valid section starting with 'CC'."
-            )
-            return None, None
+        # If middle is just a number, convert it to LGVxx
+        if middle and middle.isdigit():
+            middle = f"LGV{middle.zfill(2)}"
 
-        # Handle names that are just numbers by defaulting to 'LGV'
-        if name.isdigit():
-            name = f"LGV{name.zfill(2)}"
-        else:
-            # Pad single-digit names with leading zeros if necessary
-            if re.search(r'\d$', name) and len(re.search(r'\d+$', name).group()) == 1:
-                name = name[:-1] + f"0{name[-1]}"
-        
-        return section, name
-    else:
-        messagebox.showerror("Invalid Input", f"'{input_name}' is not in a valid format.")
-        return None, None
+        # Construct the final name
+        name = f"{middle}_{suffix}" if suffix else middle
+
+        return section, name  # Returns valid (section, name) tuple
+
+    return None  # Instead of messagebox, return None for invalid input
     
 ################################### Create ini file for WinSCP connections ##########################
 # Function to set the custom INI path in the Windows Registry
@@ -1000,34 +1004,37 @@ def create_winscp_ini_from_table(ini_path, data):
 
     # Create config parser and read the INI file (if it exists)
     config = configparser.ConfigParser()
+    errors = []  # List to collect error messages
+    
     try:
         if os.path.exists(ini_path):
             config.read(ini_path)
-
     except configparser.DuplicateOptionError as e:
-        print(f"Duplicate option found and skipped: {e}")
-
+        errors.append(f"Duplicate option found and skipped: {e}")
     except configparser.ParsingError as e:
-        print(f"Error parsing INI file: {e}")
+        errors.append(f"Error parsing INI file: {e}")
         return "Failed to read the INI file due to a parsing error."
 
-    # data = get_table_data()
     repeated = 0
     total = 0
+
     for row in data:
-        total += 1 
+        total += 1
         name, address, netid, tc_type = row
+
+        # Call parse_route_name and check if it returns None
         name_parts = parse_route_name(str(name))
         if name_parts is None:
-            return
+            errors.append(f"Invalid name format: {name}")
+            continue
+
         folder_name = name_parts[0]
         session_name = name_parts[1]
-
         section_name = f'Sessions\\{folder_name}/{session_name}'
 
         # Check if the HostName already exists
         if hostname_exists(config, address):
-            repeated=repeated+1
+            repeated += 1
             print("HostName already exists.")
             continue 
 
@@ -1043,18 +1050,26 @@ def create_winscp_ini_from_table(ini_path, data):
         if tc_type == "TC2":
             config[section_name]['FSProtocol'] = '5'
 
+    # Attempt to write to the INI file
     try:
         with open(ini_path, 'w') as configfile:
             config.write(configfile)
     except Exception as e:
-        print(f"An error occurred while writing the INI file: {e}") 
-        messagebox.showerror("Error", f"An error occurred while writing the INI file: {e}")
-    
+        errors.append(f"An error occurred while writing the INI file: {e}") 
+
     # Set the custom INI path in the registry
     if not set_custom_ini_path(ini_path):
-        return "Failed to set the custom INI path in the registry."
+        errors.append("Failed to set the custom INI path in the registry.")
 
-    messagebox.showinfo("Success", f"Session created successfully in {ini_path} with {repeated} repeated routes out of {total}")
+    # Show all errors in a single messagebox (if any exist)
+    if errors:
+        error_message = "\n".join(errors)
+        messagebox.showerror("Errors Detected", f"The following errors occurred:\n\n{error_message}")
+
+    # Show success message if no errors
+    else:
+        messagebox.showinfo("Success", f"Session created successfully in {ini_path} with {repeated} repeated routes out of {total}")
+
 
 def save_winscp_ini():
     # Custom path for the INI file (not in Roaming)
