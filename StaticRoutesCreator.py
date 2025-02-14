@@ -927,21 +927,24 @@ def parse_route_name(input_name):
     - The remaining part of the string is considered the folder name (section).
     """
 
-    # Pattern to match "LGVXX", "CBXX", "BCXX", "ECXX" or standalone numbers
-    session_pattern = re.compile(r"(LGV[_]?\d{1,3}|CB[_]?\d{1,3}|BC[_]?\d{1,3}|EC[_]?\d{1,3}|\d{1,3})")
+        # Pattern to match "LGVXX", "CBXX", "BCXX", "ECXX" or standalone numbers
+    session_pattern = re.compile(r"(LGV[_]?\d{1,3}|CB[_]?\d{1,3}|BC[_]?\d{1,3}|EC[_]?\d{1,3}|\b\d{1,3}\b)")
 
     matches = list(session_pattern.finditer(input_name))
     
     if not matches:
         return None  # No valid session name found
 
-    # Pick the first match that is NOT part of "CCXXXX"
+    # First, check for "LGVXX", "CBXX", "BCXX", "ECXX" before picking numbers
+    session_name = None
     for match in matches:
-        if "CC" not in match.group():
+        if any(prefix in match.group() for prefix in ["LGV", "CB", "BC", "EC"]):
             session_name = match.group()
             break
-    else:
-        return None  # No valid session name found
+
+    # If no valid session name found, take the last numeric match
+    if not session_name:
+        session_name = matches[-1].group()
 
     # Remove underscore in session name (e.g., "CB_02" → "CB02")
     session_name = session_name.replace("_", "")
@@ -951,7 +954,7 @@ def parse_route_name(input_name):
         session_name = f"LGV{session_name.zfill(2)}"
 
     # Remove session name from input
-    section = input_name.replace(match.group(), "").strip("_")
+    section = input_name.replace(session_name, "").strip("_")
 
     # Ensure "CCXXXX" is always in the section if present
     section_parts = section.split("_")
@@ -966,7 +969,7 @@ def parse_route_name(input_name):
     # Remove multiple consecutive underscores (Fix: Prevents "__" issue)
     section = re.sub(r"_+", "_", section)  
 
-    return section, session_name  # Return (folder name, session name)
+    return section, session_name  # Return (folder name, session name)turn (folder name, session name)
 
 
 
