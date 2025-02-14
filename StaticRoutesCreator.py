@@ -927,29 +927,37 @@ def parse_route_name(input_name):
     - The remaining part of the string is considered the folder name (section).
     """
 
-    # Fixed pattern: Removed \b around \d{1,3} to allow numbers like "01" after an underscore
+    # Pattern to match "LGVXX", "CBXX", "BCXX", "ECXX" or standalone numbers
     session_pattern = re.compile(r"(LGV[_]?\d{1,3}|CB[_]?\d{1,3}|BC[_]?\d{1,3}|EC[_]?\d{1,3}|\d{1,3})")
 
-    match = session_pattern.search(input_name)
-    if not match:
+    matches = list(session_pattern.finditer(input_name))
+    
+    if not matches:
         return None  # No valid session name found
 
-    session_name = match.group()  # Extract session name
+    # Pick the last match (ensures numbers like "01" are chosen over mid-string numbers)
+    match = matches[-1]  
+    session_name = match.group()
 
-    # If session name has an underscore (e.g., "CB_02"), remove it
+    # Remove underscore in session name (e.g., "CB_02" → "CB02")
     session_name = session_name.replace("_", "")
 
     # If session name is just a number, default to "LGVXX"
     if session_name.isdigit():
         session_name = f"LGV{session_name.zfill(2)}"
 
-    # Remove session name from input while avoiding double underscores
+    # Remove session name from input
     section = input_name.replace(match.group(), "").strip("_")
-    
+
+    # Fix: Keep "CCXXXX" when present, remove only the session part
+    section_parts = section.split("_")
+    section = "_".join([part for part in section_parts if not part.isdigit() or "CC" in part])
+
     # Remove multiple consecutive underscores (Fix: Prevents "__" issue)
     section = re.sub(r"_+", "_", section)  
 
     return section, session_name  # Return (folder name, session name)
+
 
 
     
