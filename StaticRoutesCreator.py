@@ -928,7 +928,7 @@ def parse_route_name(input_name):
     """
 
     # Pattern to match "LGVXX", "CBXX", "BCXX", "ECXX" (with or without underscores) or a number
-    session_pattern = re.compile(r"\b(LGV[_]?\d{1,3}|CB[_]?\d{1,3}|BC[_]?\d{1,3}|EC[_]?\d{1,3}|\d{1,3})\b")
+    session_pattern = re.compile(r"(LGV[_]?\d{1,3}|CB[_]?\d{1,3}|BC[_]?\d{1,3}|EC[_]?\d{1,3}|\b\d{1,3}\b)")
 
     match = session_pattern.search(input_name)
     if not match:
@@ -946,8 +946,12 @@ def parse_route_name(input_name):
     # Remove session name from input and clean up the section
     section = input_name.replace(match.group(), "").strip("_")
 
+    # Fix: Ensure no duplicate underscores but don't remove all underscores in valid cases
+    section = re.sub(r"(^_|_$)", "", section)  # Remove leading/trailing underscores if present
+
+
     return section, session_name  # Return (folder name, session name)
-    
+
     
 ################################### Create ini file for WinSCP connections ##########################
 # Function to set the custom INI path in the Windows Registry
