@@ -996,11 +996,41 @@ def hostname_exists(config, host_name):
             return True
     return False
 
+import configparser
+
+def remove_duplicate_keys(ini_path):
+    """ Reads the INI file and removes duplicate keys in sections. """
+    config = configparser.ConfigParser(strict=False)
+
+    with open(ini_path, 'r') as file:
+        lines = file.readlines()
+
+    seen = set()
+    cleaned_lines = []
+    
+    for line in lines:
+        key = line.strip()
+        if '=' in key:  # Identify key-value pairs
+            section, option = key.split('=', 1)
+            if section.strip() not in seen:
+                seen.add(section.strip())
+                cleaned_lines.append(line)
+        else:
+            cleaned_lines.append(line)
+
+    with open(ini_path, 'w') as file:
+        file.writelines(cleaned_lines)
+
+    print("Duplicate keys removed.")
+
+
 # Function to create a session in the winscp.ini file
 def create_winscp_ini_from_table(ini_path, data):
     # Ensure the directory for the INI file exists
     ini_dir = os.path.dirname(ini_path)
     os.makedirs(ini_dir, exist_ok=True)
+
+    # remove_duplicate_keys(ini_path)
 
     # Create config parser and read the INI file (if it exists)
     config = configparser.ConfigParser()
