@@ -935,9 +935,13 @@ def parse_route_name(input_name):
     if not matches:
         return None  # No valid session name found
 
-    # Pick the last match (ensures numbers like "01" are chosen over mid-string numbers)
-    match = matches[-1]  
-    session_name = match.group()
+    # Pick the first match that is NOT part of "CCXXXX"
+    for match in matches:
+        if "CC" not in match.group():
+            session_name = match.group()
+            break
+    else:
+        return None  # No valid session name found
 
     # Remove underscore in session name (e.g., "CB_02" → "CB02")
     session_name = session_name.replace("_", "")
@@ -949,14 +953,21 @@ def parse_route_name(input_name):
     # Remove session name from input
     section = input_name.replace(match.group(), "").strip("_")
 
-    # Fix: Keep "CCXXXX" when present, remove only the session part
+    # Ensure "CCXXXX" is always in the section if present
     section_parts = section.split("_")
-    section = "_".join([part for part in section_parts if not part.isdigit() or "CC" in part])
+    cc_section = [part for part in section_parts if "CC" in part]  # Extract CCXXXX parts
+    other_section = [part for part in section_parts if "CC" not in part]  # Everything else
+
+    if cc_section:
+        section = "_".join(cc_section + other_section)  # Ensure CCXXXX is always first
+    else:
+        section = "_".join(other_section)  # Just use the other parts
 
     # Remove multiple consecutive underscores (Fix: Prevents "__" issue)
     section = re.sub(r"_+", "_", section)  
 
     return section, session_name  # Return (folder name, session name)
+
 
 
 
