@@ -927,8 +927,8 @@ def parse_route_name(input_name):
     - The remaining part of the string is considered the folder name (section).
     """
 
-    # Pattern to match "LGVXX", "CBXX", "BCXX", "ECXX" (with or without underscores) or a number
-    session_pattern = re.compile(r"(LGV[_]?\d{1,3}|CB[_]?\d{1,3}|BC[_]?\d{1,3}|EC[_]?\d{1,3}|\b\d{1,3}\b)")
+    # Fixed pattern: Removed \b around \d{1,3} to allow numbers like "01" after an underscore
+    session_pattern = re.compile(r"(LGV[_]?\d{1,3}|CB[_]?\d{1,3}|BC[_]?\d{1,3}|EC[_]?\d{1,3}|\d{1,3})")
 
     match = session_pattern.search(input_name)
     if not match:
@@ -943,14 +943,14 @@ def parse_route_name(input_name):
     if session_name.isdigit():
         session_name = f"LGV{session_name.zfill(2)}"
 
-    # Remove session name from input and clean up the section
+    # Remove session name from input while avoiding double underscores
     section = input_name.replace(match.group(), "").strip("_")
-
-    # Fix: Ensure no duplicate underscores but don't remove all underscores in valid cases
-    section = re.sub(r"(^_|_$)", "", section)  # Remove leading/trailing underscores if present
-
+    
+    # Remove multiple consecutive underscores (Fix: Prevents "__" issue)
+    section = re.sub(r"_+", "_", section)  
 
     return section, session_name  # Return (folder name, session name)
+
 
     
 ################################### Create ini file for WinSCP connections ##########################
