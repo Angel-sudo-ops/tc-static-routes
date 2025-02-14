@@ -921,36 +921,33 @@ def split_string(input_string):
 
 def parse_route_name(input_name):
     """
-    Parses the input route name into (section, name). 
-    If invalid, returns an error message instead of showing a messagebox.
+    Parses the input route name into (section, name).
+    - Extracts session name as "LGVXX", "CBXX", "BCXX", "ECXX" (handles underscores like "CB_02" → "CB02").
+    - If only a number is found, defaults to "LGVXX".
+    - The remaining part of the string is considered the folder name (section).
     """
-    pattern = (
-        r"^(?P<section>CC\d+(?:_[\w\-]*)?)_(?P<name>.+)$|"  # CCxxxx first
-        r"^(?P<name_alt>.+)_(?P<section_alt>CC\d+(?:_[\w\-]*)?)$|"  # CCxxxx last
-        r"^(?P<section_general>[^_]+)_(?P<middle>LGV\d+|\d+)_(?P<suffix>.+)$"  # General section + LGV or number + suffix
-    )
 
-    match = re.match(pattern, input_name)
-    if match:
-        # Extract values, considering different patterns
-        section = (
-            match.group("section") or 
-            match.group("section_alt") or 
-            match.group("section_general")
-        )
-        middle = match.group("middle")  # Could be LGVxx or a number
-        suffix = match.group("suffix")  # Remaining part of the name
+    # Pattern to match "LGVXX", "CBXX", "BCXX", "ECXX" (with or without underscores) or a number
+    session_pattern = re.compile(r"\b(LGV[_]?\d{1,3}|CB[_]?\d{1,3}|BC[_]?\d{1,3}|EC[_]?\d{1,3}|\d{1,3})\b")
 
-        # If middle is just a number, convert it to LGVxx
-        if middle and middle.isdigit():
-            middle = f"LGV{middle.zfill(2)}"
+    match = session_pattern.search(input_name)
+    if not match:
+        return None  # No valid session name found
 
-        # Construct the final name
-        name = f"{middle}_{suffix}" if suffix else middle
+    session_name = match.group()  # Extract session name
 
-        return section, name  # Returns valid (section, name) tuple
+    # If session name has an underscore (e.g., "CB_02"), remove it
+    session_name = session_name.replace("_", "")
 
-    return None  # Instead of messagebox, return None for invalid input
+    # If session name is just a number, default to "LGVXX"
+    if session_name.isdigit():
+        session_name = f"LGV{session_name.zfill(2)}"
+
+    # Remove session name from input and clean up the section
+    section = input_name.replace(match.group(), "").strip("_")
+
+    return section, session_name  # Return (folder name, session name)
+    
     
 ################################### Create ini file for WinSCP connections ##########################
 # Function to set the custom INI path in the Windows Registry
@@ -996,7 +993,6 @@ def hostname_exists(config, host_name):
             return True
     return False
 
-import configparser
 
 def remove_duplicate_keys(ini_path):
     """ Reads the INI file and removes duplicate keys in sections. """
