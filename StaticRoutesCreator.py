@@ -927,7 +927,7 @@ def parse_route_name(input_name):
     - The remaining part of the string is considered the folder name (section).
     """
 
-        # Pattern to match "LGVXX", "CBXX", "BCXX", "ECXX" or standalone numbers
+# Pattern to match session names first
     session_pattern = re.compile(r"(LGV[_]?\d{1,3}|CB[_]?\d{1,3}|BC[_]?\d{1,3}|EC[_]?\d{1,3}|\b\d{1,3}\b)")
 
     matches = list(session_pattern.finditer(input_name))
@@ -935,46 +935,43 @@ def parse_route_name(input_name):
     if not matches:
         return None  # No valid session name found
 
-    # First, check for "LGVXX", "CBXX", "BCXX", "ECXX" before picking numbers
+    # Prioritize named session types (LGVXX, CBXX, etc.) over plain numbers
     session_name = None
     for match in matches:
         if any(prefix in match.group() for prefix in ["LGV", "CB", "BC", "EC"]):
             session_name = match.group()
             break
 
-    # If no valid session name found, take the last numeric match
+    # If no session type was found, take the last numeric match
     if not session_name:
         session_name = matches[-1].group()
 
-    # Remove underscore in session name (e.g., "CB_02" → "CB02")
+    # Remove underscores in session name (e.g., "CB_02" → "CB02")
     session_name = session_name.replace("_", "")
 
-    # If session name is just a number, default to "LGVXX"
+    # If session name is just a number, convert it to "LGVXX"
     if session_name.isdigit():
         session_name = f"LGV{session_name.zfill(2)}"
 
-    # Remove session name from input
-    section = input_name.replace(session_name, "").strip("_")
+    # Remove session name from input while keeping underscores correctly
+    section = input_name.replace(match.group(), "").strip("_")
 
-    # Ensure "CCXXXX" is always in the section if present
+    # Ensure "CCXXXX" remains in the section if present
     section_parts = section.split("_")
-    cc_section = [part for part in section_parts if "CC" in part]  # Extract CCXXXX parts
+    cc_section = [part for part in section_parts if "CC" in part]  # Extract CCXXXX
     other_section = [part for part in section_parts if "CC" not in part]  # Everything else
 
     if cc_section:
-        section = "_".join(cc_section + other_section)  # Ensure CCXXXX is always first
+        section = "_".join(cc_section + other_section)  # Keep CCXXXX first
     else:
         section = "_".join(other_section)  # Just use the other parts
 
-    # Remove multiple consecutive underscores (Fix: Prevents "__" issue)
+    # Remove multiple consecutive underscores (Prevents "__" issue)
     section = re.sub(r"_+", "_", section)  
 
-    return section, session_name  # Return (folder name, session name)turn (folder name, session name)
+    return section, session_name  # Return (folder name, session name)
 
 
-
-
-    
 ################################### Create ini file for WinSCP connections ##########################
 # Function to set the custom INI path in the Windows Registry
 def set_custom_ini_path(ini_path):
