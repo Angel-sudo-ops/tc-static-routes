@@ -23,7 +23,7 @@ import logging
 import subprocess
 import shutil
 
-__version__ = '3.4.7'
+__version__ = '3.4.8'
 
 default_file_path = os.path.join(r'C:\TwinCAT\3.1\Target', 'StaticRoutes.xml')
 
@@ -1410,9 +1410,15 @@ def update_ssh_state(*args):
 
 
 
-def open_putty_with_tunnels(putty_path, remote_host, tunnels):
+def open_putty_with_tunnels(putty_path, remote_host, ssh_port, ssh_username, ssh_password, tunnels):
     """Launch PuTTY with tunnels from get_tunnels()."""
-    putty_cmd = [putty_path, "-ssh", remote_host]  # Start PuTTY command
+    putty_cmd = [
+        putty_path, 
+        "-ssh", f"{remote_host}", 
+        "-P", str(ssh_port),
+        "-l", ssh_username,
+        "-pw", ssh_password
+        ]  # Start PuTTY command
 
     for tunnel in tunnels:
         local_port = tunnel["Local Port"]
@@ -1424,43 +1430,46 @@ def open_putty_with_tunnels(putty_path, remote_host, tunnels):
 
     try:
         subprocess.Popen(putty_cmd, shell=True)
+        return True
     except Exception as e:
         print(f"Error launching PuTTY: {e}")
+        return False
+
 
 def create_ssh_tunnel_putty():
     """Create SSH tunnels for the selected LGV."""
     
     selected_item = routes_table.selection()
     ssh_host = routes_table.item(selected_item)["values"][1]
-
-    if not is_host_reachable(ssh_host):
-        print("Host unreacheable")
-        return
-    putty_path = extract_executable("putty.exe", "resources")
+    error = None
 
     tunnels = get_tunnels()
 
     ssh_username = username_entry.get()
     ssh_password = password_entry.get()
+    ssh_port = 20022
 
-    if not tunnels:
-        messagebox.showinfo("No Tunnels", "No tunnels found to create.")
-        return
+    if not is_host_reachable(ssh_host):
+        error = f"Host {ssh_host} unreachable"
+    elif not tunnels:
+        error = "No tunnels found to create."
+    elif not ssh_username:
+        error = "Input user."
+    elif not ssh_password:
+        error = "Input password."
 
-    if not ssh_username:
-        messagebox.showwarning("Attention", "Input username")
-        print("Input user")
-        return
-    if not ssh_password:
-        messagebox.showwarning("Attention", "Input password")
-        print("Input password")
-        return
-    
-    lgv = routes_table.item(selected_item)["values"][0]
-    print(f"SSH Tunnel created for {lgv}")
+    if error:
+        print(error)
+        messagebox.showwarning("Attention", error)
+        tunnel_active = False
+    else:
+        putty_path = extract_executable("putty.exe", "resources")
+        tunnel_active = open_putty_with_tunnels(putty_path, ssh_host, ssh_port, ssh_username, ssh_password, tunnels)
 
-    open_putty_with_tunnels(putty_path, ssh_host, tunnels)
-
+    if tunnel_active:
+        lgv = routes_table.item(selected_item)["values"][0]
+        messagebox.showinfo("SSH Tunnel", f"SSH Tunnel for {lgv} active")
+        print(f"SSH Tunnel created for {lgv}")
 
 
 
