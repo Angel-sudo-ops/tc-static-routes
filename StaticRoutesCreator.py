@@ -21,6 +21,7 @@ import paramiko
 from threading import Thread
 import logging
 import subprocess
+import shutil
 
 __version__ = '3.4.7'
 
@@ -1269,11 +1270,11 @@ def create_rdp_file(target_ip, username, password):
         file.write(rdp_content.strip())
     return "temp.rdp"
 
-
+"""
 cerhost_path = None  # Will hold the Cerhost executable path
 
 def prompt_for_cerhost_path():
-    """Prompt the user to select the Cerhost executable path."""
+    ""Prompt the user to select the Cerhost executable path.""
     global cerhost_path
     
     # Open file dialog directly for the user to select the Cerhost executable
@@ -1297,25 +1298,29 @@ def prompt_for_cerhost_path():
     print(f"Cerhost path selected: {cerhost_path}")
     return cerhost_path
 
+"""
+
 def launch_cerhost(device_ip):
     """Launch Cerhost for the given IP address."""
-    global cerhost_path
+    # global cerhost_path
 
-    # Attempt to load the path from the configuration file
-    load_cerhost_path_from_file()  # Load path if not already loaded
+    # # Attempt to load the path from the configuration file
+    # load_cerhost_path_from_file()  # Load path if not already loaded
 
-    if not cerhost_path:
-        path = prompt_for_cerhost_path()
-        if not path:  # User may cancel the popup
-            print("Cerhost path not provided. Aborting.")
-            return
-
+    # if not cerhost_path:
+    #     path = prompt_for_cerhost_path()
+    #     if not path:  # User may cancel the popup
+    #         print("Cerhost path not provided. Aborting.")
+    #         return
+    cerhost_path = extract_executable("cerhost.exe", "resources")
+    print(cerhost_path)
     try:
         subprocess.Popen([cerhost_path, device_ip])
         print(f"Cerhost launched for {device_ip}")
     except Exception as e:
         messagebox.showerror("Error", f"Failed to launch Cerhost: {e}")
 
+"""
 config = configparser.ConfigParser()
 config_file = "config.ini"
 
@@ -1332,6 +1337,25 @@ def load_cerhost_path_from_file():
         cerhost_path = config["Settings"].get("CerhostPath", None)
         if cerhost_path:
             print(f"Cerhost path loaded: {cerhost_path}")
+
+"""
+
+
+def extract_executable(filename, subfolder):
+    """Extracts an executable from the PyInstaller bundle if it doesn't already exist."""
+    app_dir = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.dirname(__file__)
+    resources_dir = os.path.join(app_dir, "resources")  # Ensure it's inside 'resources' folder
+    dest_path = os.path.join(resources_dir, filename)
+
+    if not os.path.exists(dest_path):  # Extract only if it doesn't exist
+        if getattr(sys, 'frozen', False):  # Running as an .exe
+            exe_dir = sys._MEIPASS  # PyInstaller temp extraction folder
+            src_path = os.path.join(exe_dir, subfolder, filename)
+
+            os.makedirs(resources_dir, exist_ok=True)  # Ensure the 'resources' folder exists
+            shutil.copy(src_path, dest_path)  # Copy the executable to resources folder
+
+    return dest_path  # Return the path to use
 
 
 
@@ -1382,7 +1406,63 @@ def update_ssh_state(*args):
     update_tunnel_button_status()
     update_ssh_menu_status()
 
-logging.basicConfig(level=logging.DEBUG)
+# logging.basicConfig(level=logging.DEBUG)
+
+
+
+def open_putty_with_tunnels(putty_path, remote_host, tunnels):
+    """Launch PuTTY with tunnels from get_tunnels()."""
+    putty_cmd = [putty_path, "-ssh", remote_host]  # Start PuTTY command
+
+    for tunnel in tunnels:
+        local_port = tunnel["Local Port"]
+        remote_ip = tunnel["Remote IP"]
+        remote_port = tunnel["Remote Port"]
+
+        # Format as -L local_port:remote_ip:remote_port
+        putty_cmd.extend(["-L", f"{local_port}:{remote_ip}:{remote_port}"])
+
+    try:
+        subprocess.Popen(putty_cmd, shell=True)
+    except Exception as e:
+        print(f"Error launching PuTTY: {e}")
+
+def create_ssh_tunnel_putty():
+    """Create SSH tunnels for the selected LGV."""
+    
+    selected_item = routes_table.selection()
+    ssh_host = routes_table.item(selected_item)["values"][1]
+
+    if not is_host_reachable(ssh_host):
+        print("Host unreacheable")
+        return
+    putty_path = extract_executable("putty.exe", "resources")
+
+    tunnels = get_tunnels()
+
+    ssh_username = username_entry.get()
+    ssh_password = password_entry.get()
+
+    if not tunnels:
+        messagebox.showinfo("No Tunnels", "No tunnels found to create.")
+        return
+
+    if not ssh_username:
+        messagebox.showwarning("Attention", "Input username")
+        print("Input user")
+        return
+    if not ssh_password:
+        messagebox.showwarning("Attention", "Input password")
+        print("Input password")
+        return
+    
+    lgv = routes_table.item(selected_item)["values"][0]
+    print(f"SSH Tunnel created for {lgv}")
+
+    open_putty_with_tunnels(putty_path, ssh_host, tunnels)
+
+
+
 
 tunnel_connection_in_progress = False
 def create_ssh_tunnel():
@@ -2634,7 +2714,7 @@ routes_table.bind('<<TreeviewSelect>>',  update_ssh_state)
 # Create the context menu
 context_menu = tk.Menu(routes_table, tearoff=0)
 # context_menu.add_command(label="Delete", command=delete_selected_record_from_menu)
-context_menu.add_command(label="SSH Tunnel", command=create_ssh_tunnel)
+context_menu.add_command(label="SSH Tunnel", command=create_ssh_tunnel_putty)
 context_menu.add_command(label="Open RDP", command=open_remote_connection)
 
 # Bind right-click to show the context menu
