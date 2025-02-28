@@ -22,8 +22,10 @@ from threading import Thread
 import logging
 import subprocess
 import shutil
+import psutil
 
-__version__ = '3.4.8'
+
+__version__ = '3.4.9'
 
 default_file_path = os.path.join(r'C:\TwinCAT\3.1\Target', 'StaticRoutes.xml')
 
@@ -1397,7 +1399,7 @@ def update_ssh_menu_status():
     """
     selection = routes_table.selection()
     if selection:
-        if routes_table.item(selection)["values"][3] == "TC3":
+        if routes_table.item(selection)["values"][3] == "TC3" and "LGV" in routes_table.item(selection)["values"][0]:
             context_menu.entryconfig("SSH Tunnel", state="normal")
         else:
             context_menu.entryconfig("SSH Tunnel", state="disabled")
@@ -1436,12 +1438,35 @@ def open_putty_with_tunnels(putty_path, remote_host, ssh_port, ssh_username, ssh
         return False
 
 
+
+active_ssh_tunnel = None  # Stores the active SSH host
+active_lgv = None
+
 def create_ssh_tunnel_putty():
-    """Create SSH tunnels for the selected LGV."""
-    
+    """Create SSH tunnels for the selected LGV, and prevent duplicates"""
+    global active_ssh_tunnel, active_lgv
+
     selected_item = routes_table.selection()
     ssh_host = routes_table.item(selected_item)["values"][1]
+    lgv = routes_table.item(selected_item)["values"][0]
+    
     error = None
+
+    if is_putty_running():
+        if active_ssh_tunnel == ssh_host:
+            response = messagebox.askyesno(
+                "SSH Tunnel",
+                f"A tunnel to {lgv} is already active.\nDo you want to close it?"
+            )
+
+            if response:  # Yes → Close tunnel
+                close_putty()
+                active_ssh_tunnel, active_lgv = None, None
+            return
+        elif messagebox.askyesno("SSH Tunnel", f"A tunnel to {active_lgv} is already active. Do you want to close it?"):
+            close_putty()
+        else:
+            return
 
     tunnels = get_tunnels()
 
@@ -1449,14 +1474,14 @@ def create_ssh_tunnel_putty():
     ssh_password = password_entry.get()
     ssh_port = 20022
 
-    if not is_host_reachable(ssh_host):
-        error = f"Host {ssh_host} unreachable"
+    if not ssh_username:
+        error = "Input user."
+    if not ssh_password:
+        error = "Input password."
     elif not tunnels:
         error = "No tunnels found to create."
-    elif not ssh_username:
-        error = "Input user."
-    elif not ssh_password:
-        error = "Input password."
+    elif not is_host_reachable(ssh_host):
+        error = f"Host {ssh_host} unreachable"
 
     if error:
         print(error)
@@ -1467,9 +1492,44 @@ def create_ssh_tunnel_putty():
         tunnel_active = open_putty_with_tunnels(putty_path, ssh_host, ssh_port, ssh_username, ssh_password, tunnels)
 
     if tunnel_active:
-        lgv = routes_table.item(selected_item)["values"][0]
-        messagebox.showinfo("SSH Tunnel", f"SSH Tunnel for {lgv} active")
+        active_ssh_tunnel = ssh_host  # Store the active SSH host
+
+        active_lgv = lgv
+        
+        messagebox.showinfo("SSH Tunnel", f"SSH Tunnel for {lgv} is active")
         print(f"SSH Tunnel created for {lgv}")
+
+
+def is_putty_running():
+    """Check if a PuTTY SSH tunnel is already running."""
+    for process in psutil.process_iter(attrs=['pid', 'name']):
+        if "putty.exe" in process.info['name'].lower():
+            return True  # PuTTY is running
+    return False
+
+def close_putty():
+    """Find and close PuTTY SSH tunnels."""
+    for process in psutil.process_iter(attrs=['pid', 'name']):
+        if "putty.exe" in process.info['name'].lower():
+            psutil.Process(process.info['pid']).terminate()  # Kill PuTTY process
+            print("PuTTY tunnel closed.")
+            # messagebox.showinfo("SSH Tunnel", "Existing SSH tunnel has been closed.")
+            return
+    # messagebox.showwarning("SSH Tunnel", "No active SSH tunnel found.")
+
+def close_all_processes():
+    """Ensure PuTTY and Cerhost are closed when the app exits."""
+    close_putty()
+    close_cerhost()  # New function to close Cerhost
+
+def close_cerhost():
+    """Find and close Cerhost if it's running."""
+    for process in psutil.process_iter(attrs=['pid', 'name']):
+        if "cerhost.exe" in process.info['name'].lower():
+            psutil.Process(process.info['pid']).terminate()
+            print("Cerhost closed.")
+
+
 
 
 
@@ -2770,6 +2830,8 @@ check_twinCAT_version()
 
 # Populate table the first time with current StaticRoutes.xml file
 populate_table_from_xml("C:\\TwinCAT\\3.1\\Target\\StaticRoutes.xml")
+
+root.protocol("WM_DELETE_WINDOW", close_all_processes)
 
 root.mainloop()
 
