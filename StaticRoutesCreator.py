@@ -24,7 +24,7 @@ import subprocess
 import shutil
 import psutil
 
-__version__ = '3.5.1'
+__version__ = '3.5.2'
 
 default_file_path = os.path.join(r'C:\TwinCAT\3.1\Target', 'StaticRoutes.xml')
 
@@ -1155,39 +1155,37 @@ def is_host_reachable(host, timeout=2):
         print(f"Ping to {host} failed.")
         return False
 
-def is_port_open(host, port, timeout=3):
+
+def is_port_open(host, port, timeout=2):
     """Check if a specific port is open on the host."""
     try:
         with socket.create_connection((host, port), timeout=timeout):
             return True
     except Exception as e:
-        print(f"Exception at is_port_open: {e}")
+        print(f"Exception at is_port_open for port {port}: {e}")
         return False
+    
 
-def detect_connection_type(ip_address, tc_type):
+def detect_connection_type(ip_address):
     """Detect whether the LGV supports RDP or Cerhost."""
     RDP_PORT = 3389
     CERHOST_PORT = 987 
 
-    # Step 1: Ping the host
-    if not is_host_reachable(ip_address):
+    # Ping the host
+    if is_host_reachable(ip_address):
+        # Check for RDP or Cerhost
+        if is_port_open(ip_address, RDP_PORT):
+            return "RDP"
+        elif is_port_open(ip_address, CERHOST_PORT):
+            return "Cerhost"
+        else:
+            return "Unknown"
+    else:
         print(f"Host {ip_address} is unreachable.")
-        messagebox.showerror("Connection Error", f"Host {ip_address} is unreachable")
+        messagebox.showwarning("Connection Error", f"Host {ip_address} is unreachable")
         return "Unreachable"
 
-    # Step 2: Directly return RDP for TC3
-    # There could be Cerhost with TC3, so this condition is removed
-    # if tc_type == "TC3":
-    #     return "RDP"
-
-    # Step 3: Check for RDP or Cerhost only if TC2
-    if is_port_open(ip_address, RDP_PORT):
-        return "RDP"
-    if is_port_open(ip_address, CERHOST_PORT):
-        return "Cerhost"
-
-    return "Unknown"
-
+        
 def open_remote_connection():
     """Open Remote Desktop using an .rdp file."""
     selected_item = routes_table.selection()
@@ -1196,13 +1194,13 @@ def open_remote_connection():
         return
 
     target_ip = routes_table.item(selected_item)["values"][1]
-    lgv_type = routes_table.item(selected_item)["values"][3]
+    lgv = routes_table.item(selected_item)["values"][0]
     rdp_username = username_entry.get()
     rdp_password = password_entry.get()
 
-    if not is_host_reachable(target_ip):
-        messagebox.showwarning("Attention", "Host is unreacheable")
-        return
+    # if not is_host_reachable(target_ip):
+    #     messagebox.showwarning("Attention", "Host is unreacheable")
+    #     return
 
     if not rdp_username or not rdp_password:
         messagebox.showwarning("Attention", "Username and Password are required.")
@@ -1210,12 +1208,12 @@ def open_remote_connection():
 
     def detect_and_connect():
         try:
-            connection_type = detect_connection_type(target_ip, lgv_type)
+            connection_type = detect_connection_type(target_ip)
             if connection_type == "RDP":
                 # open_rdp_connection(target_ip, rdp_username, rdp_password)
                 open_rdp_connection_with_credentials(target_ip, rdp_username, rdp_password)
             elif connection_type == "Cerhost":
-                launch_cerhost(target_ip)
+                launch_cerhost(target_ip, lgv)
             else:
                 # messagebox.showerror("Connection Error", f"Unable to determine connection type for {target_ip}.")
                 print(f"Unable to determine connection type for {target_ip}.")
@@ -1305,23 +1303,22 @@ def prompt_for_cerhost_path():
 
 """
 
-def launch_cerhost(device_ip):
+def launch_cerhost(device_ip, machine_name):
     """Launch Cerhost for the given IP address."""
-    # global cerhost_path
+    global active_processes
 
-    # # Attempt to load the path from the configuration file
-    # load_cerhost_path_from_file()  # Load path if not already loaded
+    # Check if Cerhost is already open for this host
+    if device_ip in active_processes.get("cerhost", {}):
+        messagebox.showwarning("Attention", f"Cerhost for {machine_name} is already running.")
+        return  # Stop execution
 
-    # if not cerhost_path:
-    #     path = prompt_for_cerhost_path()
-    #     if not path:  # User may cancel the popup
-    #         print("Cerhost path not provided. Aborting.")
-    #         return
     cerhost_path = extract_executable("cerhost.exe", "resources")
-    print(cerhost_path)
+    print(f"Launching Cerhost: {cerhost_path} for {device_ip}")
+    
     try:
-        start_process("cerhost", [cerhost_path, device_ip])
-        print(f"Cerhost launched for {device_ip}")
+        process = start_process("cerhost", [cerhost_path, device_ip], instance_key=device_ip)
+        print(f"Cerhost launched for {device_ip} (PID {process.pid})")
+
     except Exception as e:
         messagebox.showerror("Error", f"Failed to launch Cerhost: {e}")
 
@@ -1414,15 +1411,20 @@ def update_ssh_state(*args):
 # logging.basicConfig(level=logging.DEBUG)
 
 
-def start_process(process_name, command):
+def start_process(process_name, command, instance_key=None):
     """Start a process and store its PID."""
     process = subprocess.Popen(command, shell=True)
 
     if process_name not in active_processes:
-        active_processes[process_name] = []  # Initialize list if not present
+        active_processes[process_name] = {}  if instance_key else None  # Dict for multi-instance, None for single
 
-    active_processes[process_name].append(process.pid)  # Store multiple PIDs
+    if instance_key:  # Track by instance_key (e.g., Cerhost IP)
+        active_processes[process_name][instance_key] = process.pid
+    else:  # Store single-instance process (e.g., PuTTY)
+        active_processes[process_name] = process.pid
+
     print(f"{process_name} started with PID {process.pid}")
+    return process  # Return process object for tracking
 
 
 def open_putty_with_tunnels(putty_path, remote_host, ssh_port, ssh_username, ssh_password, tunnels):
@@ -1515,16 +1517,23 @@ def create_ssh_tunnel_putty():
 
 
 def is_process_running(process_name):
-    """Check if any instance of a tracked process is still running, and remove inactive ones."""
+    """Check if a tracked process is still running and remove it if not."""
     if process_name in active_processes:
-        active_pids = active_processes[process_name]  # Get list of PIDs
-        active_pids = [pid for pid in active_pids if psutil.pid_exists(pid)]  # Keep only active ones
+        process_data = active_processes[process_name]
 
-        if active_pids:  # If at least one is running, return True
-            active_processes[process_name] = active_pids  # Update the list
+        if isinstance(process_data, int):  # Single-instance process (like PuTTY)
+            if not psutil.pid_exists(process_data):
+                del active_processes[process_name]  # Remove it if not running
+                return False
             return True
-        else:
-            del active_processes[process_name]  # No active PIDs left, remove from tracking
+        elif isinstance(process_data, dict):  # Multi-instance process (like Cerhost)
+            active_pids = [pid for pid in process_data.values() if psutil.pid_exists(pid)]
+
+            if active_pids:
+                active_processes[process_name] = {ip: pid for ip, pid in process_data.items() if psutil.pid_exists(pid)}
+                return True
+            else:
+                del active_processes[process_name]  # No active instances left
     return False
 
 # def is_putty_running():
@@ -1558,8 +1567,15 @@ def close_putty():
 #             psutil.Process(process.info['pid']).terminate()
 #             print("Cerhost closed.")
 
-def close_cerhost():
-    close_tracked_process("cerhost")
+def close_cerhost(device_ip=None):
+    """Close a specific Cerhost instance by device IP, or all if no IP is provided."""
+    if "cerhost" in active_processes:
+        if device_ip:  # Close only the requested Cerhost instance
+            close_tracked_process("cerhost", instance_key=device_ip)
+        else:  # Close all Cerhost instances
+            for ip in list(active_processes["cerhost"].keys()):
+                close_tracked_process("cerhost", instance_key=ip)
+            active_processes["cerhost"].clear()  # Remove all tracking
 
 def close_all_processes():
     """Ensure PuTTY and Cerhost are closed when the app exits."""
@@ -1603,19 +1619,42 @@ def close_process_by_name(process_name):
                 pass  # Process may have already closed
 
 
-def close_tracked_process(process_name):
-    """Close all instances of a tracked process."""
+def close_tracked_process(process_name, instance_key=None):
+    """Close a tracked process and its child processes.
+    - If `instance_key` is provided, close only that instance (for multi-instance processes like Cerhost).
+    - Otherwise, close the single-instance process (like PuTTY).
+    """
     if process_name in active_processes:
-        for pid in active_processes[process_name]:  # Iterate over all stored PIDs
-            try:
-                psutil.Process(pid).terminate()
-                print(f"{process_name} (PID {pid}) closed.")
-            except psutil.NoSuchProcess:
-                print(f"{process_name} (PID {pid}) was already closed.")
+        if instance_key:  # Close specific instance (Cerhost for an IP)
+            if instance_key in active_processes[process_name]:
+                pid = active_processes[process_name].pop(instance_key)
+                try:
+                    process = psutil.Process(pid)
 
-        del active_processes[process_name]  # Clear tracking after closing all instances
-    else:
-        print(f"No tracked instances of {process_name} to close.")
+                    # Terminate child processes first (cmd.exe, additional subprocesses)
+                    for child in process.children(recursive=True):
+                        child.terminate()
+
+                    # Now terminate the main process
+                    process.terminate()
+                    print(f"{process_name} for {instance_key} (PID {pid}) closed.")
+                except psutil.NoSuchProcess:
+                    print(f"{process_name} for {instance_key} was already closed.")
+        else:  # Close single-instance process (PuTTY)
+            pid = active_processes.pop(process_name, None)
+            if pid:
+                try:
+                    process = psutil.Process(pid)
+
+                    # Terminate child processes first
+                    for child in process.children(recursive=True):
+                        child.terminate()
+
+                    # Terminate the main process
+                    process.terminate()
+                    print(f"{process_name} (PID {pid}) closed.")
+                except psutil.NoSuchProcess:
+                    print(f"{process_name} was already closed.")
 
 
 
