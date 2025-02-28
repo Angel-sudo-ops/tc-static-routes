@@ -25,7 +25,7 @@ import shutil
 import psutil
 
 
-__version__ = '3.4.9'
+__version__ = '3.5.0'
 
 default_file_path = os.path.join(r'C:\TwinCAT\3.1\Target', 'StaticRoutes.xml')
 
@@ -1463,7 +1463,7 @@ def create_ssh_tunnel_putty():
                 close_putty()
                 active_ssh_tunnel, active_lgv = None, None
             return
-        elif messagebox.askyesno("SSH Tunnel", f"A tunnel to {active_lgv} is already active. Do you want to close it?"):
+        elif messagebox.askyesno("SSH Tunnel", f"A tunnel to {active_lgv} is already active. \nDo you want to close it?"):
             close_putty()
         else:
             return
@@ -1730,10 +1730,7 @@ def open_ssh_config_window_cond():
         open_ssh_config_window()
 
 def open_ssh_config_window():
-    global ssh_config_window, is_saved
-
-    # Track if the table data has been saved
-    is_saved = False
+    global ssh_config_window
 
     ssh_config_window = tk.Toplevel(root)
     ssh_config_window.title("Setup SSH")
@@ -1791,10 +1788,36 @@ def open_ssh_config_window():
         for row in default_tunnel_data:
             add_row(tunnel_table, *row)
 
+
+    def is_table_modified():
+        """Check if the table data differs from the saved XML or the default data."""
+        current_data = []
+        
+        if not tunnel_table.get_children():
+            return False
+
+        for row_id in tunnel_table.get_children():
+            values = tuple(str(v).strip() for v in tunnel_table.item(row_id)["values"])  # Convert to tuple for comparison
+            current_data.append(values)
+
+        # If the XML file exists, compare to its content
+        if os.path.exists(SSH_CONFIG_FILE):
+            saved_data = load_table_from_xml(SSH_CONFIG_FILE, return_data_only=True)
+            saved_data = [tuple(str(v).strip() for v in row) for row in saved_data]
+            return current_data != saved_data
+
+        return current_data != default_tunnel_data  # Returns True if data is different
+
     
     def save_table_to_xml(filename=SSH_CONFIG_FILE):
         """Save table data to an XML file."""
-        global is_saved
+
+        if not tunnel_table.get_children():
+            return
+    
+        if not is_table_modified():
+            return
+        
         # Create the root element
         root = ET.Element("Tunnels")
 
@@ -1816,27 +1839,39 @@ def open_ssh_config_window():
         with open(full_path, "w") as file:
             file.write(pretty_xml)
 
-        is_saved = True
         messagebox.showinfo("Save Successful", f"Table data saved to:\n{full_path}")
 
-    def load_table_from_xml(filename=SSH_CONFIG_FILE):
-        """Load table data from an XML file."""
+        # After saving, reload the file content so we can compare against it later
+        global default_tunnel_data
+        default_tunnel_data = load_table_from_xml(SSH_CONFIG_FILE, return_data_only=True)
+
+
+    def load_table_from_xml(filename=SSH_CONFIG_FILE, return_data_only=False):
+        """Load table data from an XML file. If return_data_only is True, return data instead of modifying the table."""
         try:
             tree = ET.parse(filename)
             root = tree.getroot()
 
+            loaded_data = []
             for tunnel in root.findall("Tunnel"):
                 local_port = tunnel.find("LocalPort").text
                 remote_ip = tunnel.find("RemoteIP").text
                 remote_port = tunnel.find("RemotePort").text
                 description = tunnel.find("Description").text
-                add_row(tunnel_table, local_port, remote_ip, remote_port, description)
+                loaded_data.append((local_port, remote_ip, remote_port, description))
+
+            if return_data_only:
+                return loaded_data # Return data for comparison
+            
+            for row in loaded_data:
+                add_row(tunnel_table, *row)
         except FileNotFoundError:
             print(f"{filename} not found. Starting with an empty table.")
+            return [] if return_data_only else None
 
     def on_window_close():
         """Handle the window close event"""
-        if not is_saved:
+        if is_table_modified():
             result  = messagebox.askyesnocancel(
                 "Unsaved Changes",
                 "You have unsaved changes. Do you want to save them before closing?"
@@ -1845,14 +1880,11 @@ def open_ssh_config_window():
                 return
             elif result:
                 save_table_to_xml()
+
         ssh_config_window.destroy()
 
     ssh_config_window.protocol("WM_DELETE_WINDOW", on_window_close)
-
-    def mark_as_unsaved(event=None):
-        global is_saved
-        is_saved = False
-    
+   
 
     # Input frame for adding data
     input_button_frame = tk.Frame(ssh_config_window)
@@ -1885,22 +1917,26 @@ def open_ssh_config_window():
         if not (local_port and remote_ip and remote_port and description):
             messagebox.showwarning("Input Error", "All fields must be filled.")
             return
+        
+        # Check if the combination of (Local Port, Remote IP, Remote Port) already exists
+        for child in tunnel_table.get_children():
+            values = tunnel_table.item(child, "values")
+            if values[:3] == (local_port, remote_ip, remote_port):  # Check first three columns
+                messagebox.showwarning("Duplicate Entry", "This tunnel already exists.")
+                return  # Exit without adding duplicate
 
         add_row(tunnel_table, local_port, remote_ip, remote_port, description)
 
-        # # Clear the input fields
-        # local_port_entry.delete(0, tk.END)
-        # remote_ip_entry.delete(0, tk.END)
-        # remote_port_entry.delete(0, tk.END)
-        # description_entry.delete(0, tk.END)
 
-    add_button = ttk.Button(input_button_frame, text="Add Data", command=add_row_from_inputs)
-    add_button.grid(rowspan=2, row=0, column=4, columnspan=4, pady=10, padx=10)
+    add_button = ttk.Button(input_button_frame, text=" Add Data ", command=add_row_from_inputs)
+    add_button.grid(row=0, column=4, columnspan=4, pady=2, padx=10)
 
-    add_button.bind("<Button-1>", mark_as_unsaved)
+    save_table_button = ttk.Button(input_button_frame, text=" Save Table ", command=save_table_to_xml)
+    save_table_button.grid(row=1, column=4, columnspan=4, pady=2, padx=10)
+
 
     table_frame = tk.Frame(ssh_config_window)
-    table_frame.pack(fill=tk.Y, expand=True, pady=10)
+    table_frame.pack(fill=tk.Y, expand=True, pady=10, padx=(5,0))
     # Create the Treeview widget (tunnel_table)
     columns = ("Local Port", "Remote IP", "Remote Port", "Description")
     tunnel_table = ttk.Treeview(table_frame, columns=columns, show="headings", height=5)
@@ -1920,10 +1956,6 @@ def open_ssh_config_window():
 
     # Bind the DEL key to delete rows
     tunnel_table.bind("<Delete>", lambda event: delete_selected_row(tunnel_table))
-    tunnel_table.bind("<Key>", mark_as_unsaved)
-
-    save_table_button = ttk.Button(ssh_config_window, text="  Save Table  ", command=save_table_to_xml)
-    save_table_button.pack(side=tk.TOP, fill=tk.Y, pady=(0,10), padx=10)
 
     def add_row(tunnel_table, local_port="", remote_ip="", remote_port="", description=""):
         """Add a row with specified data to the table."""
