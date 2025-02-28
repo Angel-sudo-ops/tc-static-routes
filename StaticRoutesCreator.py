@@ -24,7 +24,7 @@ import subprocess
 import shutil
 import psutil
 
-__version__ = '3.5.2'
+__version__ = '3.5.3'
 
 default_file_path = os.path.join(r'C:\TwinCAT\3.1\Target', 'StaticRoutes.xml')
 
@@ -1198,9 +1198,9 @@ def open_remote_connection():
     rdp_username = username_entry.get()
     rdp_password = password_entry.get()
 
-    # if not is_host_reachable(target_ip):
-    #     messagebox.showwarning("Attention", "Host is unreacheable")
-    #     return
+    if not is_host_reachable(target_ip):
+        messagebox.showwarning("Attention", "Host is unreacheable")
+        return
 
     if not rdp_username or not rdp_password:
         messagebox.showwarning("Attention", "Username and Password are required.")
