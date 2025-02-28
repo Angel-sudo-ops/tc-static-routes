@@ -24,8 +24,7 @@ import subprocess
 import shutil
 import psutil
 
-
-__version__ = '3.5.0'
+__version__ = '3.5.1'
 
 default_file_path = os.path.join(r'C:\TwinCAT\3.1\Target', 'StaticRoutes.xml')
 
@@ -1791,6 +1790,8 @@ def open_ssh_config_window():
 
     def is_table_modified():
         """Check if the table data differs from the saved XML or the default data."""
+        global default_tunnel_data, last_saved_data
+
         current_data = []
         
         if not tunnel_table.get_children():
@@ -1804,13 +1805,18 @@ def open_ssh_config_window():
         if os.path.exists(SSH_CONFIG_FILE):
             saved_data = load_table_from_xml(SSH_CONFIG_FILE, return_data_only=True)
             saved_data = [tuple(str(v).strip() for v in row) for row in saved_data]
-            return current_data != saved_data
+            
+            last_saved_data = saved_data
 
+            return current_data != saved_data
+        
         return current_data != default_tunnel_data  # Returns True if data is different
 
     
     def save_table_to_xml(filename=SSH_CONFIG_FILE):
         """Save table data to an XML file."""
+
+        global last_saved_data
 
         if not tunnel_table.get_children():
             return
@@ -1842,8 +1848,7 @@ def open_ssh_config_window():
         messagebox.showinfo("Save Successful", f"Table data saved to:\n{full_path}")
 
         # After saving, reload the file content so we can compare against it later
-        global default_tunnel_data
-        default_tunnel_data = load_table_from_xml(SSH_CONFIG_FILE, return_data_only=True)
+        last_saved_data = load_table_from_xml(SSH_CONFIG_FILE, return_data_only=True)
 
 
     def load_table_from_xml(filename=SSH_CONFIG_FILE, return_data_only=False):
