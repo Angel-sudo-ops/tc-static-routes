@@ -1316,7 +1316,7 @@ def launch_cerhost(device_ip):
     cerhost_path = extract_executable("cerhost.exe", "resources")
     print(cerhost_path)
     try:
-        subprocess.Popen([cerhost_path, device_ip])
+        start_process("cerhost", [cerhost_path, device_ip])
         print(f"Cerhost launched for {device_ip}")
     except Exception as e:
         messagebox.showerror("Error", f"Failed to launch Cerhost: {e}")
@@ -1410,6 +1410,16 @@ def update_ssh_state(*args):
 # logging.basicConfig(level=logging.DEBUG)
 
 
+def start_process(process_name, command):
+    """Start a process and store its PID."""
+    process = subprocess.Popen(command, shell=True)
+
+    if process_name not in active_processes:
+        active_processes[process_name] = []  # Initialize list if not present
+
+    active_processes[process_name].append(process.pid)  # Store multiple PIDs
+    print(f"{process_name} started with PID {process.pid}")
+
 
 def open_putty_with_tunnels(putty_path, remote_host, ssh_port, ssh_username, ssh_password, tunnels):
     """Launch PuTTY with tunnels from get_tunnels()."""
@@ -1430,13 +1440,14 @@ def open_putty_with_tunnels(putty_path, remote_host, ssh_port, ssh_username, ssh
         putty_cmd.extend(["-L", f"{local_port}:{remote_ip}:{remote_port}"])
 
     try:
-        subprocess.Popen(putty_cmd, shell=True)
+        start_process("putty", putty_cmd)
         return True
     except Exception as e:
         print(f"Error launching PuTTY: {e}")
         return False
 
 
+active_processes = {}
 
 active_ssh_tunnel = None  # Stores the active SSH host
 active_lgv = None
@@ -1499,35 +1510,108 @@ def create_ssh_tunnel_putty():
         print(f"SSH Tunnel created for {lgv}")
 
 
-def is_putty_running():
-    """Check if a PuTTY SSH tunnel is already running."""
-    for process in psutil.process_iter(attrs=['pid', 'name']):
-        if "putty.exe" in process.info['name'].lower():
-            return True  # PuTTY is running
+def is_process_running(process_name):
+    """Check if any instance of a tracked process is still running, and remove inactive ones."""
+    if process_name in active_processes:
+        active_pids = active_processes[process_name]  # Get list of PIDs
+        active_pids = [pid for pid in active_pids if psutil.pid_exists(pid)]  # Keep only active ones
+
+        if active_pids:  # If at least one is running, return True
+            active_processes[process_name] = active_pids  # Update the list
+            return True
+        else:
+            del active_processes[process_name]  # No active PIDs left, remove from tracking
     return False
 
+# def is_putty_running():
+#     """Check if a PuTTY SSH tunnel is already running."""
+#     for process in psutil.process_iter(attrs=['pid', 'name']):
+#         if "putty.exe" in process.info['name'].lower():
+#             return True  # PuTTY is running
+#     return False
+
+
+def is_putty_running():
+    return is_process_running("putty")
+
+
+# def close_putty():
+#     """Find and close PuTTY SSH tunnels."""
+#     for process in psutil.process_iter(attrs=['pid', 'name']):
+#         if "putty.exe" in process.info['name'].lower():
+#             psutil.Process(process.info['pid']).terminate()  # Kill PuTTY process
+#             print("PuTTY tunnel closed.")
+#             # messagebox.showinfo("SSH Tunnel", "Existing SSH tunnel has been closed.")
+#             return
+
 def close_putty():
-    """Find and close PuTTY SSH tunnels."""
-    for process in psutil.process_iter(attrs=['pid', 'name']):
-        if "putty.exe" in process.info['name'].lower():
-            psutil.Process(process.info['pid']).terminate()  # Kill PuTTY process
-            print("PuTTY tunnel closed.")
-            # messagebox.showinfo("SSH Tunnel", "Existing SSH tunnel has been closed.")
-            return
-    # messagebox.showwarning("SSH Tunnel", "No active SSH tunnel found.")
+    close_tracked_process("putty")
+        
+# def close_cerhost():
+#     """Find and close Cerhost if it's running."""
+#     for process in psutil.process_iter(attrs=['pid', 'name']):
+#         if "cerhost.exe" in process.info['name'].lower():
+#             psutil.Process(process.info['pid']).terminate()
+#             print("Cerhost closed.")
+
+def close_cerhost():
+    close_tracked_process("cerhost")
 
 def close_all_processes():
     """Ensure PuTTY and Cerhost are closed when the app exits."""
     close_putty()
     close_cerhost()  # New function to close Cerhost
 
-def close_cerhost():
-    """Find and close Cerhost if it's running."""
-    for process in psutil.process_iter(attrs=['pid', 'name']):
-        if "cerhost.exe" in process.info['name'].lower():
-            psutil.Process(process.info['pid']).terminate()
-            print("Cerhost closed.")
+    # close_process_by_name("putty.exe")
+    # close_process_by_name("cerhost.exe")
 
+    # close_process_fast("cerhost.exe")
+    # close_process_fast("putty.exe")
+
+    root.destroy()
+
+# def is_process_running(process_name):
+#     """Check if a process is running using tasklist (Windows only)."""
+#     try:
+#         output = os.popen(f'tasklist /FI "IMAGENAME eq {process_name}"').read()
+#         return process_name in output  # Returns True if process is found
+#     except Exception:
+#         return False
+    
+def close_process_fast(process_name):
+    """Close a process quickly using taskkill (Windows only)."""
+    if is_process_running(process_name):
+        os.system(f'taskkill /F /IM {process_name} >nul 2>&1')
+        print(f"{process_name} closed.")
+    else:
+        print(f"{process_name} is not running.")
+
+
+def close_process_by_name(process_name):
+    """Find and terminate a process by its name."""
+    for process in psutil.process_iter(['pid', 'name']):
+        if process.info['name'] and process_name.lower() in process.info['name'].lower():
+            try:
+                psutil.Process(process.info['pid']).terminate()
+                print(f"{process_name} closed.")
+                return  # Stop after closing the first match (since PuTTY and Cerhost only have one instance running)
+            except psutil.NoSuchProcess:
+                pass  # Process may have already closed
+
+
+def close_tracked_process(process_name):
+    """Close all instances of a tracked process."""
+    if process_name in active_processes:
+        for pid in active_processes[process_name]:  # Iterate over all stored PIDs
+            try:
+                psutil.Process(pid).terminate()
+                print(f"{process_name} (PID {pid}) closed.")
+            except psutil.NoSuchProcess:
+                print(f"{process_name} (PID {pid}) was already closed.")
+
+        del active_processes[process_name]  # Clear tracking after closing all instances
+    else:
+        print(f"No tracked instances of {process_name} to close.")
 
 
 
