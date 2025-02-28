@@ -1200,6 +1200,10 @@ def open_remote_connection():
     rdp_username = username_entry.get()
     rdp_password = password_entry.get()
 
+    if not is_host_reachable(target_ip):
+        messagebox.showwarning("Attention", "Host is unreacheable")
+        return
+
     if not rdp_username or not rdp_password:
         messagebox.showwarning("Attention", "Username and Password are required.")
         return
