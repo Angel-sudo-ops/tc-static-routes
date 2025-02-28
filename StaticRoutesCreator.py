@@ -1199,7 +1199,7 @@ def open_remote_connection():
     rdp_password = password_entry.get()
 
     if not is_host_reachable(target_ip):
-        messagebox.showwarning("Attention", "Host is unreacheable")
+        messagebox.showwarning("Attention", f"Host {lgv} is unreacheable")
         return
 
     if not rdp_username or not rdp_password:
