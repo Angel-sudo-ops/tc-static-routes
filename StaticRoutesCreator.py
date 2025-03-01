@@ -24,7 +24,7 @@ import subprocess
 import shutil
 import psutil
 
-__version__ = '3.5.3'
+__version__ = '3.5.4'
 
 default_file_path = os.path.join(r'C:\TwinCAT\3.1\Target', 'StaticRoutes.xml')
 
@@ -1198,6 +1198,15 @@ def open_remote_connection():
     rdp_username = username_entry.get()
     rdp_password = password_entry.get()
 
+    # Check if Cerhost is already open for this host
+    if is_cerhost_instance_running(target_ip):
+        messagebox.showwarning("Attention", f"Cerhost for {lgv} is already running.")
+        return  # Stop execution
+    
+    if is_rdp_running(target_ip):
+        messagebox.showwarning("Attention", f"RDP session for {lgv} is already running.")
+        return
+
     if not is_host_reachable(target_ip):
         messagebox.showwarning("Attention", f"Host {lgv} is unreacheable")
         return
@@ -1273,6 +1282,15 @@ def create_rdp_file(target_ip, username, password):
         file.write(rdp_content.strip())
     return "temp.rdp"
 
+def is_rdp_running(target_ip):
+    """Check if an RDP session to the target IP is already running."""
+    for process in psutil.process_iter(attrs=['name', 'cmdline']):
+        if process.info['name'].lower() == "mstsc.exe":  # RDP client process
+            if target_ip in " ".join(process.info['cmdline']):  # Check if RDP is open for this IP
+                return True
+    return False
+
+
 """
 cerhost_path = None  # Will hold the Cerhost executable path
 
@@ -1307,11 +1325,6 @@ def launch_cerhost(device_ip, machine_name):
     """Launch Cerhost for the given IP address."""
     global active_processes
 
-    # Check if Cerhost is already open for this host
-    if device_ip in active_processes.get("cerhost", {}):
-        messagebox.showwarning("Attention", f"Cerhost for {machine_name} is already running.")
-        return  # Stop execution
-
     cerhost_path = extract_executable("cerhost.exe", "resources")
     print(f"Launching Cerhost: {cerhost_path} for {device_ip}")
     
@@ -1321,6 +1334,15 @@ def launch_cerhost(device_ip, machine_name):
 
     except Exception as e:
         messagebox.showerror("Error", f"Failed to launch Cerhost: {e}")
+
+
+def is_cerhost_instance_running(device_ip):
+    """Check if a specific Cerhost instance (by IP) is running."""
+    if "cerhost" in active_processes and device_ip in active_processes["cerhost"]:
+        pid = active_processes["cerhost"][device_ip]
+        return psutil.pid_exists(pid)  # Check if the specific instance is still running
+    return False
+
 
 """
 config = configparser.ConfigParser()
@@ -1527,14 +1549,26 @@ def is_process_running(process_name):
                 return False
             return True
         elif isinstance(process_data, dict):  # Multi-instance process (like Cerhost)
-            active_pids = [pid for pid in process_data.values() if psutil.pid_exists(pid)]
+            active_pids = [pid for pid in process_data.values() if is_process_active(pid)]
 
             if active_pids:
-                active_processes[process_name] = {ip: pid for ip, pid in process_data.items() if psutil.pid_exists(pid)}
+                active_processes[process_name] = {ip: pid for ip, pid in process_data.items() if is_process_active(pid)}
                 return True
             else:
                 del active_processes[process_name]  # No active instances left
     return False
+
+
+def is_process_active(pid):
+    """Check if a process is truly active (not just a lingering background process)."""
+    try:
+        process = psutil.Process(pid)
+        if process.status() in [psutil.STATUS_RUNNING, psutil.STATUS_SLEEPING]:  # Active states
+            return True
+        else:
+            return False  # If it's 'zombie' or 'stopped'
+    except psutil.NoSuchProcess:
+        return False  # Process no longer exists
 
 # def is_putty_running():
 #     """Check if a PuTTY SSH tunnel is already running."""
