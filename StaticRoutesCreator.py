@@ -1273,18 +1273,24 @@ def open_rdp_connection(target_ip, username, password):
     except Exception as e:
         messagebox.showerror("Error", f"Failed to open Remote Desktop: {e}")
 
+
 def create_rdp_file(target_ip, username, password):
-    """Create a temporary .rdp file with credentials."""
+    """Create a temporary .rdp file with credentials, only if it doesn't already exist."""
+    rdp_filename = f"temp_{target_ip.replace('.', '_')}.rdp"  # Unique per IP
+
+    if os.path.exists(rdp_filename):
+        print(f"RDP file already exists for {target_ip}. Using existing file.")
+        return rdp_filename  # Reuse the existing file
+    
     rdp_content = f"""
     full address:s:{target_ip}
     username:s:{username}
     """
 
-    rdp_filename = f"temp_{target_ip.replace('.', '_')}.rdp"  # Unique per IP
-
     with open(rdp_filename, "w") as file:
         file.write(rdp_content.strip())
-
+        
+    print(f"Created new RDP file: {rdp_filename}")
     return rdp_filename
 
 
