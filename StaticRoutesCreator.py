@@ -24,7 +24,7 @@ import subprocess
 import shutil
 import psutil
 
-__version__ = '3.5.4'
+__version__ = '3.5.5'
 
 default_file_path = os.path.join(r'C:\TwinCAT\3.1\Target', 'StaticRoutes.xml')
 
@@ -1220,7 +1220,7 @@ def open_remote_connection():
             connection_type = detect_connection_type(target_ip)
             if connection_type == "RDP":
                 # open_rdp_connection(target_ip, rdp_username, rdp_password)
-                open_rdp_connection_with_credentials(target_ip, rdp_username, rdp_password)
+                open_rdp_connection(target_ip, rdp_username, rdp_password)
             elif connection_type == "Cerhost":
                 launch_cerhost(target_ip, lgv)
             else:
@@ -1244,8 +1244,8 @@ def open_rdp_connection_with_credentials(target_ip, username, password):
 
         # Step 2: Open Remote Desktop Connection
         rdp_command = f'mstsc /v:{target_ip}'
-        subprocess.run(rdp_command, shell=True)
-        print(f"RDP connection launched for {target_ip}")
+        process = start_process("rdp", rdp_command, instance_key=target_ip)  # Track the RDP session
+        print(f"RDP connection launched for {target_ip} (PID {process.pid})")
 
     except subprocess.CalledProcessError as e:
         print(f"Error: {e}")
@@ -1257,20 +1257,21 @@ def open_rdp_connection_with_credentials(target_ip, username, password):
         subprocess.run(cleanup_command, shell=True)
         print(f"Credentials removed for {target_ip}")
 
+
 def open_rdp_connection(target_ip, username, password):
     try:
         rdp_file = create_rdp_file(target_ip, username, password)
-        subprocess.run(["mstsc", rdp_file], check=True)
-        print(f"Opening Remote Desktop for {target_ip}")
+
+        # Start the RDP session using start_process and track it by IP
+        process = start_process("rdp", ["mstsc", rdp_file], instance_key=target_ip)
+        print(f"RDP connection launched for {target_ip} (PID {process.pid})")
+
     except FileNotFoundError:
         messagebox.showerror("Error", "Remote Desktop (mstsc) is not available on this system.")
     except subprocess.CalledProcessError:
         messagebox.showerror("Error", "Failed to open Remote Desktop. Check your credentials or target system.")
     except Exception as e:
         messagebox.showerror("Error", f"Failed to open Remote Desktop: {e}")
-    finally:
-        if os.path.exists(rdp_file):
-            os.remove(rdp_file)
 
 def create_rdp_file(target_ip, username, password):
     """Create a temporary .rdp file with credentials."""
@@ -1278,17 +1279,43 @@ def create_rdp_file(target_ip, username, password):
     full address:s:{target_ip}
     username:s:{username}
     """
-    with open("temp.rdp", "w") as file:
+
+    rdp_filename = f"temp_{target_ip.replace('.', '_')}.rdp"  # Unique per IP
+
+    with open(rdp_filename, "w") as file:
         file.write(rdp_content.strip())
-    return "temp.rdp"
+
+    return rdp_filename
+
 
 def is_rdp_running(target_ip):
     """Check if an RDP session to the target IP is already running."""
-    for process in psutil.process_iter(attrs=['name', 'cmdline']):
-        if process.info['name'].lower() == "mstsc.exe":  # RDP client process
-            if target_ip in " ".join(process.info['cmdline']):  # Check if RDP is open for this IP
-                return True
+    if "rdp" in active_processes and target_ip in active_processes["rdp"]:
+        pid = active_processes["rdp"][target_ip]
+        return psutil.pid_exists(pid)  # Check if the process is still active
     return False
+
+
+def delete_rdp_file(target_ip):
+    """Delete the temporary .rdp file for the given IP."""
+    rdp_filename = f"temp_{target_ip.replace('.', '_')}.rdp"
+    if os.path.exists(rdp_filename):
+        os.remove(rdp_filename)
+        print(f"Deleted RDP file: {rdp_filename}")
+
+
+def close_rdp_connection(target_ip=None):
+    """Close a specific RDP session by IP, or all RDP sessions if no IP is provided."""
+    if "rdp" in active_processes:
+        if target_ip:  # Close only the requested RDP session
+            close_tracked_process("rdp", instance_key=target_ip)
+            delete_rdp_file(target_ip)
+        else:  # Close all RDP sessions
+            for ip in list(active_processes["rdp"].keys()):
+                close_tracked_process("rdp", instance_key=ip)
+                delete_rdp_file(ip)
+            active_processes["rdp"].clear()  # Remove all tracking
+
 
 
 """
@@ -1615,6 +1642,7 @@ def close_all_processes():
     """Ensure PuTTY and Cerhost are closed when the app exits."""
     close_putty()
     close_cerhost()  # New function to close Cerhost
+    close_rdp_connection()
 
     # close_process_by_name("putty.exe")
     # close_process_by_name("cerhost.exe")
