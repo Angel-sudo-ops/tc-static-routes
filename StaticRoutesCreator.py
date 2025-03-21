@@ -24,7 +24,7 @@ import subprocess
 import shutil
 import psutil
 
-__version__ = '3.5.5'
+__version__ = '3.5.5.1'
 
 default_file_path = os.path.join(r'C:\TwinCAT\3.1\Target', 'StaticRoutes.xml')
 
@@ -645,7 +645,7 @@ def create_cc_xml_from_table(file_path):
     # Iterate over the data to create the Route elements
     for row in data:
         name, address, netid, tc_type = row
-        if tc_type == 'TC3':
+        if (tc_type == 'TC3') and ('LGV' in name):
             lgv = ET.SubElement(fleet, "LGV")
 
             number = name[-2:]
