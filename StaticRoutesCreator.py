@@ -23,10 +23,28 @@ import logging
 import subprocess
 import shutil
 import psutil
+import ctypes
 
-__version__ = '3.5.5.1'
+__version__ = '3.5.5.2'
 
 default_file_path = os.path.join(r'C:\TwinCAT\3.1\Target', 'StaticRoutes.xml')
+
+############################################################### Run as admin check #####################################################################
+# def is_admin():
+#     try:
+#         return ctypes.windll.shell32.IsUserAnAdmin()
+#     except:
+#         return False
+
+# def run_as_admin():
+#     if not is_admin():
+#         print("Not admin, relaunching...")
+#         script = os.path.abspath(sys.argv[0])
+#         params = " ".join([f'"{arg}"' for arg in sys.argv[1:]])
+#         ctypes.windll.shell32.ShellExecuteW(None, "runas", sys.executable, f'"{script}" {params}', None, 1)
+#         sys.exit()
+
+##############################################################################################################################################
 
 class ToolTip:
     def __init__(self, widget, text, delay=400, fade_duration=500):
@@ -2805,12 +2823,16 @@ def rotate_spinner():
         spinner_canvas.itemconfig(spinner_arc, start=new_angle)
         spinner_canvas.after(50, rotate_spinner)  # Adjust the delay for rotation speed
 
+
 ############################# Set GUI icon ##########################
 def set_icon():
     if os.path.exists(icon_path):
         root.iconbitmap(icon_path)
     else:
         print("Icon file not found.")
+
+######################################################################################################
+# run_as_admin()
 
 ################################################################# Set up the GUI ######################################################################
 root = tk.Tk()
