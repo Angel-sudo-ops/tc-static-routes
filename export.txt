@@ -1,1 +1,4 @@
-pyinstaller --onefile --manifest app.manifest --add-binary "resources/cerhost.exe;resources" --add-binary "resources/putty.exe;resources" --icon=route.ico --windowed --add-data "route.ico;." StaticRoutesCreator.py
+pyinstaller --onefile --manifest app.manifest --add-binary "resources/cerhost.exe;resources" --add-binary "resources/putty.exe;resources" --icon=route.ico --windowed --add-data "route.ico;." --uac-admin StaticRoutesCreator.py
+
+pyinstaller StaticRoutesCreator.spec
+

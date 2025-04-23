@@ -25,24 +25,9 @@ import shutil
 import psutil
 import ctypes
 
-__version__ = '3.5.5.2'
+__version__ = '3.5.5.3'
 
 default_file_path = os.path.join(r'C:\TwinCAT\3.1\Target', 'StaticRoutes.xml')
-
-############################################################### Run as admin check #####################################################################
-# def is_admin():
-#     try:
-#         return ctypes.windll.shell32.IsUserAnAdmin()
-#     except:
-#         return False
-
-# def run_as_admin():
-#     if not is_admin():
-#         print("Not admin, relaunching...")
-#         script = os.path.abspath(sys.argv[0])
-#         params = " ".join([f'"{arg}"' for arg in sys.argv[1:]])
-#         ctypes.windll.shell32.ShellExecuteW(None, "runas", sys.executable, f'"{script}" {params}', None, 1)
-#         sys.exit()
 
 ##############################################################################################################################################
 
@@ -1673,8 +1658,9 @@ def close_all_processes():
 
     # close_process_fast("cerhost.exe")
     # close_process_fast("putty.exe")
-
     root.destroy()
+
+    
 
 # def is_process_running(process_name):
 #     """Check if a process is running using tasklist (Windows only)."""
@@ -2831,9 +2817,6 @@ def set_icon():
     else:
         print("Icon file not found.")
 
-######################################################################################################
-# run_as_admin()
-
 ################################################################# Set up the GUI ######################################################################
 root = tk.Tk()
 root.title(f"Super Routes Creator {__version__}")
@@ -3083,11 +3066,12 @@ create_spinner_widget()
 check_twinCAT_version()
 
 # Populate table the first time with current StaticRoutes.xml file
-populate_table_from_xml("C:\\TwinCAT\\3.1\\Target\\StaticRoutes.xml")
+populate_table_from_xml(default_file_path)
 
 root.protocol("WM_DELETE_WINDOW", close_all_processes)
 
 root.mainloop()
+
 
 # leer config.db3 y llenar tabla con eso - DONE
 
