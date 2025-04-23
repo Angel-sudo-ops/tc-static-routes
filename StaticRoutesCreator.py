@@ -23,9 +23,8 @@ import logging
 import subprocess
 import shutil
 import psutil
-import ctypes
 
-__version__ = '3.5.5.3'
+__version__ = '3.5.5.4'
 
 default_file_path = os.path.join(r'C:\TwinCAT\3.1\Target', 'StaticRoutes.xml')
 
@@ -618,7 +617,7 @@ def save_routes_xml():
 
 
 def save_routes():
-    if only_tc2_installed:
+    if tc_version == "TC2":
         save_routes_registry()
     else:
         save_routes_xml()
@@ -1536,9 +1535,11 @@ def create_ssh_tunnel_putty():
             if response:  # Yes → Close tunnel
                 close_putty()
                 active_ssh_tunnel, active_lgv = None, None
+                tunnel_label.config(text="")
             return
         elif messagebox.askyesno("SSH Tunnel", f"A tunnel to {active_lgv} is already active. \nDo you want to close it?"):
             close_putty()
+            tunnel_label.config(text="")
         else:
             return
 
@@ -1561,6 +1562,7 @@ def create_ssh_tunnel_putty():
         print(error)
         messagebox.showwarning("Attention", error)
         tunnel_active = False
+        tunnel_label.config(text="")
     else:
         putty_path = extract_executable("putty.exe", "resources")
         tunnel_active = open_putty_with_tunnels(putty_path, ssh_host, ssh_port, ssh_username, ssh_password, tunnels)
@@ -1570,8 +1572,12 @@ def create_ssh_tunnel_putty():
 
         active_lgv = lgv
         
-        messagebox.showinfo("SSH Tunnel", f"SSH Tunnel for {lgv} is active")
-        print(f"SSH Tunnel created for {lgv}")
+        # messagebox.showinfo("SSH Tunnel", f"SSH Tunnel for {lgv} is active")
+
+        match_lgv = re.search(r"(LGV\d+)", lgv)
+        result_lgv = match_lgv.group(1) if match_lgv else lgv
+        tunnel_label.config(text=f"SSH Tunnel for {result_lgv} active")
+        print(f"SSH Tunnel created for {result_lgv}")
 
 
 def is_process_running(process_name):
@@ -2555,13 +2561,11 @@ def save_route_tc2(entry, flags=0, timeout=0, transport_type=1):
         return False
 
 
-only_tc2_installed = False
-
 def check_twinCAT_version():
-    global only_tc2_installed
     try:
         # Check if TwinCAT3 is installed
         tc3_key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\WOW6432Node\Beckhoff\TwinCAT3")
+        # messagebox.showinfo("Info", "TwinCAT3 is installed.")
         print("TwinCAT3 is installed.")
         # messagebox.showinfo("Attention", "TwinCAT3 is installed.")
         winreg.CloseKey(tc3_key)
@@ -2580,6 +2584,15 @@ def check_twinCAT_version():
     except FileNotFoundError:
         print("Neither TwinCAT3 nor TwinCAT2 are installed.")
         return None
+
+
+def update_tc_version_label():
+    if tc_version == 'TC3':
+        tc_version_label.config(text="TC3 installed")
+    elif tc_version == 'TC2':
+        tc_version_label.config(text="TC2 installed")
+    else:
+        tc_version_label.config(text="No TwinCAT")
 
     
 ############################################### Test Routes ##################################################################
@@ -2809,7 +2822,6 @@ def rotate_spinner():
         spinner_canvas.itemconfig(spinner_arc, start=new_angle)
         spinner_canvas.after(50, rotate_spinner)  # Adjust the delay for rotation speed
 
-
 ############################# Set GUI icon ##########################
 def set_icon():
     if os.path.exists(icon_path):
@@ -2969,6 +2981,10 @@ password_label.grid(row=0, column=0, padx=0, pady=5, sticky='e')
 password_entry = ttk.Entry(frame_password, width=15)
 password_entry.grid(row=0, column=1, padx=5, pady=5)
 
+tc_version_label = ttk.Label(frame_login, text="", foreground="#4682B4")
+tc_version_label.place(relx=1.0, rely=0.0, x=-5, y=-20, anchor="ne")
+
+
 test_routes_button = ttk.Button(frame_login, text="  Test Routes  ",
                                 # bg="ghost white",
                                 command=test_tc_routes)
@@ -2982,6 +2998,8 @@ create_routes_button.grid(row=1, column=1, padx=5, pady=5)
 # Disable it until test_tc_routes is done
 create_routes_button.config(state="disabled")
 # button_design(create_routes_button)
+
+
 
 
 
@@ -3060,10 +3078,16 @@ setup_tunnel_button = ttk.Button(frame_save_file, text="  Setup SSH   ",
                             command=open_ssh_config_window_cond)
 setup_tunnel_button.grid(row=1, column=3, padx=5, pady=5)
 
+tunnel_label = ttk.Label(frame_save_file, text="", foreground="#4682B4")
+tunnel_label.place(relx=1.0, rely=0.0, x=-5, y=-20, anchor="ne")
+
+
+tc_version = check_twinCAT_version()
+
+update_tc_version_label()
+
 # Create the spinner as part of the layout
 create_spinner_widget()
-
-check_twinCAT_version()
 
 # Populate table the first time with current StaticRoutes.xml file
 populate_table_from_xml(default_file_path)
