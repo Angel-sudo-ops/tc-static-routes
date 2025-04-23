@@ -24,7 +24,7 @@ import subprocess
 import shutil
 import psutil
 
-__version__ = '3.5.5.4'
+__version__ = '3.5.5.6'
 
 default_file_path = os.path.join(r'C:\TwinCAT\3.1\Target', 'StaticRoutes.xml')
 
@@ -1144,11 +1144,19 @@ def is_host_reachable(host, timeout=2):
     # Define the ping command based on the OS
     if platform.system().lower() == "windows":
         ping_cmd = ["ping", "-n", "1", "-w", str(timeout * 1000), host]
+        creation_flags = subprocess.CREATE_NO_WINDOW
     else:
         ping_cmd = ["ping", "-c", "1", "-W", str(timeout), host]
+        creation_flags = 0
 
     try:
-        subprocess.run(ping_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True, timeout=timeout + 1)
+        subprocess.run(
+            ping_cmd, 
+            stdout=subprocess.DEVNULL, 
+            stderr=subprocess.DEVNULL, 
+            check=True, timeout=timeout + 1,
+            creationflags=creation_flags
+        )
         return True
     except subprocess.TimeoutExpired:
         print(f"Ping to {host} timed out.")
@@ -1470,7 +1478,8 @@ def update_ssh_state(*args):
 
 def start_process(process_name, command, instance_key=None):
     """Start a process and store its PID."""
-    process = subprocess.Popen(command, shell=True)
+    creationflags = subprocess.CREATE_NO_WINDOW if platform.system().lower() == "windows" else 0
+    process = subprocess.Popen(command, shell=False, creationflags=creationflags)
 
     if process_name not in active_processes:
         active_processes[process_name] = {}  if instance_key else None  # Dict for multi-instance, None for single
@@ -1529,7 +1538,7 @@ def create_ssh_tunnel_putty():
         if active_ssh_tunnel == ssh_host:
             response = messagebox.askyesno(
                 "SSH Tunnel",
-                f"A tunnel to {lgv} is already active.\nDo you want to close it?"
+                f"Do you want to close the active tunnel to {lgv}?\n"
             )
 
             if response:  # Yes → Close tunnel
@@ -1579,6 +1588,8 @@ def create_ssh_tunnel_putty():
         tunnel_label.config(text=f"SSH Tunnel for {result_lgv} active")
         print(f"SSH Tunnel created for {result_lgv}")
 
+        root.after(1000, monitor_putty_status)
+
 
 def is_process_running(process_name):
     """Check if a tracked process is still running and remove it if not."""
@@ -1612,16 +1623,20 @@ def is_process_active(pid):
     except psutil.NoSuchProcess:
         return False  # Process no longer exists
 
-# def is_putty_running():
-#     """Check if a PuTTY SSH tunnel is already running."""
-#     for process in psutil.process_iter(attrs=['pid', 'name']):
-#         if "putty.exe" in process.info['name'].lower():
-#             return True  # PuTTY is running
-#     return False
-
 
 def is_putty_running():
     return is_process_running("putty")
+
+
+def monitor_putty_status():
+    global active_ssh_tunnel, active_lgv
+    if active_ssh_tunnel and not is_putty_running():
+        print(f"PuTTY tunnel to {active_lgv} has been closed.")
+        tunnel_label.config(text="")
+        active_ssh_tunnel = None
+        active_lgv= None
+    elif active_ssh_tunnel:
+        root.after(1000, monitor_putty_status)  # Only continue if a tunnel is active
 
 
 # def close_putty():
