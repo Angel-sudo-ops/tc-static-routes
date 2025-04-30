@@ -34,7 +34,7 @@ if not pyads_available:
     messagebox.showerror("Attention", "No pyads available")
     print("No pyads available")
 
-__version__ = '3.5.5.7'
+__version__ = '3.5.5.8'
 
 default_file_path = os.path.join(r'C:\TwinCAT\3.1\Target', 'StaticRoutes.xml')
 
@@ -1244,7 +1244,7 @@ def open_remote_connection():
             elif connection_type == "Cerhost":
                 launch_cerhost(target_ip, lgv)
             else:
-                # messagebox.showerror("Connection Error", f"Unable to determine connection type for {target_ip}.")
+                messagebox.showerror("Connection Error", f"Unable to determine connection type for {target_ip}. \nMaybe try Safe RDP?")
                 print(f"Unable to determine connection type for {target_ip}.")
         except Exception as e:
             messagebox.showerror("Error", f"An error occurred during connection: {e}")
@@ -1343,6 +1343,12 @@ def close_rdp_connection(target_ip=None):
             active_processes["rdp"].clear()  # Remove all tracking
 
 
+def open_safe_rdp():
+    rdp_target = "127.0.0.1:3389"
+    start_process("RDP", ["mstsc", f"/v:{rdp_target}"])
+    print("Safe RDP is open!!")
+
+
 
 """
 cerhost_path = None  # Will hold the Cerhost executable path
@@ -1373,6 +1379,7 @@ def prompt_for_cerhost_path():
     return cerhost_path
 
 """
+############################################################# Cerhost #########################################################
 
 def launch_cerhost(device_ip, machine_name):
     """Launch Cerhost for the given IP address."""
@@ -1434,6 +1441,27 @@ def extract_executable(filename, subfolder):
 
     return dest_path  # Return the path to use
 
+
+############################################################# VNC #######################################################################
+
+def open_vnc():
+    print("VNC is open")
+
+def launch_vnc(machine_name=None):
+    """Launch VNC Viewer connected to 127.0.0.1:0 (i.e., port 5900)."""
+    global active_processes
+
+    vnc_path = extract_executable("vnc.exe", "resources")
+    target = "127.0.0.1:0"  # 5900 = display 0
+    print(f"Launching VNC Viewer: {vnc_path} for {target}")
+
+    try:
+        command = [vnc_path, target]
+        process = start_process("vnc", command, instance_key="127.0.0.1:5900")
+        print(f"VNC Viewer launched for {target} (PID {process.pid})")
+
+    except Exception as e:
+        messagebox.showerror("Error", f"Failed to launch VNC Viewer: {e}")
 
 
 ############################################################## SSH tunneling config #################################################################
@@ -1600,6 +1628,8 @@ def create_ssh_tunnel_putty():
 
         root.after(1000, monitor_putty_status)
 
+        rebuild_context_menu()
+
 
 def is_process_running(process_name):
     """Check if a tracked process is still running and remove it if not."""
@@ -1645,6 +1675,7 @@ def monitor_putty_status():
         tunnel_label.config(text="")
         active_ssh_tunnel = None
         active_lgv= None
+        rebuild_context_menu()
     elif active_ssh_tunnel:
         root.after(1000, monitor_putty_status)  # Only continue if a tunnel is active
 
@@ -1761,10 +1792,9 @@ def close_tracked_process(process_name, instance_key=None):
 
 
 
-
 tunnel_connection_in_progress = False
 def create_ssh_tunnel():
-    """Create SSH tunnels for the selected LGV."""
+    """Create SSH tunnels for the selected LGV. Deprecated"""
     global active_ssh_client, tunnel_connection_in_progress
 
     # Check if a tunnel is already active
@@ -2854,6 +2884,29 @@ def set_icon():
     else:
         print("Icon file not found.")
 
+################################################### Context menu ###############################################
+
+def rebuild_context_menu():
+    context_menu.delete(0, tk.END)
+
+    # SSH submenu
+    ssh_tunnel_submenu = tk.Menu(context_menu, tearoff=0)
+    ssh_tunnel_submenu.add_command(label="Open", command=create_ssh_tunnel_putty)
+    ssh_tunnel_submenu.add_command(
+        label="VNC",
+        command=launch_vnc,
+        state="normal" if active_ssh_tunnel else "disabled"
+    )
+    ssh_tunnel_submenu.add_command(
+        label="Safe RDP",
+        command=open_safe_rdp,
+        state="normal" if active_ssh_tunnel else "disabled"
+    )
+
+    context_menu.add_cascade(label="SSH Tunnel", menu=ssh_tunnel_submenu)
+    context_menu.add_command(label="Open RDP", command=open_remote_connection)
+
+
 ################################################################# Set up the GUI ######################################################################
 root = tk.Tk()
 root.title(f"Super Routes Creator {__version__}")
@@ -3062,9 +3115,8 @@ routes_table.bind('<<TreeviewSelect>>',  update_ssh_state)
 
 # Create the context menu
 context_menu = tk.Menu(routes_table, tearoff=0)
-# context_menu.add_command(label="Delete", command=delete_selected_record_from_menu)
-context_menu.add_command(label="SSH Tunnel", command=create_ssh_tunnel_putty)
-context_menu.add_command(label="Open RDP", command=open_remote_connection)
+
+rebuild_context_menu()
 
 # Bind right-click to show the context menu
 routes_table.bind("<Button-3>", show_context_menu)
