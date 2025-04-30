@@ -34,7 +34,7 @@ if not pyads_available:
     messagebox.showerror("Attention", "No pyads available")
     print("No pyads available")
 
-__version__ = '3.5.5.8'
+__version__ = '3.5.6'
 
 default_file_path = os.path.join(r'C:\TwinCAT\3.1\Target', 'StaticRoutes.xml')
 
@@ -557,6 +557,7 @@ def delete_selected_record_from_menu():
 # Function to show the context menu
 def show_context_menu(event):
     # Check if a record is selected
+    rebuild_context_menu()
     selected_item = routes_table.identify_row(event.y)
     if selected_item:
         routes_table.selection_set(selected_item)
@@ -1344,7 +1345,7 @@ def close_rdp_connection(target_ip=None):
 
 
 def open_safe_rdp():
-    rdp_target = "127.0.0.1:3389"
+    rdp_target = "127.0.0.1:3390" #local port set 3390
     start_process("RDP", ["mstsc", f"/v:{rdp_target}"])
     print("Safe RDP is open!!")
 
@@ -1475,7 +1476,8 @@ default_tunnel_data = [
             ("40102", "192.168.11.62", "2122", "PLS Rear ETH"),
             ("40105", "192.168.11.65", "2122", "PLS Lateral Left ETH"),
             ("40106", "192.168.11.66", "2122", "PLS Lateral Right ETH"),
-            ("5900",  "192.168.11.6",  "5900", "Exor OnBoard VNC")
+            ("5900",  "192.168.11.6",  "5900", "Exor OnBoard VNC"),
+            ("3390",  "192.168.11.2",  "3389", "RDP")
         ]
 
 def update_tunnel_button_status():
@@ -2889,18 +2891,30 @@ def set_icon():
 def rebuild_context_menu():
     context_menu.delete(0, tk.END)
 
+    single_tunnel = False
+
+    selected_item = routes_table.selection()
+    ssh_tunnel_label = "Open"
+
+    if selected_item :
+        selected_host = routes_table.item(selected_item)["values"][1]
+        if active_ssh_tunnel == selected_host:
+            ssh_tunnel_label = "Close"
+            single_tunnel = True
+
+
     # SSH submenu
     ssh_tunnel_submenu = tk.Menu(context_menu, tearoff=0)
-    ssh_tunnel_submenu.add_command(label="Open", command=create_ssh_tunnel_putty)
+    ssh_tunnel_submenu.add_command(label=ssh_tunnel_label, command=create_ssh_tunnel_putty)
     ssh_tunnel_submenu.add_command(
         label="VNC",
         command=launch_vnc,
-        state="normal" if active_ssh_tunnel else "disabled"
+        state="normal" if single_tunnel else "disabled"
     )
     ssh_tunnel_submenu.add_command(
         label="Safe RDP",
         command=open_safe_rdp,
-        state="normal" if active_ssh_tunnel else "disabled"
+        state="normal" if single_tunnel else "disabled"
     )
 
     context_menu.add_cascade(label="SSH Tunnel", menu=ssh_tunnel_submenu)

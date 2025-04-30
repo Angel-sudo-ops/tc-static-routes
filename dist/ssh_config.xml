@@ -48,4 +48,10 @@
         <RemotePort>2111</RemotePort>
         <Description>TIM Vertical Right</Description>
     </Tunnel>
+    <Tunnel>
+        <LocalPort>3389</LocalPort>
+        <RemoteIP>192.168.11.2</RemoteIP>
+        <RemotePort>3389</RemotePort>
+        <Description>RDP</Description>
+    </Tunnel>
 </Tunnels>
