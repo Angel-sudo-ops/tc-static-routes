@@ -11,7 +11,6 @@ from xml.dom import minidom
 import sqlite3
 import winreg as reg
 import configparser
-import pyads
 import socket
 import select
 import asyncio
@@ -24,7 +23,18 @@ import subprocess
 import shutil
 import psutil
 
-__version__ = '3.5.5.6'
+try:
+    import pyads
+    pyads_available = True
+except Exception as e:
+    print(f"Error: {e}")
+    pyads_available = False
+
+if not pyads_available:
+    messagebox.showerror("Attention", "No pyads available")
+    print("No pyads available")
+
+__version__ = '3.5.5.7'
 
 default_file_path = os.path.join(r'C:\TwinCAT\3.1\Target', 'StaticRoutes.xml')
 
