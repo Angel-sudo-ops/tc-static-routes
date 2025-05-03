@@ -1672,14 +1672,27 @@ def is_putty_running():
 
 def monitor_putty_status():
     global active_ssh_tunnel, active_lgv
+
     if active_ssh_tunnel and not is_putty_running():
         print(f"PuTTY tunnel to {active_lgv} has been closed.")
         tunnel_label.config(text="")
         active_ssh_tunnel = None
         active_lgv= None
         rebuild_context_menu()
+
     elif active_ssh_tunnel:
-        root.after(1000, monitor_putty_status)  # Only continue if a tunnel is active
+        # Check if host is reachable
+        if not is_host_reachable(active_ssh_tunnel):
+            print(f"Host {active_lgv} unreachable. Closing PuTTY tunnel.")
+            close_putty()
+            tunnel_label.config(text="")
+            messagebox.showwarning("SSH Tunnel Closed", 
+                                   f"Connection to {active_lgv} was lost.\nTunnel has been closed.")
+            active_ssh_tunnel = None
+            active_lgv = None
+            rebuild_context_menu()
+        else:
+            root.after(1000, monitor_putty_status)  # Only continue if a tunnel is active
 
 
 # def close_putty():
