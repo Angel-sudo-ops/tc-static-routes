@@ -34,7 +34,7 @@ if not pyads_available:
     messagebox.showerror("Attention", "No pyads available")
     print("No pyads available")
 
-__version__ = '3.5.6'
+__version__ = '3.5.7'
 
 default_file_path = os.path.join(r'C:\TwinCAT\3.1\Target', 'StaticRoutes.xml')
 
@@ -1735,6 +1735,10 @@ def close_all_processes():
 
     # close_process_fast("cerhost.exe")
     # close_process_fast("putty.exe")
+
+
+def close_app():
+    close_all_processes()
     root.destroy()
 
     
@@ -3196,7 +3200,7 @@ create_spinner_widget()
 # Populate table the first time with current StaticRoutes.xml file
 populate_table_from_xml(default_file_path)
 
-root.protocol("WM_DELETE_WINDOW", close_all_processes)
+root.protocol("WM_DELETE_WINDOW", close_app)
 
 root.mainloop()
 
