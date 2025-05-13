@@ -34,7 +34,7 @@ if not pyads_available:
     messagebox.showerror("Attention", "No pyads available")
     print("No pyads available")
 
-__version__ = '3.5.7'
+__version__ = '3.5.8'
 
 default_file_path = os.path.join(r'C:\TwinCAT\3.1\Target', 'StaticRoutes.xml')
 
@@ -1669,30 +1669,42 @@ def is_process_active(pid):
 def is_putty_running():
     return is_process_running("putty")
 
+host_unreachable_count = 0
+HOST_UNREACHABLE_LIMIT = 7
 
 def monitor_putty_status():
-    global active_ssh_tunnel, active_lgv
+    global active_ssh_tunnel, active_lgv, host_unreachable_count
 
-    if active_ssh_tunnel and not is_putty_running():
+    if not active_ssh_tunnel:
+        return
+
+    if not is_putty_running():
         print(f"PuTTY tunnel to {active_lgv} has been closed.")
         tunnel_label.config(text="")
         active_ssh_tunnel = None
         active_lgv= None
-        rebuild_context_menu()
+        host_unreachable_count = 0
+        rebuild_context_menu() 
+        return
 
-    elif active_ssh_tunnel:
-        # Check if host is reachable
-        if not is_host_reachable(active_ssh_tunnel):
-            print(f"Host {active_lgv} unreachable. Closing PuTTY tunnel.")
-            close_putty()
+    if not is_host_reachable(active_ssh_tunnel, timeout=2):
+        host_unreachable_count += 1
+        print(f"[{host_unreachable_count}/{HOST_UNREACHABLE_LIMIT}] Host {active_ssh_tunnel} unreachable.")
+        if host_unreachable_count >= HOST_UNREACHABLE_LIMIT:
+            print(f"Host {active_ssh_tunnel} persistently unreachable. Closing PuTTY tunnel.")
+            close_all_processes()
             tunnel_label.config(text="")
-            messagebox.showwarning("SSH Tunnel Closed", 
-                                   f"Connection to {active_lgv} was lost.\nTunnel has been closed.")
+            messagebox.showwarning("Connection Lost",
+                                   f"Connection to {active_ssh_tunnel} was lost.\nTunnel has been closed.")
             active_ssh_tunnel = None
             active_lgv = None
+            host_unreachable_count = 0
             rebuild_context_menu()
-        else:
-            root.after(1000, monitor_putty_status)  # Only continue if a tunnel is active
+            return
+    else:
+        host_unreachable_count = 0  # Reset on successful ping
+
+    root.after(1000, monitor_putty_status)
 
 
 # def close_putty():
