@@ -34,7 +34,7 @@ if not pyads_available:
     messagebox.showerror("Attention", "No pyads available")
     print("No pyads available")
 
-__version__ = '3.5.8'
+__version__ = '3.5.8.1'
 
 default_file_path = os.path.join(r'C:\TwinCAT\3.1\Target', 'StaticRoutes.xml')
 
@@ -1190,7 +1190,8 @@ def is_port_open(host, port, timeout=2):
 def detect_connection_type(ip_address):
     """Detect whether the LGV supports RDP or Cerhost."""
     RDP_PORT = 3389
-    CERHOST_PORT = 987 
+    CERHOST_PORT = 987
+    VNC_PORT = 5900
 
     # Ping the host
     if is_host_reachable(ip_address):
@@ -1199,6 +1200,8 @@ def detect_connection_type(ip_address):
             return "RDP"
         elif is_port_open(ip_address, CERHOST_PORT):
             return "Cerhost"
+        elif is_port_open(ip_address, VNC_PORT):
+            return "VNC"
         else:
             return "Unknown"
     else:
@@ -1223,6 +1226,11 @@ def open_remote_connection():
     if is_cerhost_instance_running(target_ip):
         messagebox.showwarning("Attention", f"Cerhost for {lgv} is already running.")
         return  # Stop execution
+
+    # Check if VNC is already open for this host
+    if is_vnc_instance_running(target_ip):
+        messagebox.showwarning("Attention", f"VNC for {lgv} is already running.")
+        return  # Stop execution
     
     if is_rdp_running(target_ip):
         messagebox.showwarning("Attention", f"RDP session for {lgv} is already running.")
@@ -1244,6 +1252,8 @@ def open_remote_connection():
                 open_rdp_connection(target_ip, rdp_username, rdp_password)
             elif connection_type == "Cerhost":
                 launch_cerhost(target_ip, lgv)
+            elif connection_type == "VNC":
+                launch_vnc(target_ip, lgv)
             else:
                 messagebox.showerror("Connection Error", f"Unable to determine connection type for {target_ip}. \nMaybe try Safe RDP?")
                 print(f"Unable to determine connection type for {target_ip}.")
@@ -1448,21 +1458,32 @@ def extract_executable(filename, subfolder):
 def open_vnc():
     print("VNC is open")
 
-def launch_vnc(machine_name=None):
-    """Launch VNC Viewer connected to 127.0.0.1:0 (i.e., port 5900)."""
+
+def launch_vnc(device_ip, machine_name=None):
+    """Launch VNC Viewer connected to device_ip:0 (i.e., port 5900)."""
     global active_processes
 
     vnc_path = extract_executable("vnc.exe", "resources")
-    target = "127.0.0.1:0"  # 5900 = display 0
-    print(f"Launching VNC Viewer: {vnc_path} for {target}")
+    target = f"{device_ip}:0"  # 5900 = display 0
+    print(f"Launching VNC Viewer: {vnc_path} for {device_ip}")
 
     try:
         command = [vnc_path, target]
-        process = start_process("vnc", command, instance_key="127.0.0.1:5900")
+        process = start_process("vnc", command, instance_key=f"{device_ip}:5900")
         print(f"VNC Viewer launched for {target} (PID {process.pid})")
 
     except Exception as e:
         messagebox.showerror("Error", f"Failed to launch VNC Viewer: {e}")
+
+def launch_vnc_ssh():
+    launch_vnc("127.0.0.1")
+
+def is_vnc_instance_running(device_ip):
+    """Check if a specific vnc instance (by IP) is running."""
+    if "vnc" in active_processes and device_ip in active_processes["vnc"]:
+        pid = active_processes["vnc"][device_ip]
+        return psutil.pid_exists(pid)  # Check if the specific instance is still running
+    return False
 
 
 ############################################################## SSH tunneling config #################################################################
@@ -2937,7 +2958,7 @@ def rebuild_context_menu():
     ssh_tunnel_submenu.add_command(label=ssh_tunnel_label, command=create_ssh_tunnel_putty)
     ssh_tunnel_submenu.add_command(
         label="VNC",
-        command=launch_vnc,
+        command=launch_vnc_ssh,
         state="normal" if single_tunnel else "disabled"
     )
     ssh_tunnel_submenu.add_command(

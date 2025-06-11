@@ -63,6 +63,6 @@ def find_free_ips(base_ip, max_threads=50):
 
 
 if __name__ == "__main__":
-    subnet = "172.16.12"
+    subnet = "10.80.4"
     free = find_free_ips(subnet)
     print(f"\nTotal free IPs: {len(free)}")
