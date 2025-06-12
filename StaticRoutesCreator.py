@@ -34,7 +34,7 @@ if not pyads_available:
     messagebox.showerror("Attention", "No pyads available")
     print("No pyads available")
 
-__version__ = '3.5.8.1'
+__version__ = '3.5.8.2'
 
 default_file_path = os.path.join(r'C:\TwinCAT\3.1\Target', 'StaticRoutes.xml')
 
@@ -1188,26 +1188,42 @@ def is_port_open(host, port, timeout=2):
     
 
 def detect_connection_type(ip_address):
-    """Detect whether the LGV supports RDP or Cerhost."""
-    RDP_PORT = 3389
-    CERHOST_PORT = 987
-    VNC_PORT = 5900
-
-    # Ping the host
-    if is_host_reachable(ip_address):
-        # Check for RDP or Cerhost
-        if is_port_open(ip_address, RDP_PORT):
-            return "RDP"
-        elif is_port_open(ip_address, CERHOST_PORT):
-            return "Cerhost"
-        elif is_port_open(ip_address, VNC_PORT):
-            return "VNC"
-        else:
-            return "Unknown"
-    else:
+    """Detect whether the LGV supports RDP, Cerhost, or VNC using threads."""
+    if not is_host_reachable(ip_address):
         print(f"Host {ip_address} is unreachable.")
         messagebox.showwarning("Connection Error", f"Host {ip_address} is unreachable")
         return "Unreachable"
+
+    ports = {
+        "RDP": 3389,
+        "Cerhost": 987,
+        "VNC": 5900
+    }
+
+    result = {"type": None}
+    event = threading.Event()
+
+    def check(port_name, port_number):
+        if is_port_open(ip_address, port_number):
+            if not event.is_set():  # First to succeed
+                result["type"] = port_name
+                event.set()
+
+    threads = [
+        threading.Thread(target=check, args=(name, port))
+        for name, port in ports.items()
+    ]
+
+    for thread in threads:
+        thread.start()
+
+    # Wait for the first one to succeed or for all to finish
+    event.wait(timeout=2)  # Short wait just for first response
+
+    for thread in threads:
+        thread.join(timeout=0.1)  # Clean up quickly
+
+    return result["type"] if result["type"] else "Unknown"
 
         
 def open_remote_connection():
