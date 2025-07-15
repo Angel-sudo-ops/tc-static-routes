@@ -34,7 +34,7 @@ if not pyads_available:
     messagebox.showerror("Attention", "No pyads available")
     print("No pyads available")
 
-__version__ = '3.5.8.4'
+__version__ = '3.5.8.5'
 
 default_file_path = os.path.join(r'C:\TwinCAT\3.1\Target', 'StaticRoutes.xml')
 
@@ -1600,15 +1600,14 @@ def open_putty_with_tunnels(putty_path, remote_host, ssh_port, ssh_username, ssh
 def open_plink_with_tunnels(plink_path, remote_host, ssh_port, ssh_username, ssh_password, tunnels):
     """Launch Plink with SSH tunnels and hide the window."""
     plink_cmd = [
-        plink_path,
-        "-ssh", f"{remote_host}",
+         plink_path,
+        "-ssh", f"{ssh_username}@{remote_host}",
         "-P", str(ssh_port),
-        "-l", ssh_username,
-        "-pw", ssh_password
+        "-pw", ssh_password,
+        "-N",
+        "-batch"
     ]
-    #     "-N",  # Don't open a shell
-    #     "-batch"  # No interactive prompts
-    # ]
+
     for tunnel in tunnels:
         local_port = tunnel["Local Port"]
         remote_ip = tunnel["Remote IP"]
@@ -1706,7 +1705,7 @@ def create_ssh_tunnel_plink():
     ssh_host = routes_table.item(selected_item)["values"][1]
     lgv = routes_table.item(selected_item)["values"][0]
 
-    if is_plink_running():  # Consider renaming this to `is_plink_running`
+    if is_plink_running():
         if active_ssh_tunnel == ssh_host:
             response = messagebox.askyesno("SSH Tunnel", f"Do you want to close the active tunnel to {lgv}?")
             if response:
