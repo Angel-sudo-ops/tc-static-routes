@@ -34,7 +34,7 @@ if not pyads_available:
     messagebox.showerror("Attention", "No pyads available")
     print("No pyads available")
 
-__version__ = '3.5.8.6 betaNoPing'
+__version__ = '3.5.8.7 betaNoPing'
 
 default_file_path = os.path.join(r'C:\TwinCAT\3.1\Target', 'StaticRoutes.xml')
 
@@ -1582,24 +1582,31 @@ def ensure_hostkey_in_registry(host, port, default_value):
     reg_key_name = f"ecdsa-sha2-nistp384@{port}:{host}"
 
     try:
-        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, key_path) as reg_key:
-            try:
-                value, _ = winreg.QueryValueEx(reg_key, reg_key_name)
-                print(f"[Registry] Host key already exists for {host}:{port}")
-                messagebox.showerror("Error", f"[Registry] Host key already exists for {host}:{port}")
-                return True  # Key already exists
-            except FileNotFoundError:
-                pass  # Key does not exist, will create
+        try:
+            # Try to open SshHostKeys first
+            with winreg.OpenKey(winreg.HKEY_CURRENT_USER, key_path, 0, winreg.KEY_ALL_ACCESS) as reg_key:
+                try:
+                    value, _ = winreg.QueryValueEx(reg_key, reg_key_name)
+                    print(f"[Registry] Host key already exists for {host}:{port}")
+                    return True
+                except FileNotFoundError:
+                    pass  # Key does not exist, proceed to write
+        except FileNotFoundError:
+            # If SshHostKeys doesn't exist → create it
+            print(f"[Registry] SshHostKeys not found — creating it...")
+            winreg.CreateKey(winreg.HKEY_CURRENT_USER, key_path)
 
+        # Open again after creating (safe for writing)
         with winreg.OpenKey(winreg.HKEY_CURRENT_USER, key_path, 0, winreg.KEY_WRITE) as reg_key:
             winreg.SetValueEx(reg_key, reg_key_name, 0, winreg.REG_SZ, default_value)
             print(f"[Registry] Host key added for {host}:{port}")
-            messagebox.showerror("Error", f"[Registry] Host key added for {host}:{port}")
             return True
+
     except Exception as e:
         print(f"[Registry Error] Failed to set host key: {e}")
-        messagebox.showerror("Error", f"[Registry Error] Failed to set host key: {e}")
+        messagebox.showerror("Error", f"[Registry Error] Failed to set host key:\n{e}")
         return False
+
     
 
 def open_putty_with_tunnels(putty_path, remote_host, ssh_port, ssh_username, ssh_password, tunnels):
