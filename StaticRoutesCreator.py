@@ -34,7 +34,7 @@ if not pyads_available:
     messagebox.showerror("Attention", "No pyads available")
     print("No pyads available")
 
-__version__ = '3.5.8.5'
+__version__ = '3.5.8.6'
 
 default_file_path = os.path.join(r'C:\TwinCAT\3.1\Target', 'StaticRoutes.xml')
 
@@ -1572,6 +1572,33 @@ def start_process(process_name, command, instance_key=None):
     return process  # Return process object for tracking
 
 
+DEFAULT_HOST_KEY_VALUE = "nistp384,0xe6d6ecc3ea4c061502decdda993198e84e5d9e49c97cfe8ad60feffe3dd63fea73a5af234da8fc0a3d1c2fae6b19b067,0x11d28116ddd209dd799d05dc26bc550b1fcc21cbbbdfe39ba2c00ab7fe98b9150f0d88469049f0a5575e60e37ebbb727"
+
+def ensure_hostkey_in_registry(host, port, default_value):
+    """
+    Ensure SSH host key exists in the registry for given host/port.
+    """
+    key_path = r"Software\SimonTatham\PuTTY\SshHostKeys"
+    reg_key_name = f"ecdsa-sha2-nistp384@{port}:{host}"
+
+    try:
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, key_path) as reg_key:
+            try:
+                value, _ = winreg.QueryValueEx(reg_key, reg_key_name)
+                print(f"[Registry] Host key already exists for {host}:{port}")
+                return True  # Key already exists
+            except FileNotFoundError:
+                pass  # Key does not exist, will create
+
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, key_path, 0, winreg.KEY_WRITE) as reg_key:
+            winreg.SetValueEx(reg_key, reg_key_name, 0, winreg.REG_SZ, default_value)
+            print(f"[Registry] Host key added for {host}:{port}")
+            return True
+    except Exception as e:
+        print(f"[Registry Error] Failed to set host key: {e}")
+        return False
+    
+
 def open_putty_with_tunnels(putty_path, remote_host, ssh_port, ssh_username, ssh_password, tunnels):
     """Launch PuTTY with tunnels from get_tunnels()."""
     putty_cmd = [
@@ -1599,14 +1626,20 @@ def open_putty_with_tunnels(putty_path, remote_host, ssh_port, ssh_username, ssh
 
 def open_plink_with_tunnels(plink_path, remote_host, ssh_port, ssh_username, ssh_password, tunnels):
     """Launch Plink with SSH tunnels and hide the window."""
+
+    success = ensure_hostkey_in_registry(remote_host, ssh_port, DEFAULT_HOST_KEY_VALUE)
+
+    if not success:
+        print("[Tunnel] Aborting tunnel launch — Host key could not be written or found.")
+        return False
+
     plink_cmd = [
          plink_path,
         "-ssh", f"{ssh_username}@{remote_host}",
         "-P", str(ssh_port),
         "-pw", ssh_password,
         "-N",
-        "-batch",
-        "-hostkey", "ecdsa-sha2-nistp384 0xe6d6ecc3ea4c061502decdda993198e84e5d9e49c97cfe8ad60feffe3dd63fea73a5af234da8fc0a3d1c2fae6b19b067"
+        "-batch"
     ]
 
     for tunnel in tunnels:
