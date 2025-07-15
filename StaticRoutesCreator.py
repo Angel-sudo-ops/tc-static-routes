@@ -1605,7 +1605,8 @@ def open_plink_with_tunnels(plink_path, remote_host, ssh_port, ssh_username, ssh
         "-P", str(ssh_port),
         "-pw", ssh_password,
         "-N",
-        "-batch"
+        "-batch",
+        "-hostkey", "ecdsa-sha2-nistp384 0xe6d6ecc3ea4c061502decdda993198e84e5d9e49c97cfe8ad60feffe3dd63fea73a5af234da8fc0a3d1c2fae6b19b067"
     ]
 
     for tunnel in tunnels:
