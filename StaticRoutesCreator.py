@@ -34,7 +34,7 @@ if not pyads_available:
     messagebox.showerror("Attention", "No pyads available")
     print("No pyads available")
 
-__version__ = '3.5.8.6'
+__version__ = '3.5.8.6 betaNoPing'
 
 default_file_path = os.path.join(r'C:\TwinCAT\3.1\Target', 'StaticRoutes.xml')
 
@@ -1586,6 +1586,7 @@ def ensure_hostkey_in_registry(host, port, default_value):
             try:
                 value, _ = winreg.QueryValueEx(reg_key, reg_key_name)
                 print(f"[Registry] Host key already exists for {host}:{port}")
+                messagebox.showerror("Error", f"[Registry] Host key already exists for {host}:{port}")
                 return True  # Key already exists
             except FileNotFoundError:
                 pass  # Key does not exist, will create
@@ -1593,9 +1594,11 @@ def ensure_hostkey_in_registry(host, port, default_value):
         with winreg.OpenKey(winreg.HKEY_CURRENT_USER, key_path, 0, winreg.KEY_WRITE) as reg_key:
             winreg.SetValueEx(reg_key, reg_key_name, 0, winreg.REG_SZ, default_value)
             print(f"[Registry] Host key added for {host}:{port}")
+            messagebox.showerror("Error", f"[Registry] Host key added for {host}:{port}")
             return True
     except Exception as e:
         print(f"[Registry Error] Failed to set host key: {e}")
+        messagebox.showerror("Error", f"[Registry Error] Failed to set host key: {e}")
         return False
     
 
@@ -1766,8 +1769,8 @@ def create_ssh_tunnel_plink():
         error = "Input password."
     elif not tunnels:
         error = "No tunnels found to create."
-    elif not is_host_reachable(ssh_host):
-        error = f"Host {ssh_host} unreachable"
+    # elif not is_host_reachable(ssh_host):
+    #     error = f"Host {ssh_host} unreachable"
 
     if error:
         print(error)
