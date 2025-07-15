@@ -34,7 +34,7 @@ if not pyads_available:
     messagebox.showerror("Attention", "No pyads available")
     print("No pyads available")
 
-__version__ = '3.5.8.3'
+__version__ = '3.5.8.4'
 
 default_file_path = os.path.join(r'C:\TwinCAT\3.1\Target', 'StaticRoutes.xml')
 
@@ -795,6 +795,8 @@ def routes_table_sort_column(tv, col, reverse):
     # Rearrange items in sorted positions
     for index, (val, k) in enumerate(l):
         tv.move(k, '', index)
+
+    tv.yview_moveto(0)
 
     # Dictionary to maintain custom headings
     headings = {
