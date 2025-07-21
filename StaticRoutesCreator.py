@@ -1798,7 +1798,7 @@ def create_ssh_tunnel_plink():
         tunnel_label.config(text=f"SSH Tunnel for {result_lgv} active")
         print(f"SSH Tunnel created for {result_lgv}")
 
-        root.after(1000, monitor_plink_status)  # Still works, just rename to `monitor_plink_status` if needed
+        # root.after(1000, monitor_plink_status)  # Commented for testing
 
         rebuild_context_menu()
 
