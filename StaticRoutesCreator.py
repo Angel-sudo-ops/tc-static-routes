@@ -23,6 +23,8 @@ import subprocess
 import shutil
 import psutil
 
+from myutils.autoupdater import check_for_updates_async, get_app_version
+
 try:
     import pyads
     pyads_available = True
@@ -34,9 +36,18 @@ if not pyads_available:
     messagebox.showerror("Attention", "No pyads available")
     print("No pyads available")
 
-__version__ = '3.5.8.7 betaNoPing'
-
 default_file_path = os.path.join(r'C:\TwinCAT\3.1\Target', 'StaticRoutes.xml')
+
+################################################################# Version check #####################################################################
+updated = False
+
+VERSION = get_app_version()
+
+if "--updated" in sys.argv:
+    sys.argv.remove("--updated")  # Optional: clean it up
+    updated = True
+    print("[Updater] App launched after update.")
+    # You could show a message or log something if needed
 
 ##############################################################################################################################################
 
@@ -768,8 +779,8 @@ def create_entry_for_editing(column, row, col_index, current_value):
             entry_edit.destroy()
 
     entry_edit.bind("<Return>", save_edit)
-    entry_edit.bind("<Escape>", lambda e: cancel_edit())
-    entry_edit.bind("<FocusOut>", lambda e: cancel_edit())
+    entry_edit.bind("<Escape>", cancel_edit)
+    entry_edit.bind("<FocusOut>", cancel_edit)
 
 
 ################################## Sorting ################################################
@@ -3167,7 +3178,7 @@ def rebuild_context_menu():
 
 ################################################################# Set up the GUI ######################################################################
 root = tk.Tk()
-root.title(f"Super Routes Creator {__version__}")
+root.title(f"Super Routes Creator {VERSION}")
 
 spinner_window = None
 # Check if running as a script or frozen executable
@@ -3428,6 +3439,18 @@ create_spinner_widget()
 populate_table_from_xml(default_file_path)
 
 root.protocol("WM_DELETE_WINDOW", close_app)
+
+################################################################# Version check ######################################################################
+
+if getattr(sys, 'frozen', False) and not updated:  # Only in PyInstaller .exe
+    root.after(1500, lambda: check_for_updates_async(
+            root=root,
+            current_version=VERSION,
+            version_url="https://github.com/sudojac/tc-static-routes/releases/latest/download/version.txt",
+            download_url="https://github.com/sudojac/tc-static-routes/releases/latest/download/StaticRoutesCreator.exe"
+        ))
+
+################################################################### Main loop ##########################################################################
 
 root.mainloop()
 
