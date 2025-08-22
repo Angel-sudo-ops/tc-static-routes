@@ -1,5 +1,5 @@
 @echo off
-REM ==== Auto-release Super ADS Client ====
+REM ==== Auto-release Static Routes Creator ====
 REM Get version number from file
 setlocal
 set /p VERSION=<version.txt
