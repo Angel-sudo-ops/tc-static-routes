@@ -4,7 +4,7 @@
 a = Analysis(
     ['StaticRoutesCreator.py'],
     pathex=[],
-    binaries=[('resources/cerhost.exe', 'resources'), ('resources/putty.exe', 'resources'), ('resources/vnc.exe', 'resources')],
+    binaries=[('resources/cerhost.exe', 'resources'), ('resources/plink.exe', 'resources'), ('resources/vnc.exe', 'resources')],
     datas=[('route.ico', '.')],
     hiddenimports=[],
     hookspath=[],

@@ -34,7 +34,7 @@ if not pyads_available:
     messagebox.showerror("Attention", "No pyads available")
     print("No pyads available")
 
-__version__ = '3.5.8.2'
+__version__ = '3.5.8.7 betaNoPing'
 
 default_file_path = os.path.join(r'C:\TwinCAT\3.1\Target', 'StaticRoutes.xml')
 
@@ -795,6 +795,8 @@ def routes_table_sort_column(tv, col, reverse):
     # Rearrange items in sorted positions
     for index, (val, k) in enumerate(l):
         tv.move(k, '', index)
+
+    tv.yview_moveto(0)
 
     # Dictionary to maintain custom headings
     headings = {
@@ -1570,6 +1572,43 @@ def start_process(process_name, command, instance_key=None):
     return process  # Return process object for tracking
 
 
+DEFAULT_HOST_KEY_VALUE = "nistp384,0xe6d6ecc3ea4c061502decdda993198e84e5d9e49c97cfe8ad60feffe3dd63fea73a5af234da8fc0a3d1c2fae6b19b067,0x11d28116ddd209dd799d05dc26bc550b1fcc21cbbbdfe39ba2c00ab7fe98b9150f0d88469049f0a5575e60e37ebbb727"
+
+def ensure_hostkey_in_registry(host, port, default_value):
+    """
+    Ensure SSH host key exists in the registry for given host/port.
+    """
+    key_path = r"Software\SimonTatham\PuTTY\SshHostKeys"
+    reg_key_name = f"ecdsa-sha2-nistp384@{port}:{host}"
+
+    try:
+        try:
+            # Try to open SshHostKeys first
+            with winreg.OpenKey(winreg.HKEY_CURRENT_USER, key_path, 0, winreg.KEY_ALL_ACCESS) as reg_key:
+                try:
+                    value, _ = winreg.QueryValueEx(reg_key, reg_key_name)
+                    print(f"[Registry] Host key already exists for {host}:{port}")
+                    return True
+                except FileNotFoundError:
+                    pass  # Key does not exist, proceed to write
+        except FileNotFoundError:
+            # If SshHostKeys doesn't exist → create it
+            print(f"[Registry] SshHostKeys not found — creating it...")
+            winreg.CreateKey(winreg.HKEY_CURRENT_USER, key_path)
+
+        # Open again after creating (safe for writing)
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, key_path, 0, winreg.KEY_WRITE) as reg_key:
+            winreg.SetValueEx(reg_key, reg_key_name, 0, winreg.REG_SZ, default_value)
+            print(f"[Registry] Host key added for {host}:{port}")
+            return True
+
+    except Exception as e:
+        print(f"[Registry Error] Failed to set host key: {e}")
+        messagebox.showerror("Error", f"[Registry Error] Failed to set host key:\n{e}")
+        return False
+
+    
+
 def open_putty_with_tunnels(putty_path, remote_host, ssh_port, ssh_username, ssh_password, tunnels):
     """Launch PuTTY with tunnels from get_tunnels()."""
     putty_cmd = [
@@ -1593,6 +1632,38 @@ def open_putty_with_tunnels(putty_path, remote_host, ssh_port, ssh_username, ssh
         return True
     except Exception as e:
         print(f"Error launching PuTTY: {e}")
+        return False
+
+def open_plink_with_tunnels(plink_path, remote_host, ssh_port, ssh_username, ssh_password, tunnels):
+    """Launch Plink with SSH tunnels and hide the window."""
+
+    success = ensure_hostkey_in_registry(remote_host, ssh_port, DEFAULT_HOST_KEY_VALUE)
+
+    if not success:
+        print("[Tunnel] Aborting tunnel launch — Host key could not be written or found.")
+        return False
+
+    plink_cmd = [
+         plink_path,
+        "-ssh", f"{ssh_username}@{remote_host}",
+        "-P", str(ssh_port),
+        "-pw", ssh_password,
+        "-N",
+        "-batch"
+    ]
+
+    for tunnel in tunnels:
+        local_port = tunnel["Local Port"]
+        remote_ip = tunnel["Remote IP"]
+        remote_port = tunnel["Remote Port"]
+        plink_cmd.extend(["-L", f"{local_port}:{remote_ip}:{remote_port}"])
+
+    print("Launching plink with cmd:", " ".join(plink_cmd))
+    try:
+        start_process("plink", plink_cmd)
+        return True
+    except Exception as e:
+        print(f"Error launching Plink: {e}")
         return False
 
 
@@ -1670,6 +1741,68 @@ def create_ssh_tunnel_putty():
         rebuild_context_menu()
 
 
+def create_ssh_tunnel_plink():
+    """Create SSH tunnels using Plink for the selected LGV, and prevent duplicates."""
+    global active_ssh_tunnel, active_lgv
+
+    selected_item = routes_table.selection()
+    ssh_host = routes_table.item(selected_item)["values"][1]
+    lgv = routes_table.item(selected_item)["values"][0]
+
+    if is_plink_running():
+        if active_ssh_tunnel == ssh_host:
+            response = messagebox.askyesno("SSH Tunnel", f"Do you want to close the active tunnel to {lgv}?")
+            if response:
+                close_plink()
+                active_ssh_tunnel, active_lgv = None, None
+                tunnel_label.config(text="")
+            return
+        elif messagebox.askyesno("SSH Tunnel", f"A tunnel to {active_lgv} is already active. \nDo you want to close it?"):
+            close_plink()
+            tunnel_label.config(text="")
+        else:
+            return
+        
+    tunnels = get_tunnels()
+
+    ssh_username = username_entry.get()
+    ssh_password = password_entry.get()
+    ssh_port = 20022
+
+    error = None
+    if not ssh_username:
+        error = "Input user."
+    elif not ssh_password:
+        error = "Input password."
+    elif not tunnels:
+        error = "No tunnels found to create."
+    # elif not is_host_reachable(ssh_host):
+    #     error = f"Host {ssh_host} unreachable"
+
+    if error:
+        print(error)
+        messagebox.showwarning("Attention", error)
+        tunnel_label.config(text="")
+        return
+
+    plink_path = extract_executable("plink.exe", "resources")
+    print(f"Plink path: {plink_path}")
+    tunnel_active = open_plink_with_tunnels(plink_path, ssh_host, ssh_port, ssh_username, ssh_password, tunnels)
+
+    if tunnel_active:
+        active_ssh_tunnel = ssh_host
+        active_lgv = lgv
+
+        match_lgv = re.search(r"(LGV\d+)", lgv)
+        result_lgv = match_lgv.group(1) if match_lgv else lgv
+        tunnel_label.config(text=f"SSH Tunnel for {result_lgv} active")
+        print(f"SSH Tunnel created for {result_lgv}")
+
+        # root.after(1000, monitor_plink_status)  # Commented for testing
+
+        rebuild_context_menu()
+
+
 def is_process_running(process_name):
     """Check if a tracked process is still running and remove it if not."""
     if process_name in active_processes:
@@ -1705,6 +1838,9 @@ def is_process_active(pid):
 
 def is_putty_running():
     return is_process_running("putty")
+
+def is_plink_running():
+    return is_process_running("plink")
 
 host_unreachable_count = 0
 HOST_UNREACHABLE_LIMIT = 7
@@ -1744,6 +1880,44 @@ def monitor_putty_status():
     root.after(1000, monitor_putty_status)
 
 
+def monitor_plink_status():
+    global active_ssh_tunnel, active_lgv, host_unreachable_count
+
+    if not active_ssh_tunnel:
+        return
+
+    # Get the stored plink proces
+    if not is_plink_running():
+        print(f"Plink tunnel to {active_lgv} has been closed.")
+        tunnel_label.config(text="")
+        active_ssh_tunnel = None
+        active_lgv = None
+        host_unreachable_count = 0
+        rebuild_context_menu()
+        return
+
+    # Network still reachable?
+    if not is_host_reachable(active_ssh_tunnel, timeout=2):
+        host_unreachable_count += 1
+        print(f"[{host_unreachable_count}/{HOST_UNREACHABLE_LIMIT}] Host {active_ssh_tunnel} unreachable.")
+        if host_unreachable_count >= HOST_UNREACHABLE_LIMIT:
+            print(f"Host {active_ssh_tunnel} persistently unreachable. Closing Plink tunnel.")
+            close_all_processes()
+            tunnel_label.config(text="")
+            messagebox.showwarning("Connection Lost",
+                                   f"Connection to {active_ssh_tunnel} was lost.\nTunnel has been closed.")
+            active_ssh_tunnel = None
+            active_lgv = None
+            host_unreachable_count = 0
+            rebuild_context_menu()
+            return
+    else:
+        host_unreachable_count = 0  # Reset if ping succeeded
+
+    root.after(1000, monitor_plink_status)
+
+
+
 # def close_putty():
 #     """Find and close PuTTY SSH tunnels."""
 #     for process in psutil.process_iter(attrs=['pid', 'name']):
@@ -1755,6 +1929,9 @@ def monitor_putty_status():
 
 def close_putty():
     close_tracked_process("putty")
+
+def close_plink():
+    close_tracked_process("plink")
         
 # def close_cerhost():
 #     """Find and close Cerhost if it's running."""
@@ -1778,6 +1955,7 @@ def close_all_processes():
     close_putty()
     close_cerhost()  # New function to close Cerhost
     close_rdp_connection()
+    close_plink()
 
     # close_process_by_name("putty.exe")
     # close_process_by_name("cerhost.exe")
@@ -2971,7 +3149,7 @@ def rebuild_context_menu():
 
     # SSH submenu
     ssh_tunnel_submenu = tk.Menu(context_menu, tearoff=0)
-    ssh_tunnel_submenu.add_command(label=ssh_tunnel_label, command=create_ssh_tunnel_putty)
+    ssh_tunnel_submenu.add_command(label=ssh_tunnel_label, command=create_ssh_tunnel_plink)
     ssh_tunnel_submenu.add_command(
         label="VNC",
         command=launch_vnc_ssh,
