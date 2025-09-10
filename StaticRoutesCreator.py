@@ -1724,6 +1724,11 @@ def create_ssh_tunnel_plink():
     ssh_host = routes_table.item(selected_item)["values"][1]
     lgv = routes_table.item(selected_item)["values"][0]
 
+    if not is_host_reachable(ssh_host):
+        messagebox.showwarning("Host unreachable",
+                                   f"Tunnel creation for {lgv} not possible.\nHost is not reachable")
+        return
+
     if is_plink_running():
         if active_ssh_tunnel == ssh_host:
             response = messagebox.askyesno("SSH Tunnel", f"Do you want to close the active tunnel to {lgv}?")
@@ -1835,7 +1840,9 @@ def monitor_putty_status():
         rebuild_context_menu() 
         return
 
-    if not is_host_reachable(active_ssh_tunnel):
+    host_is_alive = is_host_reachable(active_ssh_tunnel)
+
+    if not host_is_alive.reachable:
         host_unreachable_count += 1
         print(f"[{host_unreachable_count}/{HOST_UNREACHABLE_LIMIT}] Host {active_ssh_tunnel} unreachable.")
         if host_unreachable_count >= HOST_UNREACHABLE_LIMIT:
@@ -1851,7 +1858,8 @@ def monitor_putty_status():
             return
     else:
         host_unreachable_count = 0  # Reset on successful ping
-
+        print(f"Host {active_ssh_tunnel} reachable with method {host_is_alive.method}.")
+        
     root.after(1000, monitor_putty_status)
 
 
@@ -1872,7 +1880,9 @@ def monitor_plink_status():
         return
 
     # Network still reachable?
-    if not is_host_reachable(active_ssh_tunnel):
+    host_is_alive = is_host_reachable(active_ssh_tunnel)
+
+    if not host_is_alive.reachable:
         host_unreachable_count += 1
         print(f"[{host_unreachable_count}/{HOST_UNREACHABLE_LIMIT}] Host {active_ssh_tunnel} unreachable.")
         if host_unreachable_count >= HOST_UNREACHABLE_LIMIT:
@@ -1888,6 +1898,7 @@ def monitor_plink_status():
             return
     else:
         host_unreachable_count = 0  # Reset if ping succeeded
+        print(f"Host {active_ssh_tunnel} reachable with method {host_is_alive.method}.")
 
     root.after(1000, monitor_plink_status)
 
