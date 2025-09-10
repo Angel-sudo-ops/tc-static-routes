@@ -24,6 +24,7 @@ import shutil
 import psutil
 
 from myutils.autoupdater import check_for_updates_async, get_app_version
+from myutils.connectivity import is_host_reachable, is_port_open
 
 try:
     import pyads
@@ -1162,50 +1163,13 @@ def save_winscp_ini():
     if file_path:
         create_winscp_ini_from_table(file_path, data)
 
-############################################################## RDP connection #################################################################
-def is_host_reachable(host, timeout=2):
-    """Ping the host to check if it is reachable."""
-    # Define the ping command based on the OS
-    if platform.system().lower() == "windows":
-        ping_cmd = ["ping", "-n", "1", "-w", str(timeout * 1000), host]
-        creation_flags = subprocess.CREATE_NO_WINDOW
-    else:
-        ping_cmd = ["ping", "-c", "1", "-W", str(timeout), host]
-        creation_flags = 0
-
-    try:
-        subprocess.run(
-            ping_cmd, 
-            stdout=subprocess.DEVNULL, 
-            stderr=subprocess.DEVNULL, 
-            check=True, timeout=timeout + 1,
-            creationflags=creation_flags
-        )
-        return True
-    except subprocess.TimeoutExpired:
-        print(f"Ping to {host} timed out.")
-        return False
-    except subprocess.CalledProcessError:
-        print(f"Ping to {host} failed.")
-        return False
-
-
-def is_port_open(host, port, timeout=2):
-    """Check if a specific port is open on the host."""
-    try:
-        with socket.create_connection((host, port), timeout=timeout):
-            return True
-    except Exception as e:
-        print(f"Exception at is_port_open for port {port}: {e}")
-        return False
-    
-
+############################################################## RDP connection ################################################################# 
 def detect_connection_type(ip_address):
     """Detect whether the LGV supports RDP, Cerhost, or VNC using threads."""
-    if not is_host_reachable(ip_address):
-        print(f"Host {ip_address} is unreachable.")
-        messagebox.showwarning("Connection Error", f"Host {ip_address} is unreachable")
-        return "Unreachable"
+    # if not is_host_reachable(ip_address):
+    #     print(f"Host {ip_address} is unreachable.")
+    #     messagebox.showwarning("Connection Error", f"Host {ip_address} is unreachable")
+    #     return "Unreachable"
 
     ports = {
         "RDP": 3389,
@@ -1809,7 +1773,7 @@ def create_ssh_tunnel_plink():
         tunnel_label.config(text=f"SSH Tunnel for {result_lgv} active")
         print(f"SSH Tunnel created for {result_lgv}")
 
-        # root.after(1000, monitor_plink_status)  # Commented for testing
+        root.after(1000, monitor_plink_status)  # Commented for testing
 
         rebuild_context_menu()
 
@@ -1871,7 +1835,7 @@ def monitor_putty_status():
         rebuild_context_menu() 
         return
 
-    if not is_host_reachable(active_ssh_tunnel, timeout=2):
+    if not is_host_reachable(active_ssh_tunnel):
         host_unreachable_count += 1
         print(f"[{host_unreachable_count}/{HOST_UNREACHABLE_LIMIT}] Host {active_ssh_tunnel} unreachable.")
         if host_unreachable_count >= HOST_UNREACHABLE_LIMIT:
@@ -1879,7 +1843,7 @@ def monitor_putty_status():
             close_all_processes()
             tunnel_label.config(text="")
             messagebox.showwarning("Connection Lost",
-                                   f"Connection to {active_ssh_tunnel} was lost.\nTunnel has been closed.")
+                                   f"Connection to {active_ssh_tunnel} was lost.\nSSH tunnel has been closed.")
             active_ssh_tunnel = None
             active_lgv = None
             host_unreachable_count = 0
@@ -1908,7 +1872,7 @@ def monitor_plink_status():
         return
 
     # Network still reachable?
-    if not is_host_reachable(active_ssh_tunnel, timeout=2):
+    if not is_host_reachable(active_ssh_tunnel):
         host_unreachable_count += 1
         print(f"[{host_unreachable_count}/{HOST_UNREACHABLE_LIMIT}] Host {active_ssh_tunnel} unreachable.")
         if host_unreachable_count >= HOST_UNREACHABLE_LIMIT:
@@ -3239,7 +3203,7 @@ frame_lgv.grid(row=0, column=0, padx=1, pady=1)
 deviceType = tk.StringVar(value="LGV")
 
 device_type_combobox = ttk.Combobox(frame_range, textvariable=deviceType, width=6, state="readonly")
-device_type_combobox['values'] = ("LGV", "CB", "EC")
+device_type_combobox['values'] = ("LGV", "BC", "EC")
 device_type_combobox.set(deviceType.get())
 device_type_combobox.grid(row=0, column=0, padx=1, pady=1, sticky='w')
 
