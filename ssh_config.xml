@@ -38,8 +38,8 @@
     </Tunnel>
     <Tunnel>
         <LocalPort>5900</LocalPort>
-        <RemoteIP>192.168.11.8</RemoteIP>
+        <RemoteIP>192.168.11.6</RemoteIP>
         <RemotePort>5900</RemotePort>
-        <Description>Exor Wired</Description>
+        <Description>Exor OnBoard</Description>
     </Tunnel>
 </Tunnels>

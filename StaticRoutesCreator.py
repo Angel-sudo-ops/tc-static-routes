@@ -1711,7 +1711,7 @@ def create_ssh_tunnel_putty():
         tunnel_label.config(text=f"SSH Tunnel for {result_lgv} active")
         print(f"SSH Tunnel created for {result_lgv}")
 
-        root.after(1000, monitor_putty_status)
+        root.after(5000, monitor_putty_status)
 
         rebuild_context_menu()
 
@@ -1778,7 +1778,7 @@ def create_ssh_tunnel_plink():
         tunnel_label.config(text=f"SSH Tunnel for {result_lgv} active")
         print(f"SSH Tunnel created for {result_lgv}")
 
-        root.after(1000, monitor_plink_status)  # Commented for testing
+        root.after(5000, monitor_plink_status)
 
         rebuild_context_menu()
 
@@ -1860,7 +1860,7 @@ def monitor_putty_status():
         host_unreachable_count = 0  # Reset on successful ping
         print(f"Host {active_ssh_tunnel} reachable with method {host_is_alive.method}.")
         
-    root.after(1000, monitor_putty_status)
+    root.after(5000, monitor_putty_status)
 
 
 def monitor_plink_status():
@@ -1900,7 +1900,7 @@ def monitor_plink_status():
         host_unreachable_count = 0  # Reset if ping succeeded
         print(f"Host {active_ssh_tunnel} reachable with method {host_is_alive.method}.")
 
-    root.after(1000, monitor_plink_status)
+    root.after(5000, monitor_plink_status)
 
 
 

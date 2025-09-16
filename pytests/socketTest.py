@@ -10,8 +10,8 @@ def is_port_open(host, port, timeout=2):
         return False
 
 
-host = '10.49.63.64' #'10.49.62.35'
-port = '20022' # '48898'
+host = '10.80.14.11' #'10.49.62.35'
+port = '443' # '48898'
 
 result = is_port_open(host, port)
     
