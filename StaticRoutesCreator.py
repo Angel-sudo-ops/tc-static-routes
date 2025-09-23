@@ -22,6 +22,7 @@ import logging
 import subprocess
 import shutil
 import psutil
+import binascii
 
 from myutils.autoupdater import check_for_updates_async, get_app_version
 from myutils.connectivity import is_host_reachable, is_port_open
@@ -1549,6 +1550,34 @@ def start_process(process_name, command, instance_key=None):
 
 DEFAULT_HOST_KEY_VALUE = "nistp384,0xe6d6ecc3ea4c061502decdda993198e84e5d9e49c97cfe8ad60feffe3dd63fea73a5af234da8fc0a3d1c2fae6b19b067,0x11d28116ddd209dd799d05dc26bc550b1fcc21cbbbdfe39ba2c00ab7fe98b9150f0d88469049f0a5575e60e37ebbb727"
 
+def get_ecdsa_hostkey_from_remote(host, port):
+    """
+    Retrieve the ECDSA nistp384 host key from the SSH server.
+    Format it for the PuTTY registry: nistp384,0x...,0x...
+    """
+    try:
+        sock = socket.create_connection((host, port), timeout=5)
+        transport = paramiko.Transport(sock)
+        transport.start_client(timeout=5)
+
+        key = transport.get_remote_server_key()
+        transport.close()
+
+        if key.get_name() != "ecdsa-sha2-nistp384":
+            print(f"[HostKey] Unsupported key type: {key.get_name()}")
+            return None
+
+        key_bytes = key.asbytes()
+        mid = len(key_bytes) // 2
+        part1 = binascii.hexlify(key_bytes[:mid]).decode()
+        part2 = binascii.hexlify(key_bytes[mid:]).decode()
+
+        return f"nistp384,0x{part1},0x{part2}"
+
+    except Exception as e:
+        print(f"[HostKey Error] Failed to retrieve SSH host key from {host}:{port} — {e}")
+        return None
+
 def ensure_hostkey_in_registry(host, port, default_value):
     """
     Ensure SSH host key exists in the registry for given host/port.
@@ -1612,7 +1641,13 @@ def open_putty_with_tunnels(putty_path, remote_host, ssh_port, ssh_username, ssh
 def open_plink_with_tunnels(plink_path, remote_host, ssh_port, ssh_username, ssh_password, tunnels):
     """Launch Plink with SSH tunnels and hide the window."""
 
-    success = ensure_hostkey_in_registry(remote_host, ssh_port, DEFAULT_HOST_KEY_VALUE)
+    actual_host_key = get_ecdsa_hostkey_from_remote(remote_host, ssh_port)
+
+    if not actual_host_key:
+        print("[Tunnel] Aborting tunnel launch — Failed to retrieve host key from remote.")
+        return False
+
+    success = ensure_hostkey_in_registry(remote_host, ssh_port, actual_host_key)
 
     if not success:
         print("[Tunnel] Aborting tunnel launch — Host key could not be written or found.")
