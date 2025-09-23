@@ -964,26 +964,29 @@ def ask_for_project_number(on_success_callback):
     error_label = ttk.Label(popup, text="", foreground="red")
     error_label.pack()
 
-    def submit():
+    def validate_input():
         project = project_entry.get().strip()
         if project.isdigit() and len(project) == 4:
-            entry_project.delete(0, tk.END)
-            entry_project.insert(0, project)
-
-            # Remove placeholder style
-            entry_project.config(style="Project.TEntry")
-
-            popup.destroy()
-            on_success_callback()
+            error_label.config(text="")  # Hide error when valid
+            return True
         else:
             error_label.config(text="Invalid project number")
+            return False
+
+    def submit():
+        if validate_input():
+            entry_project.delete(0, tk.END)
+            entry_project.insert(0, project_entry.get().strip())
+            entry_project.config(style="Project.TEntry")
+            popup.destroy()
+            on_success_callback()
 
     submit_button = ttk.Button(popup, text="OK", command=submit)
     submit_button.pack(pady=5)
 
     popup.bind("<Return>", lambda event: submit())
     popup.bind("<Escape>", lambda event : popup.destroy())
-    project_entry.bind("<KeyRelease>", lambda event: submit())
+    project_entry.bind("<KeyRelease>", lambda event: validate_input())
 
 
 ################################# Split project and LGV number ######################################
