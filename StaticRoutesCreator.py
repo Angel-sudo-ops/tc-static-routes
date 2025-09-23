@@ -1604,32 +1604,25 @@ def get_ecdsa_hostkey_from_remote(host, port):
         print(f"[HostKey Error] Failed to retrieve SSH host key from {host}:{port} — {e}")
         return None
 
-def ensure_hostkey_in_registry(host, port, default_value):
+def ensure_hostkey_in_registry(host, port, key_value):
     """
-    Ensure SSH host key exists in the registry for given host/port.
+    Write (or overwrite) the SSH host key in the registry for the given host/port.
     """
     key_path = r"Software\SimonTatham\PuTTY\SshHostKeys"
     reg_key_name = f"ecdsa-sha2-nistp384@{port}:{host}"
 
     try:
+        # Ensure the main SshHostKeys key exists
         try:
-            # Try to open SshHostKeys first
-            with winreg.OpenKey(winreg.HKEY_CURRENT_USER, key_path, 0, winreg.KEY_ALL_ACCESS) as reg_key:
-                try:
-                    value, _ = winreg.QueryValueEx(reg_key, reg_key_name)
-                    print(f"[Registry] Host key already exists for {host}:{port}")
-                    return True
-                except FileNotFoundError:
-                    pass  # Key does not exist, proceed to write
+            winreg.OpenKey(winreg.HKEY_CURRENT_USER, key_path)
         except FileNotFoundError:
-            # If SshHostKeys doesn't exist → create it
             print(f"[Registry] SshHostKeys not found — creating it...")
             winreg.CreateKey(winreg.HKEY_CURRENT_USER, key_path)
 
-        # Open again after creating (safe for writing)
+        # Always write (overwrite) the key value
         with winreg.OpenKey(winreg.HKEY_CURRENT_USER, key_path, 0, winreg.KEY_WRITE) as reg_key:
-            winreg.SetValueEx(reg_key, reg_key_name, 0, winreg.REG_SZ, default_value)
-            print(f"[Registry] Host key added for {host}:{port}")
+            winreg.SetValueEx(reg_key, reg_key_name, 0, winreg.REG_SZ, key_value)
+            print(f"[Registry] Host key written for {host}:{port}")
             return True
 
     except Exception as e:
