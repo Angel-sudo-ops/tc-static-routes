@@ -934,11 +934,27 @@ def populate_table_from_db3():
     
 def ask_for_project_number(on_success_callback):
     popup = tk.Toplevel()
-    popup.title("Enter Project Number")
-    popup.geometry("300x120")
+    popup.title("Project Number")
+    popup_width = 270
+    popup_height = 120
+    popup.geometry(f"{popup_width}x{popup_height}")
     popup.grab_set()  # Modal behavior
 
-    label = ttk.Label(popup, text="Please enter the 4-digit project number:")
+    # Position pop up centered to the main window
+    try:
+        root.update_idletasks()
+        root_x = root.winfo_rootx()
+        root_y = root.winfo_rooty()
+        root_width = root.winfo_width()
+        root_height = root.winfo_height()
+
+        pos_x = root_x + (root_width // 2) - (popup_width // 2)
+        pos_y = root_y + (root_height // 2) - (popup_height)
+        popup.geometry(f"{popup_width}x{popup_height}+{pos_x}+{pos_y}")
+    except:
+        pass  # fallback to default
+
+    label = ttk.Label(popup, text="Enter the 4-digit project number:")
     label.pack(pady=(10, 5))
 
     project_entry = ttk.Entry(popup, justify="center")
@@ -953,15 +969,21 @@ def ask_for_project_number(on_success_callback):
         if project.isdigit() and len(project) == 4:
             entry_project.delete(0, tk.END)
             entry_project.insert(0, project)
+
+            # Remove placeholder style
+            entry_project.config(style="Project.TEntry")
+
             popup.destroy()
             on_success_callback()
         else:
-            error_label.config(text="Invalid project number.")
+            error_label.config(text="Invalid project number")
 
     submit_button = ttk.Button(popup, text="OK", command=submit)
     submit_button.pack(pady=5)
 
     popup.bind("<Return>", lambda event: submit())
+    popup.bind("<Escape>", lambda event : popup.destroy())
+    project_entry.bind("<KeyRelease>", lambda event: submit())
 
 
 ################################# Split project and LGV number ######################################
