@@ -868,10 +868,12 @@ def read_db3_file(db3_file_path, table_name):
         return None
 
 def populate_table_from_db3():
-    project = entry_project.get()
+
     if not validate_project():
-        messagebox.showinfo("Attention", "Add project number first!")
+        ask_for_project_number(populate_table_from_db3)
         return
+    
+    project = entry_project.get()
     
     db3_path = filedialog.askopenfilename(title="Select config.db3 file", 
                                           initialdir="C:\\Program Files (x86)\\Elettric80",
@@ -928,6 +930,39 @@ def populate_table_from_db3():
     # Populate the Treeview with the data
     for item in routes_data:
         routes_table.insert("", "end", values=item)
+
+    
+def ask_for_project_number(on_success_callback):
+    popup = tk.Toplevel()
+    popup.title("Enter Project Number")
+    popup.geometry("300x120")
+    popup.grab_set()  # Modal behavior
+
+    label = ttk.Label(popup, text="Please enter the 4-digit project number:")
+    label.pack(pady=(10, 5))
+
+    project_entry = ttk.Entry(popup, justify="center")
+    project_entry.pack(pady=5)
+    project_entry.focus()
+
+    error_label = ttk.Label(popup, text="", foreground="red")
+    error_label.pack()
+
+    def submit():
+        project = project_entry.get().strip()
+        if project.isdigit() and len(project) == 4:
+            entry_project.delete(0, tk.END)
+            entry_project.insert(0, project)
+            popup.destroy()
+            on_success_callback()
+        else:
+            error_label.config(text="Invalid project number.")
+
+    submit_button = ttk.Button(popup, text="OK", command=submit)
+    submit_button.pack(pady=5)
+
+    popup.bind("<Return>", lambda event: submit())
+
 
 ################################# Split project and LGV number ######################################
 def split_string(input_string):
