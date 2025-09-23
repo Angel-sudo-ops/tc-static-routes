@@ -23,6 +23,7 @@ import subprocess
 import shutil
 import psutil
 import binascii
+import base64
 
 from myutils.autoupdater import check_for_updates_async, get_app_version
 from myutils.connectivity import is_host_reachable, is_port_open
@@ -1567,10 +1568,35 @@ def get_ecdsa_hostkey_from_remote(host, port):
             print(f"[HostKey] Unsupported key type: {key.get_name()}")
             return None
 
-        key_bytes = key.asbytes()
-        mid = len(key_bytes) // 2
-        part1 = binascii.hexlify(key_bytes[:mid]).decode()
-        part2 = binascii.hexlify(key_bytes[mid:]).decode()
+        # Decode base64-encoded key to raw bytes
+        key_data = base64.b64decode(key.get_base64())
+
+        # Helper to decode SSH string type (4-byte length + value)
+        def read_string(data, offset):
+            str_len = struct.unpack(">I", data[offset:offset + 4])[0]
+            offset += 4
+            return data[offset:offset + str_len], offset + str_len
+
+        offset = 0
+        # Skip: key type ("ecdsa-sha2-nistp384")
+        _, offset = read_string(key_data, offset)
+
+        # Skip: curve name ("nistp384")
+        _, offset = read_string(key_data, offset)
+
+        # Read the actual key Q (raw point on curve, per PuTTY format)
+        q_bytes, _ = read_string(key_data, offset)
+
+        # Split Q (uncompressed point: 0x04 | X | Y)
+        if q_bytes[0] != 0x04:
+            print("[HostKey] Unexpected format — not an uncompressed EC point.")
+            return None
+
+        x = q_bytes[1:49]
+        y = q_bytes[49:97]
+
+        part1 = binascii.hexlify(x).decode()
+        part2 = binascii.hexlify(y).decode()
 
         return f"nistp384,0x{part1},0x{part2}"
 
