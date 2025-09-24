@@ -1067,40 +1067,43 @@ def parse_route_name(input_name):
 
 
 ################################### Create ini file for WinSCP connections ##########################
+
+def is_winscp_installed():
+    possible_paths = [
+        r"C:\Program Files (x86)\WinSCP\WinSCP.exe",
+        r"C:\Program Files\WinSCP\WinSCP.exe"
+    ]
+    return any(os.path.exists(path) for path in possible_paths)
+
+
 # Function to set the custom INI path in the Windows Registry
 def set_custom_ini_path(ini_path):
     key_path = r'Software\Martin Prikryl\WinSCP 2\Configuration'
 
+    # Step 1: Check if WinSCP is installed
+    if not is_winscp_installed():
+        print("WinSCP not detected — skipping registry update.")
+        return None  # Skip registry
+
+    # Step 2: Try opening registry key
     try:
-        # Open the key for reading
-        key = reg.OpenKey(reg.HKEY_CURRENT_USER, key_path, 0, reg.KEY_READ)
-        try:
-            config_storage, _ = reg.QueryValueEx(key, "ConfigurationStorage")
-            custom_ini_file, _ = reg.QueryValueEx(key, "CustomIniFile")
-
-            # Check if the values are already set correctly
-            if config_storage == 1 and custom_ini_file == ini_path:
-                print("Registry keys are already set correctly.")
-                reg.CloseKey(key)
-                return True
-        except FileNotFoundError:
-            # Values not set, proceed to create/update them
-            pass
-
-        reg.CloseKey(key)
-
-        # Open the key for writing
         key = reg.OpenKey(reg.HKEY_CURRENT_USER, key_path, 0, reg.KEY_SET_VALUE)
+    except FileNotFoundError:
+        print("Registry key not found — WinSCP may not have been opened yet.")
+        return None
+    except Exception as e:
+        print(f"Unexpected registry error: {e}")
+        return False
+
+    # Step 3: Write values
+    try:
         reg.SetValueEx(key, "ConfigurationStorage", 0, reg.REG_DWORD, 1)
         reg.SetValueEx(key, "CustomIniFile", 0, reg.REG_SZ, ini_path)
         reg.CloseKey(key)
-
         print("Registry keys updated successfully.")
         return True
-
     except Exception as e:
         print(f"Failed to set registry key: {e}")
-        messagebox.showerror("Error", f"Failed to set path {ini_path}, run app as administrator")
         return False
     
 # Function to check if a HostName already exists in the INI file
@@ -1139,6 +1142,7 @@ def remove_duplicate_keys(ini_path):
 
 # Function to create a session in the winscp.ini file
 def create_winscp_ini_from_table(ini_path, data):
+    ini_write_success = False
     # Ensure the directory for the INI file exists
     ini_dir = os.path.dirname(ini_path)
     os.makedirs(ini_dir, exist_ok=True)
@@ -1197,21 +1201,37 @@ def create_winscp_ini_from_table(ini_path, data):
     try:
         with open(ini_path, 'w') as configfile:
             config.write(configfile)
+            ini_write_success = True
     except Exception as e:
         errors.append(f"An error occurred while writing the INI file: {e}") 
 
-    # Set the custom INI path in the registry
-    if not set_custom_ini_path(ini_path):
-        errors.append("Failed to set the custom INI path in the registry.")
+    # Set the custom INI path in the registry (only if installed)
+    result = set_custom_ini_path(ini_path)
+    if result is True:
+        print("INI path successfully set in registry.")
+    elif result is None:
+        errors.append("INI file created, but could not detect installed WinSCP.\n"
+                    "If you're using a portable version, please configure WinSCP manually to use this INI file.")
+    else:
+        errors.append("INI file created, but failed to update the registry.\n"
+                    "Please run this app as administrator or set WinSCP manually.")
+        
 
     # Show all errors in a single messagebox (if any exist)
     if errors:
         error_message = "\n".join(errors)
-        messagebox.showerror("Errors Detected", f"The following errors occurred:\n\n{error_message}")
+        messagebox.showwarning("Errors Detected", f"The following errors occurred:\n\n{error_message}")
 
     # Show success message if no errors
     else:
         messagebox.showinfo("Success", f"Session created successfully in {ini_path} with {repeated} repeated routes out of {total}")
+
+    # Even if there were errors (e.g. registry), still show file if created
+    if ini_write_success:
+        try:
+            subprocess.run(['explorer', '/select,', ini_path])
+        except Exception as e:
+            print(f"Could not open File Explorer: {e}")
 
 
 def save_winscp_ini():
@@ -3547,7 +3567,6 @@ if getattr(sys, 'frozen', False) and not updated:  # Only in PyInstaller .exe
 root.mainloop()
 
 
-# leer config.db3 y llenar tabla con eso - DONE
 
 # agregar rutas de ads
 
@@ -3557,12 +3576,3 @@ root.mainloop()
 # [Configuration\LastFingerprints]
 # 172.20.2.68=20022:ssh=ecdsa-sha2-nistp384%20384%20iXnY+SMyoQRSUxJMzgWWA+yadddMZqqgM4dLPp/uHhs
 # 172.20.2.68:20022:ssh=ecdsa-sha2-nistp384%20384%20iXnY+SMyoQRSUxJMzgWWA+yadddMZqqgM4dLPp/uHhs
-
-# Tener la posibilidad de borrar más rows al seleccionar shift o control
-
-# Routes can be created even if static routes file is not updated (TwinCAT is not restarted yet). But after routes are created TwinCAT should be restarted to have the comm
-
-
-
-# Add PuTTY sessions, first check if it is installed, if not, popup to show is not installed, if yes, create all the sessions on the registry
-# Exploring option to use the ssh tunnels with python module paramiko
