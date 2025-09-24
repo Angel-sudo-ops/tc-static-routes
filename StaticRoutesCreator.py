@@ -936,9 +936,7 @@ def ask_for_project_number(on_success_callback):
     popup = tk.Toplevel()
     popup.title("Project Number")
     popup_width = 270
-    popup_height = 120
-    popup.geometry(f"{popup_width}x{popup_height}")
-    popup.grab_set()  # Modal behavior
+    popup_height = 120  
 
     # Position pop up centered to the main window
     try:
@@ -951,6 +949,7 @@ def ask_for_project_number(on_success_callback):
         pos_x = root_x + (root_width // 2) - (popup_width // 2)
         pos_y = root_y + (root_height // 2) - (popup_height)
         popup.geometry(f"{popup_width}x{popup_height}+{pos_x}+{pos_y}")
+        popup.grab_set()  # Modal behavior
     except:
         pass  # fallback to default
 
@@ -2364,9 +2363,25 @@ def open_ssh_config_window():
     ssh_config_window.title("Setup SSH")
 
     window_width = 500
-    window_lenght = 300
-    ssh_config_window.geometry(f"{window_width}x{window_lenght}")
-    ssh_config_window.minsize(window_width, window_lenght)
+    window_height = 300
+    # ssh_config_window.geometry(f"{window_width}x{window_height}")
+
+    # Position this window to the right with respect to the main window
+    try:
+        root.update_idletasks()
+        root_x = root.winfo_rootx()
+        root_y = root.winfo_rooty()
+        root_width = root.winfo_width()
+        root_height = root.winfo_height()
+
+        pos_x = root_x + (root_width // 2) - (window_width // 2)
+        pos_y = root_y + (root_height // 2) - (window_height)
+        ssh_config_window.geometry(f"{window_width}x{window_height}+{pos_x}+{pos_y}")
+        ssh_config_window.minsize(window_width, window_height)
+
+        ssh_config_window.grab_set()
+    except:
+        pass  # fallback to default
 
     # Dictionary to maintain custom headings
     headings = {
@@ -2440,6 +2455,8 @@ def open_ssh_config_window():
             return current_data != saved_data
         
         return current_data != default_tunnel_data  # Returns True if data is different
+    
+    ssh_config_window.bind("<Escape>", lambda event : ssh_config_window.destroy())
 
     
     def save_table_to_xml(filename=SSH_CONFIG_FILE):
@@ -2528,6 +2545,8 @@ def open_ssh_config_window():
     ttk.Label(input_button_frame, text="Local Port:").grid(row=0, column=0, padx=5, pady=5, sticky="w")
     local_port_entry = ttk.Entry(input_button_frame, width=8)
     local_port_entry.grid(row=0, column=1, padx=5, pady=5, sticky="w")
+
+    local_port_entry.focus()
 
     ttk.Label(input_button_frame, text="Remote Port:").grid(row=1, column=0, padx=5, pady=5, sticky="w")
     remote_port_entry = ttk.Entry(input_button_frame, width=8)
