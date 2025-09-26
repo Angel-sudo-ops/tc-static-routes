@@ -436,9 +436,9 @@ def populate_table_from_xml(path=None):
                 messagebox.showwarning("Warning", "One or more routes are missing required fields (Name, Address, NetId).")
                 continue  # Skip this route and move to the next
 
-            name = name.text
-            address = address.text
-            net_id = net_id.text
+            name = name.text.strip()
+            address = address.text.strip()
+            net_id = net_id.text.strip()
             type_tc = "TC3" if route.find('Flags') is not None else "TC2"
             
             # Append the tuple to the list
@@ -728,7 +728,7 @@ def create_combobox_for_type(column, row):
         return
     
     combo_edit = ttk.Combobox(routes_table, values=["TC2", "TC3"], state="readonly")
-    x, y, width, height = routes_table.bbox(row, column)
+    x, y, width, height = bbox
     combo_edit.place(x=x, y=y, width=width, height=height)
 
     def on_select(event):
@@ -743,6 +743,7 @@ def create_combobox_for_type(column, row):
 
     combo_edit.bind("<<ComboboxSelected>>", on_select)
     root.bind("<Button-1>", check_focus, add="+")  # Use "+" to add to existing bindings
+    root.bind("<KeyPress>", check_focus, add='+')
     # combo_edit.focus()
 
 
@@ -751,21 +752,21 @@ def create_entry_for_editing(column, row, col_index, current_value):
     if not bbox:
         return
     
-    entry_edit = tk.Entry(routes_table, border=0)
+    entry_edit = ttk.Entry(routes_table)
     entry_edit.insert(0, current_value)
-    x, y, width, height = routes_table.bbox(row, column)
+    x, y, width, height = bbox
     entry_edit.place(x=x, y=y, width=width, height=height)
     entry_edit.focus()
     entry_edit.select_range(0, tk.END)
 
     def save_edit(event):
         if entry_edit.winfo_exists():
-            new_value = entry_edit.get()
+            new_value = entry_edit.get().strip()
             if is_duplicate(col_index, new_value, row):
                 messagebox.showerror("Invalid Input", f"Duplicate value found for {routes_table.heading(col_index, 'text')}.")
                 return  # Do not destroy the Entry, allow user to correct it
             if col_index == 0:  # Assuming the "Name" column is the first column (index 0)
-                if not new_value.strip():  # Check if the name is not empty
+                if not new_value:  # Check if the name is not empty
                     messagebox.showerror("Invalid Input", "Name field cannot be empty.")
                     return # Do not destroy the Entry, allow user to correct it
                 entry_edit.destroy() # Only destroy if validation is passed or not needed
@@ -873,7 +874,7 @@ def populate_table_from_db3():
         ask_for_project_number(populate_table_from_db3)
         return
     
-    project = entry_project.get()
+    project = entry_project.get().strip()
     
     db3_path = filedialog.askopenfilename(title="Select config.db3 file", 
                                           initialdir="C:\\Program Files (x86)\\Elettric80",
@@ -912,8 +913,8 @@ def populate_table_from_db3():
         #     messagebox.showwarning("Warning", "One or more routes are missing required fields (Name, Address, NetId).")
         #     continue  # Skip this route and move to the next
 
-            name = f"CC{project}_LGV{str(route['dbf_ID']).zfill(2)}"
-            address = route['dbf_IP']
+            name = f"CC{project}_LGV{str(route['dbf_ID']).strip().zfill(2)}"
+            address = str(route['dbf_IP']).strip()
             net_id = f"{address}.1.1"
             
             # if route['Dbf_Comm_Library']>20 or 
