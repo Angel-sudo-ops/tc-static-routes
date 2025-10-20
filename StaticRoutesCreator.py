@@ -1259,7 +1259,7 @@ def detect_connection_type(ip_address):
     ports = {
         "RDP": 3389,
         "Cerhost": 987,
-        "VNC": 5900
+        # "VNC": 5900
     }
 
     result = {"type": None}
@@ -1289,7 +1289,7 @@ def detect_connection_type(ip_address):
 
         
 def open_remote_connection():
-    """Open Remote Desktop using an .rdp file."""
+    """Open Remote Desktop or Cerhost based on detection."""
     selected_item = routes_table.selection()
     if not selected_item:
         messagebox.showwarning("No Selection", "Please select an LGV first.")
@@ -1303,12 +1303,7 @@ def open_remote_connection():
     # Check if Cerhost is already open for this host
     if is_cerhost_instance_running(target_ip):
         messagebox.showwarning("Attention", f"Cerhost for {lgv} is already running.")
-        return  # Stop execution
-
-    # Check if VNC is already open for this host
-    if is_vnc_instance_running(target_ip):
-        messagebox.showwarning("Attention", f"VNC for {lgv} is already running.")
-        return  # Stop execution
+        return 
     
     if is_rdp_running(target_ip):
         messagebox.showwarning("Attention", f"RDP session for {lgv} is already running.")
@@ -1330,15 +1325,12 @@ def open_remote_connection():
                 open_rdp_connection(target_ip, rdp_username, rdp_password)
             elif connection_type == "Cerhost":
                 launch_cerhost(target_ip, lgv)
-            elif connection_type == "VNC":
-                launch_vnc(target_ip, lgv)
             else:
                 messagebox.showerror("Connection Error", f"Unable to determine connection type for {target_ip}. \nMaybe try Safe RDP?")
                 print(f"Unable to determine connection type for {target_ip}.")
         except Exception as e:
             messagebox.showerror("Error", f"An error occurred during connection: {e}")
 
-    # Run detection in a separate thread to keep the UI responsive
     Thread(target=detect_and_connect, daemon=True).start()
 
 def open_rdp_connection_with_credentials(target_ip, username, password):
@@ -1533,10 +1525,6 @@ def extract_executable(filename, subfolder):
 
 ############################################################# VNC #######################################################################
 
-def open_vnc():
-    print("VNC is open")
-
-
 def launch_vnc(device_ip, machine_name=None):
     """Launch VNC Viewer connected to device_ip:0 (i.e., port 5900)."""
     global active_processes
@@ -1547,7 +1535,7 @@ def launch_vnc(device_ip, machine_name=None):
 
     try:
         command = [vnc_path, target]
-        process = start_process("vnc", command, instance_key=f"{device_ip}:5900")
+        process = start_process("vnc", command, instance_key=device_ip)
         print(f"VNC Viewer launched for {target} (PID {process.pid})")
 
     except Exception as e:
@@ -1562,6 +1550,29 @@ def is_vnc_instance_running(device_ip):
         pid = active_processes["vnc"][device_ip]
         return psutil.pid_exists(pid)  # Check if the specific instance is still running
     return False
+
+
+def open_vnc_connection():
+    selected_item = routes_table.selection()
+    if not selected_item:
+        messagebox.showwarning("No Selection", "Please select an LGV first.")
+        return
+
+    target_ip = routes_table.item(selected_item)["values"][1]
+    lgv = routes_table.item(selected_item)["values"][0]
+
+    if is_vnc_instance_running(target_ip):
+        messagebox.showwarning("Attention", f"VNC for {lgv} is already running.")
+        return
+
+    if not is_host_reachable(target_ip):
+        messagebox.showwarning("Attention", f"Host {lgv} is unreachable.")
+        return
+
+    try:
+        launch_vnc(target_ip)
+    except Exception as e:
+        messagebox.showerror("Error", f"Failed to launch VNC for {lgv}: {e}")
 
 
 ############################################################## SSH tunneling config #################################################################
@@ -1610,7 +1621,7 @@ def update_ssh_menu_status():
 
 def update_ssh_state(*args):
     update_tunnel_button_status()
-    update_ssh_menu_status()
+    # update_ssh_menu_status()
 
 # logging.basicConfig(level=logging.DEBUG)
 
@@ -3274,38 +3285,49 @@ def set_icon():
         print("Icon file not found.")
 
 ################################################### Context menu ###############################################
-
 def rebuild_context_menu():
+    
     context_menu.delete(0, tk.END)
 
-    single_tunnel = False
-
     selected_item = routes_table.selection()
-    ssh_tunnel_label = "Open"
+    if not selected_item:
+        return
+    
+    print
 
-    if selected_item :
-        selected_host = routes_table.item(selected_item)["values"][1]
-        if active_ssh_tunnel == selected_host:
+    item_values = routes_table.item(selected_item)["values"]
+    lgv_name, target_ip, target_amsID, tc_type = item_values[0], item_values[1], item_values[2], item_values[3]
+
+    # ---- TC3: SSH options ----
+    if tc_type.upper() == "TC3":
+        single_tunnel = False
+        ssh_tunnel_label = "Open"
+
+        if active_ssh_tunnel == target_ip:
             ssh_tunnel_label = "Close"
             single_tunnel = True
 
+        ssh_tunnel_submenu = tk.Menu(context_menu, tearoff=0)
+        ssh_tunnel_submenu.add_command(label=ssh_tunnel_label, command=create_ssh_tunnel_plink)
+        ssh_tunnel_submenu.add_command(
+            label="VNC",
+            command=launch_vnc_ssh,
+            state="normal" if single_tunnel else "disabled"
+        )
+        ssh_tunnel_submenu.add_command(
+            label="Safe RDP",
+            command=open_safe_rdp,
+            state="normal" if single_tunnel else "disabled"
+        )
 
-    # SSH submenu
-    ssh_tunnel_submenu = tk.Menu(context_menu, tearoff=0)
-    ssh_tunnel_submenu.add_command(label=ssh_tunnel_label, command=create_ssh_tunnel_plink)
-    ssh_tunnel_submenu.add_command(
-        label="VNC",
-        command=launch_vnc_ssh,
-        state="normal" if single_tunnel else "disabled"
-    )
-    ssh_tunnel_submenu.add_command(
-        label="Safe RDP",
-        command=open_safe_rdp,
-        state="normal" if single_tunnel else "disabled"
-    )
+        context_menu.add_cascade(label="SSH Tunnel", menu=ssh_tunnel_submenu)
+        context_menu.add_command(label="RDP", command=open_remote_connection)
 
-    context_menu.add_cascade(label="SSH Tunnel", menu=ssh_tunnel_submenu)
-    context_menu.add_command(label="Open RDP", command=open_remote_connection)
+    # ---- TC2: Local VNC and RDP ----
+    elif tc_type.upper() == "TC2":
+        context_menu.add_command(label="RDP", command=open_remote_connection)
+        context_menu.add_command(label="VNC", command=open_vnc_connection)
+
 
 
 ################################################################# Set up the GUI ######################################################################
