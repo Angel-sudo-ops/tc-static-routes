@@ -3132,12 +3132,20 @@ def test_route_and_update_ui(entry):
 
 
 def test_connection(ams_net_id, port, name):
+
+    ip = '.'.join(ams_net_id.split('.')[:4])
+
+    result = is_host_reachable(ip)
+    if not result.reachable:
+        print(f"{name}: Host {ip} not reachable. Skipping ADS connection.")
+        return False
+
     plc = pyads.Connection(ams_net_id, port)
     try:
         # Open the connection
         plc.open()
         state = plc.read_state()
-        print(f"PLC Status: {state}")
+        print(f" {name}: PLC Status = {state}")
 
         # Check if the PLC is in RUN state (state[0] == 5)
         if state[0] == 5:
@@ -3149,14 +3157,11 @@ def test_connection(ams_net_id, port, name):
 
     except pyads.ADSError as ads_error:
         print(f"ADS Error: {ads_error}")
-        # messagebox.showerror('Error', f"ADS Error: {ads_error} Unable to connect to {name}")
         return False
     except Exception as e:
         print(f"Unexpected Exception: {e}")
-        # messagebox.showerror('Error', f"Unexpected Exception: {e} Unable to connect to {name}")
         return False
     finally:
-        # Ensure the connection is closed if it was successfully opened
         if plc.is_open:
             plc.close()
         time.sleep(0.5)
