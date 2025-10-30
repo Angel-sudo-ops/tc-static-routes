@@ -24,6 +24,7 @@ import shutil
 import psutil
 import binascii
 import base64
+from ftplib import FTP_PORT
 
 from myutils.autoupdater import check_for_updates_async, get_app_version
 from myutils.connectivity import is_host_reachable, is_port_open
@@ -1509,7 +1510,7 @@ def load_cerhost_path_from_file():
 def extract_executable(filename, subfolder):
     """Extracts an executable from the PyInstaller bundle if it doesn't already exist."""
     app_dir = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.dirname(__file__)
-    resources_dir = os.path.join(app_dir, "resources")  # Ensure it's inside 'resources' folder
+    resources_dir = os.path.join(app_dir, subfolder)  # Ensure it's inside 'resources' folder
     dest_path = os.path.join(resources_dir, filename)
 
     if not os.path.exists(dest_path):  # Extract only if it doesn't exist
@@ -1546,6 +1547,9 @@ def launch_vnc_ssh():
 
 def is_vnc_instance_running(device_ip):
     """Check if a specific vnc instance (by IP) is running."""
+
+    is_process_running("vnc")
+
     if "vnc" in active_processes and device_ip in active_processes["vnc"]:
         pid = active_processes["vnc"][device_ip]
         return psutil.pid_exists(pid)  # Check if the specific instance is still running
@@ -1587,7 +1591,36 @@ def check_port(ip, port, timeout=0.5):
             return True
         except (socket.timeout, OSError):
             return False
+    
+def is_ftp(ip):
+    """ Check if ftp port is open"""
+    return check_port(ip, FTP_PORT)
 
+def is_winscp_instance_running(device_ip):
+    """Check if a specific WinSCP instance is running."""
+
+    is_process_running("winscp")
+
+    if "winscp" in active_processes and device_ip in active_processes["winscp"]:
+        pid = active_processes["winscp"][device_ip]
+        return psutil.pid_exists(pid)
+    return False
+
+
+def launch_winscp(ip, protocol_url):
+    """Launch WinSCP for a given LGV and track it."""
+    global active_processes
+    winscp_path = extract_executable("winscp.exe", "resources\\winscp")
+
+    print(f"Launching WinSCP: {winscp_path} for {ip}")
+
+    try:
+        command = [winscp_path, "/newinstance", protocol_url, "/ini=nul"]
+        process = start_process("winscp", command, instance_key=ip)
+        print(f"WinSCP launched for {ip} (PID {process.pid})")
+    except Exception as e:
+        messagebox.showerror("Error", f"Failed to launch WinSCP: {e}")
+    
 
 def open_winscp_session():
     selected_item = routes_table.selection()
@@ -1601,17 +1634,16 @@ def open_winscp_session():
     target_ip = values[1]
     tc_type = values[3].upper() if len(values) > 2 else None
 
+    if is_winscp_instance_running(target_ip):
+        messagebox.showwarning("Attention", f"WinSCP for {lgv_name} is already running.")
+        return
+
     if not is_host_reachable(target_ip):
         messagebox.showwarning("Attention", f"Host {lgv_name} is unreachable.")
         return
 
-    winscp_path = Path("resources/winscp/WinSCP.exe")
-    if not winscp_path.exists():
-        messagebox.showerror("Error", "WinSCP portable not found in 'resources/winscp/'.")
-        return
-
     username = username_entry.get().strip() if tc_type == "TC3" else "anonymous"
-    password = password_entry.get().strip()
+    password = password_entry.get().strip() if tc_type == "TC3" else "anonymous@example.com"
 
     if not username:
         messagebox.showwarning("Attention", "Username is required.")
@@ -1624,22 +1656,14 @@ def open_winscp_session():
     try:
         if tc_type == "TC3":
             # Always use SFTP on port 20022
-            cmd = [
-                str(winscp_path),
-                f"sftp://{username}:{password}@{target_ip}:20022/",
-                "/ini=nul"
-            ]
-            subprocess.Popen(cmd)
+            url = f"sftp://{username}:{password}@{target_ip}:20022/"
+            launch_winscp(target_ip, url)
 
         elif tc_type == "TC2":
             # Try FTP first, then fallback to Explorer (NetFolder)
-            if check_port(target_ip, 21):
-                cmd = [
-                    str(winscp_path),
-                    f"ftp://{username}:{password}@{target_ip}:21/",
-                    "/ini=nul"
-                ]
-                subprocess.Popen(cmd)
+            if is_ftp(target_ip):
+                url = f"ftp://{username}:{password}@{target_ip}:21/"
+                launch_winscp(target_ip, url)
             else:
                 subprocess.Popen(["explorer", f"\\\\{target_ip}\\"], shell=True)
 
@@ -2160,12 +2184,20 @@ def close_cerhost(device_ip=None):
                 close_tracked_process("cerhost", instance_key=ip)
             active_processes["cerhost"].clear()  # Remove all tracking
 
+# def close_winscp():
+#     close_tracked_process("winscp")
+
+# def close_vnc():
+#     close_tracked_process("vnc")
+
 def close_all_processes():
     """Ensure PuTTY and Cerhost are closed when the app exits."""
     close_putty()
     close_cerhost()  # New function to close Cerhost
     close_rdp_connection()
     close_plink()
+    # close_winscp()
+    # close_vnc()
 
     # close_process_by_name("putty.exe")
     # close_process_by_name("cerhost.exe")
