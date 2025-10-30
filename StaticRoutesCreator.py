@@ -1575,6 +1575,82 @@ def open_vnc_connection():
         messagebox.showerror("Error", f"Failed to launch VNC for {lgv}: {e}")
 
 
+#################################################################### WinSCP #########################################################################
+from pathlib import Path
+
+def check_port(ip, port, timeout=0.5):
+    """Return True if port is open."""
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.settimeout(timeout)
+        try:
+            s.connect((ip, port))
+            return True
+        except (socket.timeout, OSError):
+            return False
+
+
+def open_winscp_session():
+    selected_item = routes_table.selection()
+    if not selected_item:
+        messagebox.showwarning("No Selection", "Please select an LGV first.")
+        return
+
+    item = selected_item[0]
+    values = routes_table.item(item)["values"]
+    lgv_name = values[0]
+    target_ip = values[1]
+    tc_type = values[3].upper() if len(values) > 2 else None
+
+    if not is_host_reachable(target_ip):
+        messagebox.showwarning("Attention", f"Host {lgv_name} is unreachable.")
+        return
+
+    winscp_path = Path("resources/winscp/WinSCP.exe")
+    if not winscp_path.exists():
+        messagebox.showerror("Error", "WinSCP portable not found in 'resources/winscp/'.")
+        return
+
+    username = username_entry.get().strip() if tc_type == "TC3" else "anonymous"
+    password = password_entry.get().strip()
+
+    if not username:
+        messagebox.showwarning("Attention", "Username is required.")
+        return
+    
+    if not password:
+        messagebox.showwarning("Attention", "Password is required.")
+        return
+
+    try:
+        if tc_type == "TC3":
+            # Always use SFTP on port 20022
+            cmd = [
+                str(winscp_path),
+                f"sftp://{username}:{password}@{target_ip}:20022/",
+                "/ini=nul"
+            ]
+            subprocess.Popen(cmd)
+
+        elif tc_type == "TC2":
+            # Try FTP first, then fallback to Explorer (NetFolder)
+            if check_port(target_ip, 21):
+                cmd = [
+                    str(winscp_path),
+                    f"ftp://{username}:{password}@{target_ip}:21/",
+                    "/ini=nul"
+                ]
+                subprocess.Popen(cmd)
+            else:
+                subprocess.Popen(["explorer", f"\\\\{target_ip}\\"], shell=True)
+
+        else:
+            messagebox.showinfo("Info", f"Unsupported LGV type: {tc_type}")
+
+    except Exception as e:
+        messagebox.showerror("Error", f"Failed to launch WinSCP for {lgv_name}:\n{e}")
+
+
+
 ############################################################## SSH tunneling config #################################################################
 SSH_CONFIG_FILE = "ssh_config.xml"
 
@@ -3327,10 +3403,12 @@ def rebuild_context_menu():
 
         context_menu.add_cascade(label="SSH Tunnel", menu=ssh_tunnel_submenu)
         context_menu.add_command(label="RDP", command=open_remote_connection)
+        context_menu.add_command(label="WinSCP", command=open_winscp_session)
 
     # ---- TC2: Local VNC and RDP ----
     elif tc_type.upper() == "TC2":
         context_menu.add_command(label="RDP", command=open_remote_connection)
+        context_menu.add_command(label="WinSCP", command=open_winscp_session)
         context_menu.add_command(label="VNC", command=open_vnc_connection)
 
 
