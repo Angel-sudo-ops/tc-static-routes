@@ -904,6 +904,9 @@ def populate_table_from_db3():
     for row_param in rows_param:
         if row_param['dbf_Name'] == "agvlayoutloadmethod" and row_param['dbf_Value'] == "SFTP":
             default_type_tc = "TC3" # If SFTP, set all to TC3
+            break
+
+    has_layout_protocol = any('LayoutCopy_Protocol' in row for row in rows_agvs)
 
     # Initialize an empty list to hold the data
     routes_data = []
@@ -918,13 +921,18 @@ def populate_table_from_db3():
             address = str(route['dbf_IP']).strip()
             net_id = f"{address}.1.1"
             
-            # if route['Dbf_Comm_Library']>20 or 
-            if route['LayoutCopy_Protocol']=="SFTP":
-                type_tc = "TC3" 
-            elif route['LayoutCopy_Protocol']=="FTP" or route['LayoutCopy_Protocol']=="NETFOLDER":
-                type_tc = "TC2" 
+            if has_layout_protocol: 
+                # if route['Dbf_Comm_Library']>20 or
+                protocol =  route['LayoutCopy_Protocol']
+                if protocol == "SFTP":
+                    type_tc = "TC3" 
+                elif protocol in ("FTP", "NETFOLDER"):
+                    type_tc = "TC2" 
+                else:
+                    type_tc = default_type_tc 
             else:
-                type_tc = default_type_tc 
+                # Key never existed at all
+                type_tc = default_type_tc
         
             # Append the tuple to the list
             routes_data.append((name, address, net_id, type_tc))
