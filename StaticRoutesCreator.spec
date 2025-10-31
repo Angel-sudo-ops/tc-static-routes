@@ -8,7 +8,7 @@ a = Analysis(
         ('resources/cerhost.exe', 'resources'), 
         ('resources/plink.exe', 'resources'), 
         ('resources/vnc.exe', 'resources'),
-        ('resources/winscp/winscp.exe', 'winscp')
+        ('resources/winscp/winscp.exe', 'resources/winscp')
         ],
     datas=[('route.ico', '.'), ('version.txt', '.')],
     hiddenimports=[],
