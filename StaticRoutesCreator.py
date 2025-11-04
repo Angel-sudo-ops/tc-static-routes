@@ -902,7 +902,7 @@ def populate_table_from_db3():
     # Default type_tc based on the transfer mode
     default_type_tc = "TC2"  # Assume TC2 unless specified otherwise
     for row_param in rows_param:
-        if row_param['dbf_Name'] == "agvlayoutloadmethod" and row_param['dbf_Value'] == "SFTP":
+        if str(row_param['dbf_Name']).lower() == "agvlayoutloadmethod" and str(row_param['dbf_Value']).upper() == "SFTP":
             default_type_tc = "TC3" # If SFTP, set all to TC3
             break
 
@@ -923,7 +923,7 @@ def populate_table_from_db3():
             
             if has_layout_protocol: 
                 # if route['Dbf_Comm_Library']>20 or
-                protocol =  route['LayoutCopy_Protocol']
+                protocol =  str(route['LayoutCopy_Protocol']).upper()
                 if protocol == "SFTP":
                     type_tc = "TC3" 
                 elif protocol in ("FTP", "NETFOLDER"):
