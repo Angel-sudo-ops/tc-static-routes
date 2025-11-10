@@ -3339,7 +3339,6 @@ def get_table_data():
     return rows
 
 
-
 def apply_prefix_to_selected():
     prefix = prefix_var.get().strip().upper()
     selected_items = routes_table.selection()
@@ -3361,7 +3360,7 @@ def apply_prefix_to_selected():
         # Find LGV section (regardless of position)
         lgv_index = next((i for i, p in enumerate(parts) if p.startswith("LGV")), None)
         if lgv_index is None:
-            print(f"⚠️ Skipping non-LGV name: {name}")
+            print(f"Skipping non-LGV name: {name}")
             continue
 
         project = parts[0]  # CCxxxx
@@ -3574,6 +3573,8 @@ frame_prefix.grid(row=0, column=0, padx=1, pady=1)
 prefix_label = ttk.Label(frame_prefix, text="Prefix:")
 prefix_label.grid(row=0, column=0, padx=(0, 0), pady=(5, 5), sticky="ew")
 
+ToolTip(prefix_label, "Select LGVs (Ctrl/Shift + Click) → type prefix → press Enter")
+
 prefix_var = tk.StringVar()
 prefix_entry = ttk.Entry(frame_prefix, textvariable=prefix_var, width=6)
 prefix_entry.grid(row=0, column=1, padx=(0, 10), pady=(5, 5), sticky="ew")
@@ -3587,6 +3588,7 @@ def limit_prefix(*args):
 prefix_var.trace_add("write", limit_prefix)
 
 prefix_entry.bind("<Return>", lambda e: apply_prefix_to_selected())
+
 
 
 deviceType = tk.StringVar(value="LGV")
