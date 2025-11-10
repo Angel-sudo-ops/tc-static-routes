@@ -3346,38 +3346,42 @@ def apply_prefix_to_selected():
 
     if not selected_items:
         # messagebox.showinfo("Info", "No rows selected.")
-        print("No rows selected to apply a prefix.")
+        print("No rows selected to apply prefix.")
         return
+
+    updated_count = 0
 
     for item in selected_items:
         values = list(routes_table.item(item, "values"))
-        name = values[0]
+        name = values[0].strip()
 
-        if "_LGV" not in name:
-            continue  # only modify LGVs
+        # Split into non-empty parts
+        parts = [p for p in name.split("_") if p]
 
-        parts = name.split("_")
+        # Find LGV section (regardless of position)
+        lgv_index = next((i for i, p in enumerate(parts) if p.startswith("LGV")), None)
+        if lgv_index is None:
+            print(f"⚠️ Skipping non-LGV name: {name}")
+            continue
 
-        # Expected patterns:
-        #  CCXXXX_LGVXX  -> add prefix
-        #  CCXXXX_OLD_LGVXX -> replace OLD with new
-        if len(parts) == 2:  # CCXXXX_LGVXX
-            if prefix:
-                new_name = f"{parts[0]}_{prefix}_{parts[1]}"
-            else:
-                new_name = name  # no prefix entered
-        elif len(parts) == 3:  # CCXXXX_OLD_LGVXX
-            if prefix:
-                new_name = f"{parts[0]}_{prefix}_{parts[2]}"
-            else:
-                new_name = f"{parts[0]}_{parts[2]}"  # remove prefix entirely
+        project = parts[0]  # CCxxxx
+        lgv_part = parts[lgv_index]
+
+        # Rebuild cleanly: CCxxxx_[PREFIX_]LGVxx
+        if prefix:
+            new_name = f"{project}_{prefix}_{lgv_part}"
         else:
-            continue  # skip malformed names
+            new_name = f"{project}_{lgv_part}"
 
+        # Apply changes to the table
         values[0] = new_name
         routes_table.item(item, values=values)
+        updated_count += 1
 
-    # messagebox.showinfo("Success", f"Updated {len(selected_items)} LGV name(s) with prefix '{prefix or '(none)'}'.")
+    # messagebox.showinfo(
+    #     "Success",
+    #     f"Updated {updated_count} LGV name(s) with prefix '{prefix or '(none)'}'.",
+    # )
 
 
 ################################### Button design ##########################################
@@ -3518,7 +3522,7 @@ else:
 # root.iconbitmap(icon_path)
 
 window_width = 430
-window_lenght = 550
+window_lenght = 540
 root.geometry(f"{window_width}x{window_lenght}")
 root.minsize(window_width, window_lenght)
 # root.resizable(True, True)
@@ -3561,7 +3565,7 @@ create_placeholder(entry_project, "e.g., 1584", "Project.TEntry", "Placeholder.T
 entry_project.bind("<KeyRelease>", validate_entry(entry_project, 'Project.TEntry', validate_project))
 
 frame_range = tk.Frame(root)
-frame_range.grid(row=1, column=0, padx=5, pady=5, sticky='e')
+frame_range.grid(row=1, column=0, padx=(0,5), pady=5, sticky='e')
 
 frame_prefix = tk.Frame(frame_range)
 frame_prefix.grid(row=0, column=0, padx=1, pady=1)
@@ -3572,7 +3576,7 @@ prefix_label.grid(row=0, column=0, padx=(0, 0), pady=(5, 5), sticky="ew")
 
 prefix_var = tk.StringVar()
 prefix_entry = ttk.Entry(frame_prefix, textvariable=prefix_var, width=6)
-prefix_entry.grid(row=0, column=1, padx=(0, 15), pady=(5, 5), sticky="ew")
+prefix_entry.grid(row=0, column=1, padx=(0, 10), pady=(5, 5), sticky="ew")
 
 # Limit to 4 characters
 def limit_prefix(*args):
@@ -3639,7 +3643,7 @@ delete_table_button.grid(row=3, column=1, pady=10)
 
 frame_load = ttk.Labelframe(root, text="Load", labelanchor='nw', style="Custom.TLabelframe")
 # frame_load = tk.LabelFrame(root, text="Load", labelanchor='nw', font=italic_font)
-frame_load.grid(row=4, column=0, columnspan=1, padx=15, pady=5, sticky='w')
+frame_load.grid(row=4, column=0, columnspan=1, padx=(10,15), pady=5, sticky='w')
 # Add a button to trigger the XML file selection and table population
 load_xml_button = ttk.Button(frame_load, text=" StaticRoutes.xml ", 
                             # bg="ghost white", 
