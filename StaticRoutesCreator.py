@@ -165,10 +165,8 @@ def create_routes_xml(project, lgv_list, base_ip, file_path, is_tc3):
         route_element = ET.SubElement(routes, "Route")
         
         name = ET.SubElement(route_element, "Name")
-        if lgv_list[i] > 0 and lgv_list[i] < 10:
-            name.text = f"CC{project}_LGV0{lgv_list[i]}"
-        else:
-            name.text = f"CC{project}_LGV{lgv_list[i]}"
+
+        name.text = f"CC{project}_LGV{str(lgv_list[i]).strip().zfill(2)}"
         
         address = ET.SubElement(route_element, "Address")
         address.text = f"{base_ip_prefix}.{current_offset}"  # Increment IP offset
@@ -485,7 +483,12 @@ def populate_table_from_inputs():
     # Loop through the parsed IPs and add to the table
     for i, current_ip in enumerate(ip_list):
         net_id = f"{current_ip}.1.1"
-        route_name = f"CC{project}_{deviceType.get()}{str(lgvs[i]).zfill(2)}"
+
+        prefix = prefix_var.get().strip().upper()
+        if prefix and deviceType.get() == "LGV":  # Only apply when LGV is selected
+            route_name = f"CC{project}_{prefix}_{deviceType.get()}{str(lgvs[i]).zfill(2)}"
+        else:
+            route_name = f"CC{project}_{deviceType.get()}{str(lgvs[i]).zfill(2)}"
         
         # Check if the record already exists in the table, ignoring the TC type and name
         record_exists = False
@@ -917,7 +920,14 @@ def populate_table_from_db3():
         #     messagebox.showwarning("Warning", "One or more routes are missing required fields (Name, Address, NetId).")
         #     continue  # Skip this route and move to the next
 
-            name = f"CC{project}_LGV{str(route['dbf_ID']).strip().zfill(2)}"
+            # Maybe prefix can be get automatically, because we know the type of lgv from database (?)
+
+            prefix = prefix_var.get().strip().upper()
+            if deviceType.get() == "LGV":  # Only apply when LGV is selected
+                name = f"CC{project}_TYP{str(route['dbf_AGV_Type']).strip()}_LGV{str(route['dbf_ID']).strip().zfill(2)}"
+            else:
+                name = f"CC{project}_LGV{str(route['dbf_ID']).strip().zfill(2)}"
+
             address = str(route['dbf_IP']).strip()
             net_id = f"{address}.1.1"
             
@@ -3328,6 +3338,48 @@ def get_table_data():
         rows.append(routes_table.item(item)["values"])
     return rows
 
+
+
+def apply_prefix_to_selected():
+    prefix = prefix_var.get().strip().upper()
+    selected_items = routes_table.selection()
+
+    if not selected_items:
+        # messagebox.showinfo("Info", "No rows selected.")
+        print("No rows selected to apply a prefix.")
+        return
+
+    for item in selected_items:
+        values = list(routes_table.item(item, "values"))
+        name = values[0]
+
+        if "_LGV" not in name:
+            continue  # only modify LGVs
+
+        parts = name.split("_")
+
+        # Expected patterns:
+        #  CCXXXX_LGVXX  -> add prefix
+        #  CCXXXX_OLD_LGVXX -> replace OLD with new
+        if len(parts) == 2:  # CCXXXX_LGVXX
+            if prefix:
+                new_name = f"{parts[0]}_{prefix}_{parts[1]}"
+            else:
+                new_name = name  # no prefix entered
+        elif len(parts) == 3:  # CCXXXX_OLD_LGVXX
+            if prefix:
+                new_name = f"{parts[0]}_{prefix}_{parts[2]}"
+            else:
+                new_name = f"{parts[0]}_{parts[2]}"  # remove prefix entirely
+        else:
+            continue  # skip malformed names
+
+        values[0] = new_name
+        routes_table.item(item, values=values)
+
+    # messagebox.showinfo("Success", f"Updated {len(selected_items)} LGV name(s) with prefix '{prefix or '(none)'}'.")
+
+
 ################################### Button design ##########################################
 def on_enter(e):
     if e.widget['state']== "normal":
@@ -3350,7 +3402,7 @@ def is_descendant(widget, parent):
         widget = widget.master
     return False
 
-def on_click(event):
+def on_click_remove_selection(event):
     # print(f"x: {root.winfo_pointerx()}, y: {root.winfo_pointery()}")
     widget = event.widget
     if widget not in exceptions and not any(is_descendant(widget, exception) for exception in exceptions):
@@ -3510,15 +3562,35 @@ entry_project.bind("<KeyRelease>", validate_entry(entry_project, 'Project.TEntry
 
 frame_range = tk.Frame(root)
 frame_range.grid(row=1, column=0, padx=5, pady=5, sticky='e')
-frame_lgv = tk.Frame(frame_range)
-frame_lgv.grid(row=0, column=0, padx=1, pady=1)
+
+frame_prefix = tk.Frame(frame_range)
+frame_prefix.grid(row=0, column=0, padx=1, pady=1)
+
+
+prefix_label = ttk.Label(frame_prefix, text="Prefix:")
+prefix_label.grid(row=0, column=0, padx=(0, 0), pady=(5, 5), sticky="ew")
+
+prefix_var = tk.StringVar()
+prefix_entry = ttk.Entry(frame_prefix, textvariable=prefix_var, width=6)
+prefix_entry.grid(row=0, column=1, padx=(0, 15), pady=(5, 5), sticky="ew")
+
+# Limit to 4 characters
+def limit_prefix(*args):
+    value = prefix_var.get()
+    if len(value) > 4:
+        prefix_var.set(value[:4])
+
+prefix_var.trace_add("write", limit_prefix)
+
+prefix_entry.bind("<Return>", lambda e: apply_prefix_to_selected())
+
 
 deviceType = tk.StringVar(value="LGV")
 
 device_type_combobox = ttk.Combobox(frame_range, textvariable=deviceType, width=6, state="readonly")
 device_type_combobox['values'] = ("LGV", "BC", "EC")
 device_type_combobox.set(deviceType.get())
-device_type_combobox.grid(row=0, column=0, padx=1, pady=1, sticky='w')
+device_type_combobox.grid(row=0, column=1, padx=1, pady=1, sticky='w')
 
 # cb_radio = ttk.Radiobutton(frame_lgv, text="CB", variable=deviceType, value="CB")
 # cb_radio.grid(row=0, column=0, padx=1, pady=1, sticky='w')
@@ -3526,7 +3598,7 @@ device_type_combobox.grid(row=0, column=0, padx=1, pady=1, sticky='w')
 # lgv_radio.grid(row=0, column=1, padx=1, pady=1, sticky='w')
 
 entry_lgv_range = ttk.Entry(frame_range, style="Range.TEntry")#, fg="grey")
-entry_lgv_range.grid(row=0, column=1, padx=5, pady=5)
+entry_lgv_range.grid(row=0, column=2, padx=5, pady=5)
 create_placeholder(entry_lgv_range, "e.g., 1-5,11-17,20-25", "Range.TEntry", "Placeholder.TEntry")
 entry_lgv_range.bind("<KeyRelease>", validate_entry(entry_lgv_range, 'Range.TEntry', validate_range))
 
@@ -3629,7 +3701,7 @@ create_routes_button.config(state="disabled")
 
 # Add a frame to hold the Treeview and the scrollbar
 frame_table = tk.Frame(root)
-frame_table.grid(row=5, columnspan=3, padx=15, pady=10)
+frame_table.grid(row=5, columnspan=3, padx=15, pady=(10,0))
 
 # Add a Treeview to display the data
 routes_table = ttk.Treeview(frame_table, columns=("Name", "Address", "NetId", "Type"), show="headings", height=10)
@@ -3650,10 +3722,10 @@ vsb.pack(side=tk.RIGHT, fill=tk.Y)
 routes_table.configure(yscrollcommand=vsb.set)
 
 # Define the column widths
-routes_table.column("Name", width=110, anchor='w')
-routes_table.column("Address", width=110, anchor='w')
-routes_table.column("NetId", width=120, anchor='w')
-routes_table.column("Type", width=50, anchor='w')
+routes_table.column("Name", width=125, anchor='w')
+routes_table.column("Address", width=100, anchor='w')
+routes_table.column("NetId", width=115, anchor='w')
+routes_table.column("Type", width=45, anchor='w')
 
 routes_table.bind('<Delete>', delete_selected_record)
 routes_table.bind('<Double-1>', on_double_click)
@@ -3667,8 +3739,8 @@ rebuild_context_menu()
 # Bind right-click to show the context menu
 routes_table.bind("<Button-3>", show_context_menu)
 
-exceptions = [routes_table, vsb, frame_login]
-root.bind("<Button-1>", on_click)
+exceptions = [routes_table, vsb, frame_login, frame_prefix]
+root.bind("<Button-1>", on_click_remove_selection)
 
 
 frame_save_file = ttk.Labelframe(root, text="Save", labelanchor='nw', style="Custom.TLabelframe")
