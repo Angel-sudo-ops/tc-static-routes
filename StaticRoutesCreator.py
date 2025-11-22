@@ -1739,6 +1739,7 @@ def update_ssh_menu_status():
 
 def update_ssh_state(*args):
     update_tunnel_button_status()
+    rebuild_context_menu()
     # update_ssh_menu_status()
 
 # logging.basicConfig(level=logging.DEBUG)
@@ -2184,6 +2185,12 @@ def close_putty():
 
 def close_plink():
     close_tracked_process("plink")
+
+def close_vnc():
+    close_tracked_process("vnc")
+
+def close_winscp():
+    close_tracked_process("winscp")
         
 # def close_cerhost():
 #     """Find and close Cerhost if it's running."""
@@ -2209,13 +2216,13 @@ def close_cerhost(device_ip=None):
 #     close_tracked_process("vnc")
 
 def close_all_processes():
-    """Ensure PuTTY and Cerhost are closed when the app exits."""
+    """Ensure all third party apps are closed when the app exits."""
     close_putty()
     close_cerhost()  # New function to close Cerhost
     close_rdp_connection()
     close_plink()
-    # close_winscp()
-    # close_vnc()
+    close_winscp()
+    close_vnc()
 
     # close_process_by_name("putty.exe")
     # close_process_by_name("cerhost.exe")
@@ -3469,13 +3476,13 @@ def rebuild_context_menu():
     if not selected_item:
         return
     
-    print
+    # print
 
     item_values = routes_table.item(selected_item)["values"]
     lgv_name, target_ip, target_amsID, tc_type = item_values[0], item_values[1], item_values[2], item_values[3]
 
     # ---- TC3: SSH options ----
-    if tc_type.upper() == "TC3":
+    if tc_type.upper() == "TC3" and "LGV" in lgv_name:
         single_tunnel = False
         ssh_tunnel_label = "Open"
 
@@ -3501,7 +3508,7 @@ def rebuild_context_menu():
         context_menu.add_command(label="WinSCP", command=open_winscp_session)
 
     # ---- TC2: Local VNC and RDP ----
-    elif tc_type.upper() == "TC2":
+    elif tc_type.upper() == "TC2" or not ("LGV" in lgv_name):
         context_menu.add_command(label="RDP", command=open_remote_connection)
         context_menu.add_command(label="WinSCP", command=open_winscp_session)
         context_menu.add_command(label="VNC", command=open_vnc_connection)
@@ -3579,8 +3586,9 @@ prefix_var = tk.StringVar()
 prefix_entry = ttk.Entry(frame_prefix, textvariable=prefix_var, width=6)
 prefix_entry.grid(row=0, column=1, padx=(0, 10), pady=(5, 5), sticky="ew")
 
-# Limit to 4 characters
+
 def limit_prefix(*args):
+    """ Limit entry to 4 characters"""
     value = prefix_var.get()
     if len(value) > 4:
         prefix_var.set(value[:4])
