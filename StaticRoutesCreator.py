@@ -1487,9 +1487,15 @@ def launch_cerhost(device_ip, machine_name):
 
     cerhost_path = extract_executable("cerhost.exe", "resources")
     print(f"Launching Cerhost: {cerhost_path} for {device_ip}")
+    cerhost_dir = os.path.dirname(cerhost_path)
     
     try:
-        process = start_process("cerhost", [cerhost_path, device_ip], instance_key=device_ip)
+        process = start_process(
+            "cerhost", 
+            [cerhost_path, device_ip], 
+            instance_key=device_ip,
+            cwd=cerhost_dir)
+        
         print(f"Cerhost launched for {device_ip} (PID {process.pid})")
 
     except Exception as e:
@@ -1549,12 +1555,17 @@ def launch_vnc(device_ip, machine_name=None):
     global active_processes
 
     vnc_path = extract_executable("vnc.exe", "resources")
+    vnc_dir = os.path.dirname(vnc_path)
     target = f"{device_ip}:0"  # 5900 = display 0
     print(f"Launching VNC Viewer: {vnc_path} for {device_ip}")
 
     try:
         command = [vnc_path, target]
-        process = start_process("vnc", command, instance_key=device_ip)
+        process = start_process(
+            "vnc", 
+            command, instance_key=device_ip,
+            cwd=vnc_dir)
+        
         print(f"VNC Viewer launched for {target} (PID {process.pid})")
 
     except Exception as e:
@@ -1629,12 +1640,18 @@ def launch_winscp(ip, protocol_url):
     """Launch WinSCP for a given LGV and track it."""
     global active_processes
     winscp_path = extract_executable("winscp.exe", "resources\\winscp")
+    winscp_dir = os.path.dirname(winscp_path)
 
     print(f"Launching WinSCP: {winscp_path} for {ip}")
 
     try:
         command = [winscp_path, "/newinstance", protocol_url, "/ini=nul"]
-        process = start_process("winscp", command, instance_key=ip)
+        process = start_process(
+            "winscp", 
+            command, 
+            instance_key=ip,
+            cwd=winscp_dir)
+        
         print(f"WinSCP launched for {ip} (PID {process.pid})")
     except Exception as e:
         messagebox.showerror("Error", f"Failed to launch WinSCP: {e}")
@@ -1745,17 +1762,23 @@ def update_ssh_state(*args):
 # logging.basicConfig(level=logging.DEBUG)
 
 
-def start_process(process_name, command, instance_key=None):
-    """Start a process and store its PID."""
+def start_process(process_name, command, instance_key=None, cwd=None):
+    """Start a process and store its PID, with optional working directory"""
     creationflags = subprocess.CREATE_NO_WINDOW if platform.system().lower() == "windows" else 0
-    process = subprocess.Popen(command, shell=False, creationflags=creationflags)
 
-    if process_name not in active_processes:
-        active_processes[process_name] = {}  if instance_key else None  # Dict for multi-instance, None for single
+    process = subprocess.Popen(
+        command, 
+        shell=False, 
+        creationflags=creationflags,
+        cwd=cwd)
 
-    if instance_key:  # Track by instance_key (e.g., Cerhost IP)
+    if instance_key:
+        # Multi-instance mode (e.g., vnc.exe, cerhost.exe)
+        if process_name not in active_processes or not isinstance(active_processes[process_name], dict):
+            active_processes[process_name] = {}
         active_processes[process_name][instance_key] = process.pid
-    else:  # Store single-instance process (e.g., PuTTY)
+    else:  
+        # Single-instance mode (e.g., putty/plink)
         active_processes[process_name] = process.pid
 
     print(f"{process_name} started with PID {process.pid}")
@@ -1844,7 +1867,7 @@ def ensure_hostkey_in_registry(host, port, key_value):
         return False
 
     
-
+# Deprecated
 def open_putty_with_tunnels(putty_path, remote_host, ssh_port, ssh_username, ssh_password, tunnels):
     """Launch PuTTY with tunnels from get_tunnels()."""
     putty_cmd = [
@@ -1902,7 +1925,10 @@ def open_plink_with_tunnels(plink_path, remote_host, ssh_port, ssh_username, ssh
 
     print("Launching plink with cmd:", " ".join(plink_cmd))
     try:
-        start_process("plink", plink_cmd)
+        start_process(
+            "plink", 
+            plink_cmd,
+            cwd=os.path.dirname(plink_cmd))
         return True
     except Exception as e:
         print(f"Error launching Plink: {e}")
