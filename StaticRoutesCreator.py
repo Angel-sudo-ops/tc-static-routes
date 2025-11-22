@@ -1572,6 +1572,9 @@ def launch_vnc(device_ip, machine_name=None):
         messagebox.showerror("Error", f"Failed to launch VNC Viewer: {e}")
 
 def launch_vnc_ssh():
+    if is_vnc_instance_running("127.0.0.1"):
+        messagebox.showwarning("Attention", "SSH-VNC session is already running.")
+        return
     launch_vnc("127.0.0.1")
 
 def is_vnc_instance_running(device_ip):
@@ -1928,7 +1931,7 @@ def open_plink_with_tunnels(plink_path, remote_host, ssh_port, ssh_username, ssh
         start_process(
             "plink", 
             plink_cmd,
-            cwd=os.path.dirname(plink_cmd))
+            cwd=os.path.dirname(plink_path))
         return True
     except Exception as e:
         print(f"Error launching Plink: {e}")
@@ -2194,105 +2197,91 @@ def monitor_plink_status():
         print(f"Host {active_ssh_tunnel} reachable with method {host_is_alive.method}.")
 
     root.after(5000, monitor_plink_status)
-
-
-
-# def close_putty():
-#     """Find and close PuTTY SSH tunnels."""
-#     for process in psutil.process_iter(attrs=['pid', 'name']):
-#         if "putty.exe" in process.info['name'].lower():
-#             psutil.Process(process.info['pid']).terminate()  # Kill PuTTY process
-#             print("PuTTY tunnel closed.")
-#             # messagebox.showinfo("SSH Tunnel", "Existing SSH tunnel has been closed.")
-#             return
-
-def close_putty():
-    close_tracked_process("putty")
+     
 
 def close_plink():
     close_tracked_process("plink")
 
-def close_vnc():
-    close_tracked_process("vnc")
+def close_putty():
+    close_tracked_process("putty")
 
-def close_winscp():
-    close_tracked_process("winscp")
-        
-# def close_cerhost():
-#     """Find and close Cerhost if it's running."""
-#     for process in psutil.process_iter(attrs=['pid', 'name']):
-#         if "cerhost.exe" in process.info['name'].lower():
-#             psutil.Process(process.info['pid']).terminate()
-#             print("Cerhost closed.")
-
-def close_cerhost(device_ip=None):
-    """Close a specific Cerhost instance by device IP, or all if no IP is provided."""
-    if "cerhost" in active_processes:
-        if device_ip:  # Close only the requested Cerhost instance
-            close_tracked_process("cerhost", instance_key=device_ip)
-        else:  # Close all Cerhost instances
-            for ip in list(active_processes["cerhost"].keys()):
-                close_tracked_process("cerhost", instance_key=ip)
-            active_processes["cerhost"].clear()  # Remove all tracking
-
-# def close_winscp():
-#     close_tracked_process("winscp")
-
-# def close_vnc():
-#     close_tracked_process("vnc")
 
 def close_all_processes():
-    """Ensure all third party apps are closed when the app exits."""
-    close_putty()
-    close_cerhost()  # New function to close Cerhost
-    close_rdp_connection()
-    close_plink()
-    close_winscp()
-    close_vnc()
-
-    # close_process_by_name("putty.exe")
-    # close_process_by_name("cerhost.exe")
-
-    # close_process_fast("cerhost.exe")
-    # close_process_fast("putty.exe")
+    """Close ALL tracked processes."""
+    for process_name in list(active_processes.keys()):
+        close_tracked_process(process_name)
 
 
 def close_app():
     close_all_processes()
     root.destroy()
 
-    
-
-# def is_process_running(process_name):
-#     """Check if a process is running using tasklist (Windows only)."""
-#     try:
-#         output = os.popen(f'tasklist /FI "IMAGENAME eq {process_name}"').read()
-#         return process_name in output  # Returns True if process is found
-#     except Exception:
-#         return False
-    
-def close_process_fast(process_name):
-    """Close a process quickly using taskkill (Windows only)."""
-    if is_process_running(process_name):
-        os.system(f'taskkill /F /IM {process_name} >nul 2>&1')
-        print(f"{process_name} closed.")
-    else:
-        print(f"{process_name} is not running.")
 
 
-def close_process_by_name(process_name):
-    """Find and terminate a process by its name."""
-    for process in psutil.process_iter(['pid', 'name']):
-        if process.info['name'] and process_name.lower() in process.info['name'].lower():
+def kill_pid(pid):
+    """Safely terminate a PID and its children."""
+    try:
+        proc = psutil.Process(pid)
+
+        # Kill children first
+        for child in proc.children(recursive=True):
             try:
-                psutil.Process(process.info['pid']).terminate()
-                print(f"{process_name} closed.")
-                return  # Stop after closing the first match (since PuTTY and Cerhost only have one instance running)
-            except psutil.NoSuchProcess:
-                pass  # Process may have already closed
+                child.terminate()
+            except Exception:
+                pass
+
+        proc.terminate()
+
+        try:
+            proc.wait(timeout=2)
+        except psutil.TimeoutExpired:
+            proc.kill()
+
+    except psutil.NoSuchProcess:
+        pass
 
 
 def close_tracked_process(process_name, instance_key=None):
+    """
+    Close a tracked process (single or multi-instance).
+    - If instance_key is given → close only that instance.
+    - If no instance_key → close all instances under process_name.
+    """
+    if process_name not in active_processes:
+        return
+
+    entry = active_processes[process_name]
+
+    # -----------------------------------------------
+    # MULTI-INSTANCE (dict) → Cerhost, VNC, WinSCP
+    # -----------------------------------------------
+    if isinstance(entry, dict):
+
+        # Close specific instance
+        if instance_key:
+            pid = entry.pop(instance_key, None)
+            if pid:
+                kill_pid(pid)
+            return
+
+        # Close ALL instances
+        for key, pid in list(entry.items()):
+            kill_pid(pid)
+        entry.clear()
+        return
+
+    # -----------------------------------------------
+    # SINGLE-INSTANCE (int or None) → PuTTY, plink
+    # -----------------------------------------------
+    else:
+        pid = active_processes.get(process_name)
+        if pid:
+            kill_pid(pid)
+        active_processes[process_name] = None
+
+
+# Deprecated
+def close_tracked_process_deprecated(process_name, instance_key=None):
     """Close a tracked process and its child processes.
     - If `instance_key` is provided, close only that instance (for multi-instance processes like Cerhost).
     - Otherwise, close the single-instance process (like PuTTY).
