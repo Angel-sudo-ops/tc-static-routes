@@ -631,7 +631,9 @@ def create_routes_xml_from_table(file_path):
     with open(file_path, "w", encoding='utf-8') as f:
         f.write(xmlstr)
 
-    messagebox.showinfo("Success", "StaticRoutes file has been created successfully. \nRemember to RESTART TwinCAT!!")
+    messagebox.showinfo("Success", "StaticRoutes file has been created successfully. " \
+    "                               \nRemember to RESTART TwinCAT!! " \
+    "                               \nRight-click the TwinCAT icon → System → Start/Restart so the new routes take effect")
 
 def save_routes_xml():
     if not get_table_data():
@@ -1416,10 +1418,7 @@ def create_rdp_file(target_ip, username, password):
 
 def is_rdp_running(target_ip):
     """Check if an RDP session to the target IP is already running."""
-    if "rdp" in active_processes and target_ip in active_processes["rdp"]:
-        pid = active_processes["rdp"][target_ip]
-        return psutil.pid_exists(pid)  # Check if the process is still active
-    return False
+    return is_process_active("rdp", target_ip)
 
 
 def delete_rdp_file(target_ip):
@@ -1504,10 +1503,7 @@ def launch_cerhost(device_ip, machine_name):
 
 def is_cerhost_instance_running(device_ip):
     """Check if a specific Cerhost instance (by IP) is running."""
-    if "cerhost" in active_processes and device_ip in active_processes["cerhost"]:
-        pid = active_processes["cerhost"][device_ip]
-        return psutil.pid_exists(pid)  # Check if the specific instance is still running
-    return False
+    return is_process_active("cerhost", device_ip)
 
 
 """
@@ -1578,14 +1574,7 @@ def launch_vnc_ssh():
     launch_vnc("127.0.0.1")
 
 def is_vnc_instance_running(device_ip):
-    """Check if a specific vnc instance (by IP) is running."""
-
-    is_process_running("vnc")
-
-    if "vnc" in active_processes and device_ip in active_processes["vnc"]:
-        pid = active_processes["vnc"][device_ip]
-        return psutil.pid_exists(pid)  # Check if the specific instance is still running
-    return False
+    return is_process_active("vnc", device_ip)
 
 
 def open_vnc_connection():
@@ -1629,14 +1618,7 @@ def is_ftp(ip):
     return check_port(ip, FTP_PORT)
 
 def is_winscp_instance_running(device_ip):
-    """Check if a specific WinSCP instance is running."""
-
-    is_process_running("winscp")
-
-    if "winscp" in active_processes and device_ip in active_processes["winscp"]:
-        pid = active_processes["winscp"][device_ip]
-        return psutil.pid_exists(pid)
-    return False
+    return is_process_active("winscp", device_ip)
 
 
 def launch_winscp(ip, protocol_url):
@@ -2079,7 +2061,7 @@ def create_ssh_tunnel_plink():
         rebuild_context_menu()
 
 
-def is_process_running(process_name):
+def is_process_running_deprecated(process_name):
     """Check if a tracked process is still running and remove it if not."""
     if process_name in active_processes:
         process_data = active_processes[process_name]
@@ -2100,7 +2082,7 @@ def is_process_running(process_name):
     return False
 
 
-def is_process_active(pid):
+def is_process_active_deprecated(pid):
     """Check if a process is truly active (not just a lingering background process)."""
     try:
         process = psutil.Process(pid)
@@ -2110,13 +2092,69 @@ def is_process_active(pid):
             return False  # If it's 'zombie' or 'stopped'
     except psutil.NoSuchProcess:
         return False  # Process no longer exists
+    
+
+def is_process_active(process_name, instance_key=None):
+    """
+    Check if a process or process instance is running.
+    Automatically removes stale entries from active_processes.
+    
+    - If instance_key is None → checks if *any* instance is alive.
+    - If instance_key is provided → checks that specific instance.
+    """
+    if process_name not in active_processes:
+        return False
+
+    entry = active_processes[process_name]
+
+    # ------------------------------------------
+    # SINGLE INSTANCE (PuTTY, plink)
+    # ------------------------------------------
+    if isinstance(entry, int):
+        if psutil.pid_exists(entry):
+            return True
+        else:
+            # stale -> remove
+            active_processes[process_name] = None
+            return False
+
+    # ------------------------------------------
+    # MULTI INSTANCE (VNC, Cerhost, RDP, WinSCP)
+    # ------------------------------------------
+    if isinstance(entry, dict):
+
+        # Check specific instance
+        if instance_key:
+            pid = entry.get(instance_key)
+            if pid and psutil.pid_exists(pid):
+                return True
+            
+            # stale -> remove it
+            entry.pop(instance_key, None)
+            return False
+
+        # Check *any* instance
+        still_alive = {}
+        for key, pid in entry.items():
+            if psutil.pid_exists(pid):
+                still_alive[key] = pid
+
+        if still_alive:
+            active_processes[process_name] = still_alive
+            return True
+
+        # No instances alive → remove entry
+        active_processes[process_name] = {}
+        return False
+
+    return False
 
 
 def is_putty_running():
-    return is_process_running("putty")
+    return is_process_active("putty")
 
 def is_plink_running():
-    return is_process_running("plink")
+    return is_process_active("plink")
 
 host_unreachable_count = 0
 HOST_UNREACHABLE_LIMIT = 7
@@ -3704,6 +3742,7 @@ password_label = ttk.Label(frame_password, text="Password:")
 password_label.grid(row=0, column=0, padx=0, pady=5, sticky='e')
 
 password_entry = ttk.Entry(frame_password, width=15)
+password_entry.insert(0, "1")
 password_entry.grid(row=0, column=1, padx=5, pady=5)
 
 tc_version_label = ttk.Label(frame_login, text="", foreground="#4682B4")
