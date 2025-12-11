@@ -3435,13 +3435,14 @@ def rebuild_context_menu():
     
     context_menu.delete(0, tk.END)
 
-    selected_item = routes_table.selection()
-    if not selected_item:
+    selected = routes_table.selection()
+
+    if len(selected) != 1:
         return
     
-    # print
+    item_id = selected[0]
 
-    item_values = routes_table.item(selected_item)["values"]
+    item_values = routes_table.item(item_id)["values"]
     lgv_name, target_ip, target_amsID, tc_type = item_values[0], item_values[1], item_values[2], item_values[3]
 
     # ---- TC3: SSH options ----
