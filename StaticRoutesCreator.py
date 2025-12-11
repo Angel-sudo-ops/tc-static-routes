@@ -18,7 +18,6 @@ import struct
 import winreg
 import paramiko
 from threading import Thread
-import logging
 import subprocess
 import shutil
 import psutil
@@ -28,6 +27,8 @@ from ftplib import FTP_PORT
 
 from myutils.autoupdater import check_for_updates_async, get_app_version
 from myutils.connectivity import is_host_reachable, is_port_open
+
+from myutils.tooltips import ToolTip
 
 try:
     import pyads
@@ -54,97 +55,6 @@ if "--updated" in sys.argv:
     # You could show a message or log something if needed
 
 ##############################################################################################################################################
-
-class ToolTip:
-    def __init__(self, widget, text, delay=400, fade_duration=500):
-        self.widget = widget
-        self.text = text
-        self.delay = delay  # delay before showing tooltip in milliseconds
-        self.fade_duration = fade_duration  # duration of fade effect in milliseconds
-        self.tooltip_window = None
-        self.id = None
-        self.opacity = 0
-        self.is_fading_out = False
-
-        self.widget.bind("<Enter>", self.schedule_tooltip)
-        self.widget.bind("<Leave>", self.start_fade_out)
-        self.widget.bind("<Button-1>", self.on_click)
-        self.widget.winfo_toplevel().bind("<Motion>", self.check_motion)
-
-    def schedule_tooltip(self, event):
-        self.cancel_tooltip()
-        if not self.is_fading_out:
-            self.id = self.widget.after(self.delay, self.show_tooltip)
-
-    def show_tooltip(self):
-        if self.tooltip_window or not self.text:
-            return
-        x, y, _, _ = self.widget.bbox("insert")
-        x += self.widget.winfo_rootx() + 25
-        y += self.widget.winfo_rooty() + 25
-
-        self.tooltip_window = tw = tk.Toplevel(self.widget)
-        tw.wm_overrideredirect(True)
-        tw.wm_geometry(f"+{x}+{y}")
-        tw.attributes('-alpha', 0.0)  # Start with full transparency
-
-        style = ttk.Style()
-        style.configure("Tooltip.TLabel", background="white", relief='solid', borderwidth=1, font=("helvetica", "8", "normal"))
-
-        label = ttk.Label(tw, text=self.text, 
-                          style="Tooltip.TLabel"
-                        #   justify='left',
-                        #   background="white", relief='solid', borderwidth=1,
-                        #   font=("helvetica", "8", "normal")
-                          )
-        label.pack(ipadx=1)
-
-        self.is_fading_out = False
-        self.fade_in()
-
-    def fade_in(self):
-        if self.opacity < 1.0 and not self.is_fading_out:
-            self.opacity += 0.05
-            self.tooltip_window.attributes('-alpha', self.opacity)
-            self.tooltip_window.after(int(self.fade_duration / 20), self.fade_in)
-        else:
-            if self.opacity >= 1.0:
-                self.opacity = 1.0
-
-    def start_fade_out(self, event=None):
-        if self.tooltip_window and not self.is_fading_out:
-            self.is_fading_out = True
-            self.fade_out()
-
-    def fade_out(self):
-        if self.opacity > 0:
-            self.opacity -= 0.05
-            if self.tooltip_window:
-                self.tooltip_window.attributes('-alpha', self.opacity)
-                self.tooltip_window.after(int(self.fade_duration / 20), self.fade_out)
-        else:
-            if self.tooltip_window:
-                self.tooltip_window.destroy()
-                self.tooltip_window = None
-                self.opacity = 0  # Reset opacity for the next tooltip
-            self.is_fading_out = False
-
-    def cancel_tooltip(self):
-        if self.id:
-            self.widget.after_cancel(self.id)
-            self.id = None
-
-    def check_motion(self, event):
-        widget_under_cursor = self.widget.winfo_containing(event.x_root, event.y_root)
-        if widget_under_cursor != self.widget and self.tooltip_window and not self.is_fading_out:
-            self.start_fade_out()
-    
-    def on_click(self, event):
-        # Reset the tooltip logic on click to ensure it can still appear
-        self.cancel_tooltip()
-        if self.tooltip_window:
-            self.start_fade_out()
-        self.schedule_tooltip(event)
 
 # Function to create routes.xml with dynamic parameters
 def create_routes_xml(project, lgv_list, base_ip, file_path, is_tc3):
@@ -270,10 +180,10 @@ def validate_entry(entry, style_name, validate_func):
 
 # Real-time validation functions
 def validate_project(*args):
-    project = entry_project.get().strip()
+    project = project_entry.get().strip()
     if (project.isdigit() and len(project) == 4):
         return True
-    elif not project or project == placeholders[entry_project]:
+    elif not project or project == placeholders[project_entry]:
         return  False
     else:
         return False
@@ -350,14 +260,14 @@ def on_focus_in(entry, placeholder_text, entry_style):
         entry.config(style=entry_style)
 
 def on_focus_out(entry, placeholder_text, placeholder_style):
-    if not entry.get():
+    if entry.get() == "":
         entry.insert(0, placeholder_text)
         entry.config(style=placeholder_style)
 
 # Function to validate the inputs and create XML
 def validate_and_create_xml():
     try:
-        project = str(entry_project.get())
+        project = str(project_entry.get())
         if len(project) != 4:
             raise ValueError("Project number must be a 4 digit number")
     except ValueError as e:
@@ -453,7 +363,7 @@ def populate_table_from_xml(path=None):
 ############################# Populate table based on inputs ##############################
 
 def populate_table_from_inputs():
-    project = entry_project.get()
+    project = project_entry.get()
     lgv_range = entry_lgv_range.get()
     base_ip = entry_base_ip.get()
     is_tc3 = optionTC.get() == "TC3"
@@ -880,7 +790,7 @@ def populate_table_from_db3():
         ask_for_project_number(populate_table_from_db3)
         return
     
-    project = entry_project.get().strip()
+    project = project_entry.get().strip()
     
     db3_path = filedialog.askopenfilename(title="Select config.db3 file", 
                                           initialdir="C:\\Program Files (x86)\\Elettric80",
@@ -996,11 +906,11 @@ def ask_for_project_number(on_success_callback):
 
     def submit(event=None):
         if validate_input():
-            entry_project.delete(0, tk.END)
-            entry_project.insert(0, project_entry.get().strip())
-            entry_project.config(style="Project.TEntry")
+            project_entry.delete(0, tk.END)
+            project_entry.insert(0, project_entry.get().strip())
+            project_entry.config(style="Project.TEntry")
 
-            validate_entry(entry_project, 'Project.TEntry', validate_project)()
+            validate_entry(project_entry, 'Project.TEntry', validate_project)()
 
             popup.destroy()
             on_success_callback()
@@ -3618,10 +3528,31 @@ frame_project.grid(row=0, column=0, padx=5, pady=5, sticky='e')
 label_project = ttk.Label(frame_project, text="Project number CC:")
 label_project.grid(row=0, column=0, padx=0, pady=5)
 
-entry_project = ttk.Entry(frame_project, style="Project.TEntry")#, fg="grey"
-entry_project.grid(row=0, column=1, padx=5, pady=5)
-create_placeholder(entry_project, "e.g., 1584", "Project.TEntry", "Placeholder.TEntry")
-entry_project.bind("<KeyRelease>", validate_entry(entry_project, 'Project.TEntry', validate_project))
+# digit validator
+digit_only = (root.register(lambda P: P.isdigit() or P == ""), "%P")
+
+project_var = tk.StringVar(value="")
+project_entry = ttk.Entry(frame_project,  
+                            textvariable=project_var,
+                            validate="key",
+                            validatecommand=digit_only,
+                            style="Project.TEntry")
+project_entry.grid(row=0, column=1, padx=5, pady=5)
+create_placeholder(project_entry, "e.g., 1584", "Project.TEntry", "Placeholder.TEntry")
+project_entry.bind("<KeyRelease>", validate_entry(project_entry, 'Project.TEntry', validate_project))
+
+def limit_project(*args):
+    """ Limit project number to 4 numbers """
+    value = project_var.get()
+    if len(value) > 4:
+        project_var.set(value[:4])
+        return
+    # create_placeholder(project_entry, "e.g., 1584", "Project.TEntry", "Placeholder.TEntry")
+    # Update style
+    if value != "":
+        project_entry.configure(style="Project.TEntry")
+
+project_var.trace_add("write", limit_project)
 
 frame_range = tk.Frame(root)
 frame_range.grid(row=1, column=0, padx=(0,5), pady=5, sticky='e')
