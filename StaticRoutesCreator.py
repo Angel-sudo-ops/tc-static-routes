@@ -1469,7 +1469,8 @@ def launch_vnc(device_ip, machine_name=None):
         command = [vnc_path, target]
         process = start_process(
             "vnc", 
-            command, instance_key=device_ip,
+            command, 
+            instance_key=device_ip,
             cwd=vnc_dir)
         
         print(f"VNC Viewer launched for {target} (PID {process.pid})")
