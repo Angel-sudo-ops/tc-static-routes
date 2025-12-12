@@ -1,3 +1,6 @@
+import tkinter as tk
+from tkinter import ttk
+
 class ToolTip:
     def __init__(self, widget, text, delay=400, fade_duration=500):
         self.widget = widget
