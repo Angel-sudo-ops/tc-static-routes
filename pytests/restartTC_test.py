@@ -35,73 +35,91 @@ def restart_twincat_deprecated():
         plc.close()
 
 
+SYSTEM_SERVICE_PORT = 10000
 
-def restart_twincat(net_id, timeout=50.0, poll_interval=0.1):
+def wait_for_ads_state(ams_net_id, target_state, timeout=15.0, poll_interval=0.3):
+    deadline = time.monotonic() + timeout
+    last_error = None
 
-    system_service_port = 10000
-    plc = pyads.Connection(net_id, system_service_port)
+    while time.monotonic() < deadline:
+        conn = pyads.Connection(ams_net_id, SYSTEM_SERVICE_PORT)
+        try:
+            conn.open()
+            ads_state, device_state = conn.read_state()
+            print(f"[DEBUG] ads_state={ads_state}, device_state={device_state}")
+
+            if ads_state == target_state:
+                return ads_state, device_state
+
+        except pyads.ADSError as e:
+            last_error = e
+            print(f"[DEBUG] read_state failed during transition: {e}")
+
+        finally:
+            try:
+                conn.close()
+            except Exception:
+                pass
+
+        time.sleep(poll_interval)
+
+    raise TimeoutError(
+        f"Timed out waiting for ADS state {target_state}. "
+        f"Last ADS error: {last_error}"
+    )
+
+
+def restart_twincat(ams_net_id, local = False, timeout=15.0, poll_interval=0.3):
+    conn = pyads.Connection(ams_net_id, SYSTEM_SERVICE_PORT)
 
     try:
-        plc.open()
+        conn.open()
+        ads_state, device_state = conn.read_state()
+        print(f"[INFO] Initial state: {ads_state}")
 
-        ads_state, device_state = plc.read_state()
-        print(f"[INFO] Current ADS state: {ads_state}.")
-
-        # If already in CONFIG, skip RECONFIG
         if ads_state != ADSSTATE_CONFIG:
             print("[INFO] Sending RECONFIG...")
-            plc.write_control(
-                ADSSTATE_RECONFIG,
-                device_state,
-                0,
-                pyads.PLCTYPE_BYTE
-            )
-
-            ads_state, device_state = wait_for_ads_state(
-                plc,
-                ADSSTATE_CONFIG,
-                timeout,
-                poll_interval
-            )
-            print((f"[INFO] Reached CONFIG state"))
-        
-        # Send RESET to return to RUN
-        print("[INFO] Sending RESET...")
-        plc.write_control(
-            ADSSTATE_RESET, 
-            device_state, 
-            0, 
-            pyads.PLCTYPE_BYTE
-        )
-
-        ads_state, device_state = wait_for_ads_state(
-            plc, 
-            ADSSTATE_RUN,
-            timeout,
-            poll_interval
-        )
-        print(f"[SUCCESS] TwinCAT is now in RUN state")
-
-    except TimeoutError as te:
-        print(f"[TIMEOUT {te}")
-    # except Exception as e:
-    #     print(f"[ERROR] {e}")
+            conn.write_control(ADSSTATE_RECONFIG, device_state, 0, pyads.PLCTYPE_BYTE)
+        else:
+            print("[INFO] Already in CONFIG.")
 
     finally:
-        plc.close()
-        print("[INFO] Connection closed")
+        try:
+            conn.close()
+        except Exception:
+            pass
 
+    ads_state, device_state = wait_for_ads_state(
+        ams_net_id,
+        ADSSTATE_CONFIG,
+        timeout=timeout,
+        poll_interval=poll_interval
+    )
+    print(f"[INFO] Reached CONFIG: {ads_state}")
 
-def wait_for_ads_state(conn, target_state, timeout=15.0, poll_interval=0.1):
-    deadline = time.monotonic() + timeout
-    while time.monotonic() < deadline:
-        ads_state, device_state = conn.read_state()
-        if ads_state == target_state:
-            print("state reached")
-            return ads_state, device_state
-        time.sleep(poll_interval)
-        print("waiting for state")
-    raise TimeoutError(f"Timed out waiting for ADS state {target_state}")
+    conn = pyads.Connection(ams_net_id, SYSTEM_SERVICE_PORT)
+    try:
+        conn.open()
+        print("[INFO] Sending RESET...")
+        conn.write_control(ADSSTATE_RESET, device_state, 0, pyads.PLCTYPE_BYTE)
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+    if local:
+        target_state = ADSSTATE_CONFIG
+    else:
+        target_state = ADSSTATE_RUN
+
+    ads_state, device_state = wait_for_ads_state(
+        ams_net_id,
+        target_state,
+        timeout=timeout,
+        poll_interval=poll_interval
+    )
+    print(f"[INFO] Reached target state: {ads_state}")
 
 
 
@@ -120,7 +138,7 @@ def get_local_ams_netid():
 
 def restart_local_twincat():
     local_netid = get_local_ams_netid()
-    restart_twincat(local_netid)
+    restart_twincat(local_netid, local=True)
 
 
 
