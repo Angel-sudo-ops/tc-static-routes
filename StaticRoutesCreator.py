@@ -3797,7 +3797,8 @@ if getattr(sys, 'frozen', False) and not updated:  # Only in PyInstaller .exe
             root=root,
             current_version=VERSION,
             version_url="https://github.com/sudojac/tc-static-routes/releases/latest/download/version.txt",
-            download_url="https://github.com/sudojac/tc-static-routes/releases/latest/download/StaticRoutesCreator.exe"
+            download_url="https://github.com/sudojac/tc-static-routes/releases/latest/download/StaticRoutesCreator.exe",
+            changelog_url="https://github.com/sudojac/tc-static-routes/releases/latest/download/changelog.txt"
         ))
 
 ################################################################### Main loop ##########################################################################
