@@ -1,4 +1,16 @@
 [3.6.1.1] 
- 
-[3.6.1.0] 
+- test release
+[3.6.1.0]
+
+- small adjustment in timeout for connectiviy
+- adjust wait_for_ads method, when restarting local twincat, expect config mode instead of run
+- restart twincat test works but needs small fixes
+- add missing imports in tooltips module
+- bugfix rebuil_context_menu, adjust for multiselection
+- add Tooltip to tooltips module limit project number to 4 digist and only numbers
+- add a test for twincat restart (it does not work, but just to have it)
+- improve method to detect if a process is active
+- improve app closure
+- imporove start_process to consider working directory, avoid using _MEIxxxx for files
+- rebuild_context_menu when calling update_ssh_state
  
