@@ -148,4 +148,11 @@ if __name__ == "__main__":
 
     ams_net_id = '10.60.119.126.1.1'
     restart_twincat(ams_net_id)
+
+# poner en azul el lgv en la tabla hasta que se reinicia 
+# rojo cuando manda el reset
+# verde cuando ya está en run
+
+# click derecho, y cuando esté haciendo la rutina deselleccionar elemento para poder ver los colores
+
     
