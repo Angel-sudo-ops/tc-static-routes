@@ -24,7 +24,7 @@ class ReachabilityResult:
 # ------------------------------
 # Low-level checks
 # ------------------------------
-def is_port_open(host, port, timeout=1):
+def is_port_open(host, port, timeout=5):
     try:
         with socket.create_connection((host, port), timeout=timeout):
             return True
@@ -47,7 +47,7 @@ def is_https_port_open(host):
 
 
 
-def ping_to_host(host, timeout=1):
+def ping_to_host(host, timeout=5):
     
     system = platform.system().lower()
     if "windows" in system:
@@ -124,7 +124,7 @@ def is_host_reachable(host):
     for thread in threads:
         thread.start()
 
-    event.wait(timeout=0.5)
+    event.wait(timeout=5)
     for thread in threads:
         thread.join(timeout=0.1)
 
