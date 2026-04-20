@@ -9,8 +9,12 @@ a = Analysis(
         ('resources/plink.exe', 'resources'), 
         ('resources/vnc.exe', 'resources'),
         ('resources/winscp/winscp.exe', 'resources/winscp')
-        ],
-    datas=[('route.ico', '.'), ('version.txt', '.')],
+    ],
+    datas=[
+        ('route.ico', '.'), 
+        ('version.txt', '.'),
+        ('myutils', 'myutils'),
+    ],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},
@@ -34,7 +38,7 @@ exe = EXE(
     upx=True,
     upx_exclude=[],
     runtime_tmpdir=None,
-    console=False,
+    console=True,
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,
