@@ -827,7 +827,7 @@ def populate_table_from_db3():
     routes_data = []
     # Iterate through each <Route> element in the XML
     for route in rows_agvs:
-        if route['dbf_Enabled']: 
+        if to_bool(route['dbf_Enabled']):
         # if None in (name, address, net_id):
         #     messagebox.showwarning("Warning", "One or more routes are missing required fields (Name, Address, NetId).")
         #     continue  # Skip this route and move to the next
@@ -862,6 +862,9 @@ def populate_table_from_db3():
     # Populate the Treeview with the data
     for item in routes_data:
         routes_table.insert("", "end", values=item)
+
+def to_bool(value):
+    return str(value).strip().upper() in ("1", "TRUE")
 
     
 def ask_for_project_number(on_success_callback):
@@ -1241,7 +1244,7 @@ def open_remote_connection():
         return
 
     if not is_host_reachable(target_ip):
-        messagebox.showwarning("Attention", f"Host {lgv} is unreacheable")
+        messagebox.showwarning("Attention", f"Host {lgv} is unreachable")
         return
 
     if not rdp_username or not rdp_password:
@@ -2777,7 +2780,7 @@ class RouteManager:
         print(f"Starting EZRegisterToRemote for PLC {remote_ip}...")
 
         my_ip_address = local_ip
-        router_table_name = "TCP_" + local_name
+        router_table_name = "TCP_" + local_name #TCP_
         int_send_length = 27 + len(router_table_name) + 15 + len(username) + 5 + len(password) + 5 + len(my_ip_address) + 1
 
         if not use_static_route:
@@ -2879,7 +2882,7 @@ class RouteManager:
         print(f"Sending message to {remote_ip}: {sendbuf.hex()}")
 
         # Now create the UDP socket and send the message asynchronously
-        address = (remote_ip, 48899)
+        address = (remote_ip, 48899) #48899
         self.UDPSocket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.UDPSocket.settimeout(5.0)
         self.UDPSocket.setblocking(False)
@@ -3253,7 +3256,7 @@ def test_connection(ams_net_id, port, name):
             return False
 
     except pyads.ADSError as ads_error:
-        print(f"ADS Error: {ads_error}")
+        print(f"{ads_error}")
         return False
     except Exception as e:
         print(f"Unexpected Exception: {e}")
@@ -3815,3 +3818,13 @@ root.mainloop()
 # [Configuration\LastFingerprints]
 # 172.20.2.68=20022:ssh=ecdsa-sha2-nistp384%20384%20iXnY+SMyoQRSUxJMzgWWA+yadddMZqqgM4dLPp/uHhs
 # 172.20.2.68:20022:ssh=ecdsa-sha2-nistp384%20384%20iXnY+SMyoQRSUxJMzgWWA+yadddMZqqgM4dLPp/uHhs
+
+
+# add plant name as an option as CC
+
+# CC1234_LGV12
+# LAN_LGV12
+
+# fix bug adding project cc number after clicking config.db3 button
+
+# mabe adjust to modify staticroutes file when testing routes if ruote no present

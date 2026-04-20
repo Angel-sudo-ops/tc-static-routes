@@ -1,7 +1,6 @@
 [3.6.1.3] 
 - adjust write commits on changelog
 
-
 [3.6.1.0]
 
 - small adjustment in timeout for connectiviy
