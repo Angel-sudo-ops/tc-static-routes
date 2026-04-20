@@ -30,6 +30,8 @@ from myutils.connectivity import is_host_reachable, is_port_open
 
 from myutils.tooltips import ToolTip
 
+from myutils.twincat_restart import get_local_ams_netid, restart_local_twincat, restart_twincat
+
 try:
     import pyads
     pyads_available = True
@@ -541,9 +543,11 @@ def create_routes_xml_from_table(file_path):
     with open(file_path, "w", encoding='utf-8') as f:
         f.write(xmlstr)
 
-    messagebox.showinfo("Success", "StaticRoutes file has been created successfully. " \
-    "                               \nRemember to RESTART TwinCAT!! " \
-    "                               \nRight-click the TwinCAT icon → System → Start/Restart so the new routes take effect")
+    restart_local_twincat()
+
+    # messagebox.showinfo("Success", "StaticRoutes file has been created successfully. " \
+    # "                               \nRemember to RESTART TwinCAT!! " \
+    # "                               \nRight-click the TwinCAT icon → System → Start/Restart so the new routes take effect")
 
 def save_routes_xml():
     if not get_table_data():
@@ -2749,18 +2753,6 @@ def string_to_byte_format(ip_string):
     
     return byte_representation
 
-def get_local_ams_netid():
-    ams_net_id=None
-    try:
-        pyads.open_port()
-        ams_net_id = pyads.get_local_address().netid
-        print (ams_net_id)
-    except Exception as e:
-        print(f"Unexpected error: {e} \nCheck if TwinCAT on local machine is running")
-    finally:
-        pyads.close_port()
-
-    return ams_net_id
 
 class TcpStateObject:
     def __init__(self):
@@ -3149,7 +3141,24 @@ def update_tc_version_label():
     else:
         tc_version_label.config(text="No TwinCAT")
 
+############################################### Restart Twincat #############################################################
     
+def restartTC():
+    selected = routes_table.selection()
+    if selected:
+        start_spinner(190,133)
+        name, ip, ams_netid, typeTC = routes_table.item(selected)["values"]
+        print(ams_netid)
+
+        t = threading.Thread(target=restart_twincat, args=(ams_netid,), daemon=True)
+        t.start()
+        
+        # if not t.is_alive():
+        #     routes_table.after(0, lambda: stop_spinner())
+        #     routes_table.after(0, lambda: routes_table.selection_remove(routes_table.selection()))
+            
+
+
 ############################################### Test Routes ##################################################################
 # Not used
 def test_tc_routes_no_thread():
@@ -3709,6 +3718,7 @@ create_routes_button.config(state="disabled")
 # button_design(create_routes_button)
 
 restart_tc_button = ttk.Button(frame_router, text="Restart TC",
+                               command=restartTC
                                 )
 
 restart_tc_button.grid(row=1, column=1, columnspan=2, padx=5, pady=5)
