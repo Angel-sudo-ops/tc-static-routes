@@ -1,3 +1,6 @@
+[3.6.1.5] 
+- rebuild local imports and add local modules to .spec
+ 
 [3.6.1.4] 
 - bugfix detecting if lgv enabled when loading config.db3
  
