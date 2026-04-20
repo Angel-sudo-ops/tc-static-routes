@@ -113,14 +113,10 @@ REM ---------------------------------------------------------
 echo [%NEW_VERSION%] > changelog.new
 
 if defined PREV_TAG (
-    (
-        git log %PREV_TAG%..HEAD --pretty=format:"- %%s"
-    ) | findstr /v /i "export .exe bump version"
+    git log %PREV_TAG%..HEAD --pretty=format:"- %%s" | findstr /v /i "export .exe bump version" >> changelog.new
 ) else (
-    (
-        git log --pretty=format:"- %%s"
-    ) | findstr /v /i "export .exe bump version"
-) >> changelog.new
+    git log --pretty=format:"- %%s" | findstr /v /i "export .exe bump version" >> changelog.new
+)
 
 REM Blank line separation
 echo( >> changelog.new
