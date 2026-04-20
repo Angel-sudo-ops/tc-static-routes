@@ -3504,6 +3504,10 @@ root.minsize(window_width, window_lenght)
 # Apply the icon after the window is initialized
 root.after(100, set_icon)
 
+root.columnconfigure(0, weight=1)
+root.columnconfigure(1, weight=1)
+root.columnconfigure(2, weight=1)
+
 # italic_font = font.Font(family="Segoe UI", size=10, slant="italic")
 
 # Create a custom style for the LabelFrame with an italic font
@@ -3640,9 +3644,14 @@ delete_table_button.grid(row=3, column=1, pady=10)
 # button_design(delete_table_button)
 
 
-frame_load = ttk.Labelframe(root, text="Load", labelanchor='nw', style="Custom.TLabelframe")
+frame_load_router = tk.Frame(root)
+frame_load_router.grid(row=4, column=0, columnspan=3, padx=10, pady=0, sticky='ew')
+
+frame_load_router.columnconfigure(1, weight=1) 
+
+frame_load = ttk.Labelframe(frame_load_router, text="Load", labelanchor='nw', style="Custom.TLabelframe")
 # frame_load = tk.LabelFrame(root, text="Load", labelanchor='nw', font=italic_font)
-frame_load.grid(row=4, column=0, columnspan=1, padx=(10,15), pady=5, sticky='w')
+frame_load.grid(row=0, column=0, padx=(0,10), pady=5, sticky='ns')
 # Add a button to trigger the XML file selection and table population
 load_xml_button = ttk.Button(frame_load, text=" StaticRoutes.xml ", 
                             # bg="ghost white", 
@@ -3657,47 +3666,53 @@ load_db3_button.grid(row=2, column=0, padx=10, pady=5, sticky='ew')
 # button_design(load_db3_button)
 
 
-# frame_login = ttk.Frame(root, bd=1, relief="groove")
-frame_login = ttk.Labelframe(root, text="Router", labelanchor='nw', style="Custom.TLabelframe")
-frame_login.grid(row=4, column=0, columnspan=2, padx=0, pady=5, sticky='e')
+# frame_router = ttk.Frame(root, bd=1, relief="groove")
+frame_router = ttk.Labelframe(frame_load_router, text="Router", labelanchor='nw', style="Custom.TLabelframe")
+frame_router.grid(row=0, column=1, columnspan=2, padx=0, pady=5, sticky='ew')
 
-frame_user = tk.Frame(frame_login)
+frame_user = tk.Frame(frame_router)
 frame_user.grid(row=0, column=0, padx=5, pady=0)
 
 username_label = ttk.Label(frame_user, text="Username:")
 username_label.grid(row=0, column=0, padx=0, pady=5, sticky='e')
 
-username_entry = ttk.Entry(frame_user, width=15)
+username_entry = ttk.Entry(frame_user, width=13)
 username_entry.insert(0, "Administrator")
 username_entry.grid(row=0, column=1, padx=5, pady=5)
 
-frame_password = tk.Frame(frame_login)
+frame_password = tk.Frame(frame_router)
 frame_password.grid(row=1, column=0, padx=5, pady=0)
 
 password_label = ttk.Label(frame_password, text="Password:")
 password_label.grid(row=0, column=0, padx=0, pady=5, sticky='e')
 
-password_entry = ttk.Entry(frame_password, width=15)
+password_entry = ttk.Entry(frame_password, width=13)
 password_entry.insert(0, "1")
 password_entry.grid(row=0, column=1, padx=5, pady=5)
 
-tc_version_label = ttk.Label(frame_login, text="", foreground="#4682B4")
+tc_version_label = ttk.Label(frame_router, text="", foreground="#4682B4")
 tc_version_label.place(relx=1.0, rely=0.0, x=-5, y=-20, anchor="ne")
 
 
-test_routes_button = ttk.Button(frame_login, text="  Test Routes  ",
-                                # bg="ghost white",
+test_routes_button = ttk.Button(frame_router, text="1. Test",
+                                width=6,
                                 command=test_tc_routes)
-test_routes_button.grid(row=0, column=1, padx=5, pady=5)
+test_routes_button.grid(row=0, column=1, padx=0, pady=5)
 # button_design(test_routes_button)
 
-create_routes_button = ttk.Button(frame_login, text="Create Routes",
-                                # bg="ghost white",
+create_routes_button = ttk.Button(frame_router, text="2. Create",  
+                                width=8,
                                 command=create_tc_routes)
-create_routes_button.grid(row=1, column=1, padx=5, pady=5)
+create_routes_button.grid(row=0, column=2, padx=0, pady=5)
 # Disable it until test_tc_routes is done
 create_routes_button.config(state="disabled")
 # button_design(create_routes_button)
+
+restart_tc_button = ttk.Button(frame_router, text="Restart TC",
+                                )
+
+restart_tc_button.grid(row=1, column=1, columnspan=2, padx=5, pady=5)
+
 
 
 
@@ -3743,7 +3758,7 @@ rebuild_context_menu()
 # Bind right-click to show the context menu
 routes_table.bind("<Button-3>", show_context_menu)
 
-exceptions = [routes_table, vsb, frame_login, frame_prefix]
+exceptions = [routes_table, vsb, frame_router, frame_prefix]
 root.bind("<Button-1>", on_click_remove_selection)
 
 

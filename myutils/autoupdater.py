@@ -268,3 +268,6 @@ def get_app_version():
             return f.read().strip()
     except FileNotFoundError:
         return "Unknown"
+    
+
+#maybe just show commits since last version??
