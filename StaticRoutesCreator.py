@@ -3143,21 +3143,60 @@ def update_tc_version_label():
 
 ############################################### Restart Twincat #############################################################
     
+active_restart_threads = 0
+
 def restartTC():
+    global active_restart_threads
+    if active_restart_threads != 0:
+        return  # Prevent overlapping restarts
+
     selected = routes_table.selection()
-    if selected:
-        start_spinner(190,133)
-        name, ip, ams_netid, typeTC = routes_table.item(selected)["values"]
-        print(ams_netid)
+    if not selected:
+        return
+    
+    if not messagebox.askokcancel(
+                "TwinCAT Restart", 
+                "You are about to restart TwinCAT for selected LGV(s) \nClick OK to continue"):
+        return
 
-        t = threading.Thread(target=restart_twincat, args=(ams_netid,), daemon=True)
-        t.start()
-        
-        # if not t.is_alive():
-        #     routes_table.after(0, lambda: stop_spinner())
-        #     routes_table.after(0, lambda: routes_table.selection_remove(routes_table.selection()))
+    # Build data list from selected rows
+    data = [list(routes_table.item(item)["values"]) for item in selected]
+
+    start_spinner(190, 133)
+
+    with lock:
+        active_restart_threads = len(data)
+
+    start_restart_thread(data)
+
+
+def start_restart_thread(data):
+    if not data:
+        return
+
+    entry = data.pop(0)
+    threading.Thread(target=restart_and_update_ui, args=(entry,), daemon=True).start()
+
+    # Stagger thread starts
+    routes_table.after(100, lambda: start_restart_thread(data))
+
+
+def restart_and_update_ui(entry):
+    global active_restart_threads
+    name, ip, ams_net_id, type_tc = entry
+
+    try:
+        restart_twincat(ams_net_id)  # Your existing restart function
+        print(f"TwinCAT restart command sent successfully to {name}")
+    except Exception as e:
+        print(f"Failed to restart TwinCAT in {name}— {e}")
+
+    with lock:
+        active_restart_threads -= 1
+        if active_restart_threads == 0:
+            routes_table.after(0, lambda: stop_spinner())
+            routes_table.after(0, lambda: routes_table.selection_remove(routes_table.selection()))
             
-
 
 ############################################### Test Routes ##################################################################
 # Not used
@@ -3177,7 +3216,7 @@ def test_tc_routes_no_thread():
 max_threads = 5
 semaphore = threading.Semaphore(max_threads)
 active_threads = 0
-lock = threading.Lock()
+# lock = threading.Lock()
 
 def test_tc_routes():
     global active_threads
