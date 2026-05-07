@@ -23,6 +23,7 @@ import shutil
 import psutil
 import binascii
 import base64
+import logging
 from ftplib import FTP_PORT
 
 from myutils.autoupdater import check_for_updates_async, get_app_version
@@ -3186,10 +3187,10 @@ def restart_and_update_ui(entry):
     name, ip, ams_net_id, type_tc = entry
 
     try:
-        restart_twincat(ams_net_id)  # Your existing restart function
+        restart_twincat(ams_net_id) 
         print(f"TwinCAT restart command sent successfully to {name}")
     except Exception as e:
-        print(f"Failed to restart TwinCAT in {name}— {e}")
+        print(f"Failed to restart TwinCAT in {name} — {e}")
 
     with lock:
         active_restart_threads -= 1
@@ -3867,6 +3868,14 @@ if getattr(sys, 'frozen', False) and not updated:  # Only in PyInstaller .exe
             download_url="https://github.com/sudojac/tc-static-routes/releases/latest/download/StaticRoutesCreator.exe",
             changelog_url="https://github.com/sudojac/tc-static-routes/releases/latest/download/changelog.txt"
         ))
+
+
+# logging
+
+logging.basicConfig(
+    level=logging.DEBUG,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+)
 
 ################################################################### Main loop ##########################################################################
 

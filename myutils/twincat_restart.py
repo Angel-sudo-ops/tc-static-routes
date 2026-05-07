@@ -3,8 +3,16 @@ Utilities for restarting a TwinCAT runtime via ADS.
 
 Restart sequence
 ----------------
-1. If not already in CONFIG state, send RECONFIG and wait for CONFIG.
-2. Send RESET and wait for RUN (or CONFIG when stop_at_config=True).
+1. Read initial state.
+2. Send RESET.
+3. Wait for the state to leave the initial state (confirms RESET was accepted).
+4. Wait for the target state (RUN for remote, CONFIG for local).
+
+Known transitions:
+  - Remote PLC in RUN:    RUN    -> (transition) -> RUN
+  - Local in CONFIG:      CONFIG -> (transition) -> CONFIG
+  - Remote PLC in CONFIG: CONFIG -> (transition) -> RUN
+
 """
 
 import logging
@@ -14,7 +22,6 @@ from contextlib import contextmanager
 import pyads
 from pyads.constants import (
     ADSSTATE_CONFIG,
-    ADSSTATE_RECONFIG,
     ADSSTATE_RESET,
     ADSSTATE_RUN,
 )
@@ -46,7 +53,7 @@ def _ads_connection(ams_net_id, port=SYSTEM_SERVICE_PORT):
 # State polling
 # ---------------------------------------------------------------------------
 
-def wait_for_ads_state(ams_net_id, target_state, timeout=15, poll_interval=0.3):
+def wait_for_ads_state(ams_net_id, target_state, timeout, poll_interval):
     """
     Poll until the ADS state equals *target_state* or *timeout* expires.
     """
@@ -75,48 +82,72 @@ def wait_for_ads_state(ams_net_id, target_state, timeout=15, poll_interval=0.3):
     )
 
 
+def wait_for_state_change(ams_net_id, initial_state, timeout = 30.0, poll_interval = 0.3,):
+    """
+    Poll until the ADS state is different from *initial_state*.
+
+    Used to confirm that a RESET command was actually accepted, the PLC
+    must leave its current state before we check for the final target state.
+
+    """
+    deadline = time.monotonic() + timeout
+    last_error: Exception | None = None
+
+    while time.monotonic() < deadline:
+        try:
+            with _ads_connection(ams_net_id) as conn:
+                ads_state, device_state = conn.read_state()
+
+            log.debug("ads_state=%s device_state=%s", ads_state, device_state)
+
+            if ads_state != initial_state:
+                log.info("State changed from %s to %s", initial_state, ads_state)
+                return ads_state, device_state
+
+        except pyads.ADSError as e:
+            last_error = e
+            log.debug("Transient ADS error while polling: %s", e)
+
+        time.sleep(poll_interval)
+
+    raise TimeoutError(
+        f"Timed out waiting for state to change from {initial_state}. "
+        f"Last ADS error: {last_error}"
+    )
+
+
+
 # ---------------------------------------------------------------------------
 # Core restart logic
 # ---------------------------------------------------------------------------
 
-def restart_twincat(ams_net_id, stop_at_config=False, timeout=15, poll_interval=0.3):
+def restart_twincat(ams_net_id, stop_at_config=False, timeout=60, poll_interval=0.5):
     """
     Restart a TwinCAT runtime with ams_net_id
     """
-    # --- Step 1: move to CONFIG -------------------------------------------
+    target_state = ADSSTATE_CONFIG if stop_at_config else ADSSTATE_RUN
+
+    # --- Step 1: read initial state ------------------------------------------
     with _ads_connection(ams_net_id) as conn:
-        ads_state, device_state = conn.read_state()
-        log.info("Initial state: ads=%s device=%s", ads_state, device_state)
+        initial_state, device_state = conn.read_state()
+        log.info("Initial state: ads=%s device=%s", initial_state, device_state)
 
-        if ads_state != ADSSTATE_CONFIG:
-            log.info("Sending RECONFIG...")
-            conn.write_control(ADSSTATE_RECONFIG, device_state, 0, pyads.PLCTYPE_BYTE)
-        else:
-            log.info("Already in CONFIG, skipping RECONFIG.")
-
-    ads_state, device_state = wait_for_ads_state(
-        ams_net_id, ADSSTATE_CONFIG, timeout=timeout, poll_interval=poll_interval
-    )
-    log.info("Reached CONFIG state.")
-
-    # --- Step 2: reset -------------------------------------------------------
-    # Re-read device_state here rather than relying on the value returned by
-    # the polling loop, which may reflect the last successful poll some
-    # milliseconds ago.
+    # --- Step 2: send RESET --------------------------------------------------
     with _ads_connection(ams_net_id) as conn:
         _, device_state = conn.read_state()
         log.info("Sending RESET...")
         conn.write_control(ADSSTATE_RESET, device_state, 0, pyads.PLCTYPE_BYTE)
 
-    # --- Step 3: wait for final state ----------------------------------------
-    target_state = ADSSTATE_CONFIG if stop_at_config else ADSSTATE_RUN
+    # --- Step 3: wait for state to leave initial state -----------------------
+    # This confirms RESET was actually accepted, not silently ignored.
+    wait_for_state_change(ams_net_id, initial_state)
+
+    # --- Step 4: wait for target state ---------------------------------------
     ads_state, device_state = wait_for_ads_state(
         ams_net_id, target_state, timeout=timeout, poll_interval=poll_interval
     )
     log.info("Reached target state: ads=%s device=%s", ads_state, device_state)
-    restart_ok = True
 
-    return restart_ok
 # ---------------------------------------------------------------------------
 # Local-machine helpers
 # ---------------------------------------------------------------------------
@@ -140,12 +171,20 @@ def get_local_ams_netid():
         pyads.close_port()
 
 
-def restart_local_twincat(stop_at_config=True, timeout=15, poll_interval=0.3):
+def restart_local_twincat(timeout=15, poll_interval=0.3):
     """Restart the TwinCAT instance on the local machine."""
     local_netid = get_local_ams_netid()
-    restart_twincat(
-        local_netid,
-        stop_at_config=stop_at_config,
-        timeout=timeout,
-        poll_interval=poll_interval,
+    restart_twincat(local_netid, stop_at_config=True, timeout=timeout, poll_interval=poll_interval,
     )
+
+
+
+# if __name__ == "__main__":
+
+#     restart_local_twincat()
+
+    # ams_net_id = '10.60.119.126.1.1'
+    # restart_twincat(ams_net_id)
+
+    # ams_net_id = '10.60.119.124.1.1'
+    # restart_twincat_reset(ams_net_id)
