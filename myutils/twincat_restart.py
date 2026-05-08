@@ -72,7 +72,7 @@ def wait_for_ads_state(ams_net_id, target_state, timeout, poll_interval):
 
         except pyads.ADSError as e:
             last_error = e
-            log.debug("Transient ADS error while polling: %s", e)
+            log.debug("Transient ADS error while polling final state: %s", e)
 
         time.sleep(poll_interval)
 
@@ -82,7 +82,7 @@ def wait_for_ads_state(ams_net_id, target_state, timeout, poll_interval):
     )
 
 
-def wait_for_state_change(ams_net_id, initial_state, timeout = 30.0, poll_interval = 0.3,):
+def wait_for_state_change(ams_net_id, initial_state, timeout = 30.0, poll_interval = 0.3):
     """
     Poll until the ADS state is different from *initial_state*.
 
@@ -91,7 +91,7 @@ def wait_for_state_change(ams_net_id, initial_state, timeout = 30.0, poll_interv
 
     """
     deadline = time.monotonic() + timeout
-    last_error: Exception | None = None
+    consecutive_errors = 0
 
     while time.monotonic() < deadline:
         try:
@@ -100,19 +100,27 @@ def wait_for_state_change(ams_net_id, initial_state, timeout = 30.0, poll_interv
 
             log.debug("ads_state=%s device_state=%s", ads_state, device_state)
 
+            consecutive_errors = 0
+
             if ads_state != initial_state:
                 log.info("State changed from %s to %s", initial_state, ads_state)
                 return ads_state, device_state
 
         except pyads.ADSError as e:
-            last_error = e
-            log.debug("Transient ADS error while polling: %s", e)
+            consecutive_errors += 1
+            log.debug("Transient ADS error (%d consecutive) while polling during wait for state change: %s", consecutive_errors, e)
+            if consecutive_errors == 1:
+                log.info("Single connection drop detected - assuming restart in progress during wait for state change")
+                return None, None
+            raise TimeoutError (
+                f"Too many consecutive ADS errors - possible network issue"
+                f"Last error: {e}"
+            )
 
         time.sleep(poll_interval)
 
     raise TimeoutError(
         f"Timed out waiting for state to change from {initial_state}. "
-        f"Last ADS error: {last_error}"
     )
 
 
@@ -121,7 +129,7 @@ def wait_for_state_change(ams_net_id, initial_state, timeout = 30.0, poll_interv
 # Core restart logic
 # ---------------------------------------------------------------------------
 
-def restart_twincat(ams_net_id, stop_at_config=False, timeout=60, poll_interval=0.5):
+def restart_twincat(ams_net_id, stop_at_config=False, timeout=60, poll_interval=0.3):
     """
     Restart a TwinCAT runtime with ams_net_id
     """
@@ -171,11 +179,10 @@ def get_local_ams_netid():
         pyads.close_port()
 
 
-def restart_local_twincat(timeout=15, poll_interval=0.3):
+def restart_local_twincat(timeout=15, poll_interval=0.5):
     """Restart the TwinCAT instance on the local machine."""
     local_netid = get_local_ams_netid()
-    restart_twincat(local_netid, stop_at_config=True, timeout=timeout, poll_interval=poll_interval,
-    )
+    restart_twincat(local_netid, stop_at_config=True, timeout=timeout, poll_interval=poll_interval,)
 
 
 

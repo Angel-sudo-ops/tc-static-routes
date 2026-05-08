@@ -544,8 +544,6 @@ def create_routes_xml_from_table(file_path):
     with open(file_path, "w", encoding='utf-8') as f:
         f.write(xmlstr)
 
-    restart_local_twincat()
-
     # messagebox.showinfo("Success", "StaticRoutes file has been created successfully. " \
     # "                               \nRemember to RESTART TwinCAT!! " \
     # "                               \nRight-click the TwinCAT icon → System → Start/Restart so the new routes take effect")
@@ -567,6 +565,11 @@ def save_routes():
         save_routes_registry()
     else:
         save_routes_xml()
+    
+    # After saving routes, restart twincat
+    restart_local_twincat()
+
+    # maybe add the restart so that it only happens when routes are saved, if not, ask the user to create routes again
 
 def save_routes_registry():
     data = get_table_data()
