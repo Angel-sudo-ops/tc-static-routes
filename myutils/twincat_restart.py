@@ -82,7 +82,7 @@ def wait_for_ads_state(ams_net_id, target_state, timeout, poll_interval):
     )
 
 
-def wait_for_state_change(ams_net_id, initial_state, timeout = 30.0, poll_interval = 0.3):
+def wait_for_state_change(ams_net_id, initial_state, timeout = 30.0, poll_interval = 0.2):
     """
     Poll until the ADS state is different from *initial_state*.
 
@@ -92,30 +92,36 @@ def wait_for_state_change(ams_net_id, initial_state, timeout = 30.0, poll_interv
     """
     deadline = time.monotonic() + timeout
     consecutive_errors = 0
+    tries = 0
 
     while time.monotonic() < deadline:
         try:
             with _ads_connection(ams_net_id) as conn:
                 ads_state, device_state = conn.read_state()
 
-            log.debug("ads_state=%s device_state=%s", ads_state, device_state)
+            log.debug("Try %d: ads_state=%s device_state=%s", tries, ads_state, device_state)
 
+            consecutive_errors_before = consecutive_errors
             consecutive_errors = 0
 
             if ads_state != initial_state:
                 log.info("State changed from %s to %s", initial_state, ads_state)
                 return ads_state, device_state
+            
+            if consecutive_errors_before == 1:
+                log.info("Single connection drop detected - assuming restart in progress during wait for state change . Leaving wait for state change")
+                return None, None
 
         except pyads.ADSError as e:
             consecutive_errors += 1
-            log.debug("Transient ADS error (%d consecutive) while polling during wait for state change: %s", consecutive_errors, e)
-            if consecutive_errors == 1:
-                log.info("Single connection drop detected - assuming restart in progress during wait for state change")
-                return None, None
-            raise TimeoutError (
-                f"Too many consecutive ADS errors - possible network issue"
-                f"Last error: {e}"
-            )
+            log.debug("Try %d. Transient ADS error (%d consecutive) while polling during wait for state change: %s", tries, consecutive_errors, e)
+            if consecutive_errors > 2:
+                raise TimeoutError (
+                    f"Too many consecutive ADS errors - possible network issue"
+                    f"Last error: {e}"
+                )
+            
+        tries +=1
 
         time.sleep(poll_interval)
 
