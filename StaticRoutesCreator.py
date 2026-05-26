@@ -25,6 +25,7 @@ import binascii
 import base64
 import logging
 from ftplib import FTP_PORT
+from datetime import datetime
 
 from myutils.autoupdater import check_for_updates_async, get_app_version
 from myutils.connectivity import is_host_reachable, is_port_open
@@ -44,7 +45,8 @@ if not pyads_available:
     messagebox.showerror("Attention", "No pyads available")
     print("No pyads available")
 
-default_file_path = os.path.join(r'C:\TwinCAT\3.1\Target', 'StaticRoutes.xml')
+DEFAULT_DIR  = r"C:\TwinCAT\3.1\Target"
+DEFAULT_PATH = os.path.join(DEFAULT_DIR, 'StaticRoutes.xml')
 
 ################################################################# Version check #####################################################################
 updated = False
@@ -149,7 +151,7 @@ def convert_static_to_cc(static_routes_file, CC_file):
 
 def validate_and_create_cc():
     # static_file_path = entry_file_path.get().strip()
-    static_file_path = default_file_path
+    static_file_path = DEFAULT_PATH
 
     path_to_save_file = filedialog.asksaveasfilename(
         initialdir= os.path.join(os.path.expanduser("~"), "Documents"),
@@ -548,26 +550,48 @@ def create_routes_xml_from_table(file_path):
     # "                               \nRemember to RESTART TwinCAT!! " \
     # "                               \nRight-click the TwinCAT icon → System → Start/Restart so the new routes take effect")
 
-def save_routes_xml():
+def save_routes_xml(auto_save=True):
     if not get_table_data():
         messagebox.showerror("Attention", "Routes table is empty!")
-        return
-    file_path = filedialog.asksaveasfilename(defaultextension=".xml",
-                                             initialdir="C:\\TwinCAT\\3.1\\Target",
-                                             initialfile="StaticRoutes.xml",
-                                             filetypes=[("XML files", "*.xml")])
-    if file_path:
-        create_routes_xml_from_table(file_path)
+        return False
+    
+    if auto_save:
+        file_path = DEFAULT_PATH
+        if os.path.exists(file_path):
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            old_path = os.path.join(DEFAULT_DIR, f"StaticRoutes_{timestamp}_old.xml")
+            shutil.move(file_path, old_path)
+            messagebox.showinfo(
+                "Filed Renamed",
+                f"An existing 'StaticRoutes.xml' was found.\n"
+                f"It has been renamed to 'StaticRoutes_{timestamp}_old.xml'\n"
+                f"and the new file has been saved."
+            )
+        else:
+            messagebox.showinfo(
+                "File Saved",
+                f"'StaticRoutes.xml' has been saved to: \n{DEFAULT_DIR}"
+            )
+    else:
+
+        file_path = filedialog.asksaveasfilename(
+            defaultextension=".xml",
+            initialdir=DEFAULT_DIR,
+            initialfile="StaticRoutes.xml",
+            filetypes=[("XML files", "*.xml")]
+        )
+        if not file_path:
+            return False # User cancelled
+
+    create_routes_xml_from_table(file_path)
+    return True
 
 
 def save_routes():
-    if tc_version == "TC2":
-        save_routes_registry()
-    else:
-        save_routes_xml()
-    
+    save_fn = save_routes_registry if tc_version == "TC2" else save_routes_xml
     # After saving routes, restart twincat
-    restart_local_twincat()
+    if save_fn():
+        restart_local_twincat()
 
     # maybe add the restart so that it only happens when routes are saved, if not, ask the user to create routes again
 
@@ -581,9 +605,12 @@ def save_routes_registry():
             break
 
     if i==total:
-        messagebox.showinfo("Success", "All routes added to the registry. \nRemember to restart TwinCAT!!")
+        # messagebox.showinfo("Success", "All routes added to the registry. \nRemember to restart TwinCAT!!")
+        print("All routes added to the registry. Restart TwinCAT.")
+        return True
     else:
         messagebox.showerror("Attention", "Unable to add some routes to the registry")
+        return False
     
 
 ######################################## Create Control Center xml file from table ################################
@@ -3857,7 +3884,7 @@ update_tc_version_label()
 create_spinner_widget()
 
 # Populate table the first time with current StaticRoutes.xml file
-populate_table_from_xml(default_file_path)
+populate_table_from_xml(DEFAULT_PATH)
 
 root.protocol("WM_DELETE_WINDOW", close_app)
 

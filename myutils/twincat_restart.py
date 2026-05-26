@@ -115,7 +115,7 @@ def wait_for_state_change(ams_net_id, initial_state, timeout = 30.0, poll_interv
         except pyads.ADSError as e:
             consecutive_errors += 1
             log.debug("Try %d. Transient ADS error (%d consecutive) while polling during wait for state change: %s", tries, consecutive_errors, e)
-            if consecutive_errors > 2:
+            if consecutive_errors > 20:
                 raise TimeoutError (
                     f"Too many consecutive ADS errors - possible network issue"
                     f"Last error: {e}"
@@ -160,7 +160,7 @@ def restart_twincat(ams_net_id, stop_at_config=False, timeout=60, poll_interval=
     ads_state, device_state = wait_for_ads_state(
         ams_net_id, target_state, timeout=timeout, poll_interval=poll_interval
     )
-    log.info("Reached target state: ads=%s device=%s", ads_state, device_state)
+    log.info("Reached target state: ads_state=%s device_state=%s", ads_state, device_state)
 
 # ---------------------------------------------------------------------------
 # Local-machine helpers
