@@ -1,3 +1,16 @@
+[3.6.2.1]
+- remove restart twincat button until it's ready
+- bugfix when extracting changelog in prepare_release and autoupdater, adjust release.bat, exit if clean working tree not clean
+- bugfix add project number when loading condig.db3
+- add thread for method for restarting local twincat to avoid window freezing
+- save StaticRoutes.xml file and then restart local twincat automatically, if file present rename it to _timestamp_old
+- give priority to state change over single connection drop for setting twincat restart
+- consider restart if single connetion drop, twincat restart
+- restart twincat improvements, send just reset
+- restart twincat for selected entries
+- start working with some logic for twincat restart
+- add restart button to UI
+ 
 [3.6.1.7] 
 - remove console
  
