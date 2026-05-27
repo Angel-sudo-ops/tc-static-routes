@@ -3757,7 +3757,7 @@ username_entry.insert(0, "Administrator")
 username_entry.grid(row=0, column=1, padx=5, pady=5)
 
 frame_password = tk.Frame(frame_router)
-frame_password.grid(row=1, column=0, padx=5, pady=0)
+frame_password.grid(row=1, column=0, padx=(5,0), pady=0)
 
 password_label = ttk.Label(frame_password, text="Password:")
 password_label.grid(row=0, column=0, padx=0, pady=5, sticky='e')
@@ -3770,25 +3770,25 @@ tc_version_label = ttk.Label(frame_router, text="", foreground="#4682B4")
 tc_version_label.place(relx=1.0, rely=0.0, x=-5, y=-20, anchor="ne")
 
 
-test_routes_button = ttk.Button(frame_router, text="1. Test",
-                                width=6,
+test_routes_button = ttk.Button(frame_router, text="  Test Routes  ",
+                                # width=6,
                                 command=test_tc_routes)
-test_routes_button.grid(row=0, column=1, padx=0, pady=5)
+test_routes_button.grid(row=0, column=1, padx=5, pady=5)
 # button_design(test_routes_button)
 
-create_routes_button = ttk.Button(frame_router, text="2. Create",  
-                                width=8,
+create_routes_button = ttk.Button(frame_router, text="Create Routes",  
+                                # width=8,
                                 command=create_tc_routes)
-create_routes_button.grid(row=0, column=2, padx=0, pady=5)
+create_routes_button.grid(row=1, column=1, padx=5, pady=5)
 # Disable it until test_tc_routes is done
 create_routes_button.config(state="disabled")
 # button_design(create_routes_button)
 
-restart_tc_button = ttk.Button(frame_router, text="Restart TC",
-                               command=restartTC
-                                )
+# restart_tc_button = ttk.Button(frame_router, text="Restart TC",
+#                                command=restartTC
+#                                 )
 
-restart_tc_button.grid(row=1, column=1, columnspan=2, padx=5, pady=5)
+# restart_tc_button.grid(row=1, column=1, columnspan=2, padx=5, pady=5)
 
 
 
