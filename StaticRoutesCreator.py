@@ -591,7 +591,7 @@ def save_routes():
     save_fn = save_routes_registry if tc_version == "TC2" else save_routes_xml
     # After saving routes, restart twincat
     if save_fn():
-        restart_local_twincat()
+        threading.Thread(target=restart_local_twincat, daemon=True).start()
 
     # maybe add the restart so that it only happens when routes are saved, if not, ask the user to create routes again
 
