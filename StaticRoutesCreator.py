@@ -173,7 +173,8 @@ placeholder_fg = 'grey'
 
 def validate_entry(entry, style_name, validate_func):
     def inner_validate(*args):
-        if entry.get() != placeholders[entry]:
+        placeholder = placeholders.get(entry)
+        if placeholder is None or entry.get() != placeholder:
             result = validate_func(entry)
             if result:
                 style.configure(style_name, background=good_input_bg, foreground=good_input_fg)
@@ -819,13 +820,14 @@ def read_db3_file(db3_file_path, table_name):
         messagebox.showerror("Error", f"An error occurred: {e}")
         return None
 
-def populate_table_from_db3():
+def populate_table_from_db3(project=None):
 
-    if not validate_project():
-        ask_for_project_number(populate_table_from_db3)
-        return
-    
-    project = project_entry.get().strip()
+    if project is None:
+        if not validate_project():
+            ask_for_project_number(populate_table_from_db3)
+            return
+        
+        project = project_entry.get().strip()
     
     db3_path = filedialog.askopenfilename(title="Select config.db3 file", 
                                           initialdir="C:\\Program Files (x86)\\Elettric80",
@@ -944,14 +946,9 @@ def ask_for_project_number(on_success_callback):
 
     def submit(event=None):
         if validate_input():
-            project_entry.delete(0, tk.END)
-            project_entry.insert(0, project_entry.get().strip())
-            project_entry.config(style="Project.TEntry")
-
-            validate_entry(project_entry, 'Project.TEntry', validate_project)()
-
+            project = project_entry.get().strip()
             popup.destroy()
-            on_success_callback()
+            on_success_callback(project)
 
     submit_button = ttk.Button(popup, text="OK", command=submit)
     submit_button.pack(pady=5)
