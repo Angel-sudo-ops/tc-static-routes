@@ -3904,6 +3904,13 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
 )
 
+
+try:
+    import pyi_splash
+    pyi_splash.close()
+except ImportError:
+    pass
+
 ################################################################### Main loop ##########################################################################
 
 root.mainloop()
