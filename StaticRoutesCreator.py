@@ -30,7 +30,7 @@ from datetime import datetime
 from myutils.autoupdater import check_for_updates_async, get_app_version
 from myutils.connectivity import is_host_reachable, is_port_open
 
-from myutils.tooltips import ToolTip
+from myutils.tooltips import ToolTip, create_tooltip_btn
 
 from myutils.twincat_restart import get_local_ams_netid, restart_local_twincat, restart_twincat
 
@@ -3038,7 +3038,7 @@ def create_tc_routes():
         global active_route_creation_threads
         active_route_creation_threads = len(red_items)
 
-    start_spinner(190, 133)
+    start_spinner(195, 133)
 
     for item in red_items:
         entry = routes_table.item(item)["values"]
@@ -3190,7 +3190,7 @@ def restartTC():
     # Build data list from selected rows
     data = [list(routes_table.item(item)["values"]) for item in selected]
 
-    start_spinner(190, 133)
+    start_spinner(195, 133)
 
     with lock:
         active_restart_threads = len(data)
@@ -3268,7 +3268,7 @@ def test_tc_routes():
         for item in routes_table.get_children():
             routes_table.item(item, tags=("black"))
 
-    start_spinner(190, 133)
+    start_spinner(195, 133)
     
     with lock:
         active_threads = len(data)
@@ -3742,6 +3742,8 @@ load_db3_button.grid(row=2, column=0, padx=10, pady=5, sticky='ew')
 # button_design(load_db3_button)
 
 
+
+
 # frame_router = ttk.Frame(root, bd=1, relief="groove")
 frame_router = ttk.Labelframe(frame_load_router, text="Router", labelanchor='nw', style="Custom.TLabelframe")
 frame_router.grid(row=0, column=1, columnspan=2, padx=0, pady=5, sticky='ew')
@@ -3752,9 +3754,9 @@ frame_user.grid(row=0, column=0, padx=5, pady=0)
 username_label = ttk.Label(frame_user, text="Username:")
 username_label.grid(row=0, column=0, padx=0, pady=5, sticky='e')
 
-username_entry = ttk.Entry(frame_user, width=13)
+username_entry = ttk.Entry(frame_user, width=14)
 username_entry.insert(0, "Administrator")
-username_entry.grid(row=0, column=1, padx=5, pady=5)
+username_entry.grid(row=0, column=1, padx=(5,2), pady=5)
 
 frame_password = tk.Frame(frame_router)
 frame_password.grid(row=1, column=0, padx=(5,0), pady=0)
@@ -3762,33 +3764,40 @@ frame_password.grid(row=1, column=0, padx=(5,0), pady=0)
 password_label = ttk.Label(frame_password, text="Password:")
 password_label.grid(row=0, column=0, padx=0, pady=5, sticky='e')
 
-password_entry = ttk.Entry(frame_password, width=13)
+password_entry = ttk.Entry(frame_password, width=14)
 password_entry.insert(0, "1")
-password_entry.grid(row=0, column=1, padx=5, pady=5)
+password_entry.grid(row=0, column=1, padx=(5,2), pady=5)
 
 tc_version_label = ttk.Label(frame_router, text="", foreground="#4682B4")
 tc_version_label.place(relx=1.0, rely=0.0, x=-5, y=-20, anchor="ne")
 
 
-test_routes_button = ttk.Button(frame_router, text="  Test Routes  ",
-                                # width=6,
-                                command=test_tc_routes)
-test_routes_button.grid(row=0, column=1, padx=5, pady=5)
+test_routes_button = ttk.Button(frame_router, width=7, text="Test", command=test_tc_routes)
+test_routes_button.grid(row=0, column=1, padx=(2,2), pady=5)
+# test_routes_text = tk.StringVar(value="Test Route(s)")
+# create_tooltip_btn(test_routes_button, test_routes_text, root)
+# text="  Test Routes  "
 # button_design(test_routes_button)
 
-create_routes_button = ttk.Button(frame_router, text="Create Routes",  
-                                # width=8,
-                                command=create_tc_routes)
-create_routes_button.grid(row=1, column=1, padx=5, pady=5)
+create_routes_button = ttk.Button(frame_router, width=7, text="Create", command=create_tc_routes)
+create_routes_button.grid(row=1, column=1, padx=(2,2), pady=5)
+# create_routes_text = tk.StringVar(value="Create Route(s)")
+# create_tooltip_btn(create_routes_button, create_routes_text, root)
+# text="Create Routes"
 # Disable it until test_tc_routes is done
 create_routes_button.config(state="disabled")
 # button_design(create_routes_button)
 
-# restart_tc_button = ttk.Button(frame_router, text="Restart TC",
-#                                command=restartTC
-#                                 )
+# Separator between Test/Create and Restart
+separator = ttk.Separator(frame_router, orient='vertical')
+separator.grid(row=0, column=2, rowspan=2, sticky='ns', padx=(3,3), pady=4)
 
-# restart_tc_button.grid(row=1, column=1, columnspan=2, padx=5, pady=5)
+restart_tc_button = ttk.Button(frame_router, width=3, 
+                               text="⟳",
+                               command=restartTC)
+restart_tc_button.grid(row=0, column=3, rowspan=2, padx=(2,5), pady=0)
+restart_text = tk.StringVar(value="Restart PLC(s)")
+create_tooltip_btn(restart_tc_button, restart_text, root)
 
 
 

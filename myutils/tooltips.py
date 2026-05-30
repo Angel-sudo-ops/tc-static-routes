@@ -91,3 +91,32 @@ class ToolTip:
         if self.tooltip_window:
             self.start_fade_out()
         self.schedule_tooltip(event)
+
+
+# Tooltip Logic
+def create_tooltip_btn(widget, text_var, root):
+    tooltip = tk.Label(root, text="", bg="white", relief="solid", bd=1, font=("helvetica", "8", "normal"), padx=1, pady=1)
+    tooltip.place_forget()
+
+    def on_enter(event):
+        tooltip.config(text=text_var.get())
+        # Place it in the global reference
+        # tooltip.place(x=400, y=160)
+
+        widget = event.widget
+
+        # Use widget-relative placement inside the same parent
+        tooltip.place(
+            in_=widget,  # Anchor to the button
+            relx=0.5,    # Centered horizontally
+            rely=0.0,    # Just above the button
+            x=-7,
+            y=0,       # Shift up
+            anchor="s"   # Anchor the bottom center of tooltip to relx/rel...
+        )
+
+    def on_leave(event):
+        tooltip.place_forget()
+
+    widget.bind("<Enter>", on_enter)
+    widget.bind("<Leave>", on_leave)
