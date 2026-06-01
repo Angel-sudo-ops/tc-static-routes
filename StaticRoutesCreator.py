@@ -3007,8 +3007,14 @@ active_route_creation_threads = 0       # Counter for active route creation thre
 lock = threading.Lock()                 # Lock for testing routes
 failed_routes = []
 
+operation_running = False # Flag for test, create and restart functions
+
 # Modified to create routes for red-tagged entries (failed connections)
 def create_tc_routes():
+    global operation_running
+    if operation_running:
+        print("Another operation already running")
+        return
 
     # This gets either the user selection or the whole table
     items = get_items_for_routes()
@@ -3039,6 +3045,8 @@ def create_tc_routes():
         active_route_creation_threads = len(red_items)
 
     start_spinner(195, 133)
+
+    operation_running = True
 
     for item in red_items:
         entry = routes_table.item(item)["values"]
@@ -3081,6 +3089,8 @@ def create_and_retest_route(entry, username, password, local_ams_net_id, system_
             global active_route_creation_threads
             active_route_creation_threads -= 1
             if active_route_creation_threads == 0:
+                global operation_running
+                operation_running = False
                 routes_table.after(0, lambda: stop_spinner())
                 routes_table.after(0, lambda: routes_table.selection_remove(routes_table.selection()))
                 routes_table.after(0, lambda: log_failed_routes())  # Log the failed routes
@@ -3175,6 +3185,12 @@ def update_tc_version_label():
 active_restart_threads = 0
 
 def restartTC():
+
+    global operation_running
+    if operation_running:
+        print("Another operation already running")
+        return
+
     global active_restart_threads
     if active_restart_threads != 0:
         return  # Prevent overlapping restarts
@@ -3200,6 +3216,7 @@ def restartTC():
     with lock:
         active_restart_threads = len(data)
 
+    operation_running = True
     start_restart_thread(data)
 
 
@@ -3236,6 +3253,8 @@ def restart_and_update_ui(entry):
     with lock:
         active_restart_threads -= 1
         if active_restart_threads == 0:
+            global operation_running
+            operation_running = False
             routes_table.after(0, lambda: stop_spinner())
             routes_table.after(0, lambda: routes_table.selection_remove(routes_table.selection()))
 
@@ -3272,6 +3291,12 @@ active_threads = 0
 # lock = threading.Lock()
 
 def test_tc_routes():
+
+    global operation_running
+    if operation_running:
+        print("Another operation already running")
+        return
+    
     global active_threads
     if active_threads != 0:
         return
@@ -3298,6 +3323,7 @@ def test_tc_routes():
     with lock:
         active_threads = len(data)
 
+    operation_running = True
     start_thread_for_route(data)
 
 
@@ -3328,6 +3354,8 @@ def test_route_and_update_ui(entry):
     with lock:
         active_threads -= 1
         if active_threads == 0:
+            global operation_running
+            operation_running = False
             # Ensure that the spinner stops and the selection is removed after the UI update
             routes_table.after(0, lambda: stop_spinner())
             routes_table.after(0, lambda: routes_table.selection_remove(routes_table.selection()))
