@@ -3195,6 +3195,8 @@ def restartTC():
 
     start_spinner(195, 133)
 
+    routes_table.after(0, lambda: create_routes_button.config(state="disabled"))
+
     with lock:
         active_restart_threads = len(data)
 
@@ -3283,13 +3285,13 @@ def test_tc_routes():
     # Set back to black when testing again
     # only tested routes if selected, if not all of them
     # for item in routes_table.get_children():
-    selected = routes_table.selection()
-    if selected:
-        for item in selected:
-            routes_table.item(item, tags=("black"))
-    else:
-        for item in routes_table.get_children():
-            routes_table.item(item, tags=("black"))
+    # selected = routes_table.selection()
+    # if selected:
+    #     for item in selected:
+    #         routes_table.item(item, tags=("black"))
+    # else:
+    for item in routes_table.get_children():
+        routes_table.item(item, tags=("black"))
 
     start_spinner(195, 133)
     
