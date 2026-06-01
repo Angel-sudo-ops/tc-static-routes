@@ -3061,10 +3061,10 @@ def create_and_retest_route(entry, username, password, local_ams_net_id, system_
 
         if route_manager.AddRouteSuccess:
             # After route creation, retest the connection
-            connection_ok = test_connection(ams_net_id, port, name)
+            connection_ok = test_connection(remote_ip, ams_net_id, port, name)
 
             # Update the UI with the result
-            routes_table.after(0, lambda: update_ui_with_result_retest(name, connection_ok))
+            routes_table.after(0, lambda: update_ui_with_result(name, connection_ok))
         else:
             # Log is route was not successfully added
             raise Exception(f"Route was not added for {remote_ip}")
@@ -3094,6 +3094,7 @@ def log_failed_routes():
         print("All routes were created successfully.")
 
 # Function to update the UI with the result
+### SAME AS update_ui_with_result SO DO NOT USE THIS ONE
 def update_ui_with_result_retest(name, connection_ok):
     for item in routes_table.get_children():
         if routes_table.item(item, 'values')[0] == name:
@@ -3182,13 +3183,15 @@ def restartTC():
     if not selected:
         return
     
-    if not messagebox.askokcancel(
-                "TwinCAT Restart", 
-                "You are about to restart TwinCAT for selected LGV(s) \nClick OK to continue"):
-        return
-
     # Build data list from selected rows
     data = [list(routes_table.item(item)["values"]) for item in selected]
+    
+    plc_names = "\n".join(row[0] for row in data)
+
+    if not messagebox.askokcancel(
+                "TwinCAT Restart", 
+                f"You are about to restart TwinCAT for selected PLC(s):\n\n{plc_names}\n\nClick OK to continue"):
+        return
 
     start_spinner(195, 133)
 
@@ -3213,17 +3216,37 @@ def restart_and_update_ui(entry):
     global active_restart_threads
     name, ip, ams_net_id, type_tc = entry
 
+    routes_table.after(0, lambda: update_ui_with_result(name, None))
+    for item in routes_table.get_children():
+            routes_table.item(item, tags="black")
+
     try:
-        restart_twincat(ams_net_id) 
+        # restart_twincat(ams_net_id) 
+        check_conn_before_restart(ip, ams_net_id)
         print(f"TwinCAT restart command sent successfully to {name}")
+        restart_ok = True
     except Exception as e:
         print(f"Failed to restart TwinCAT in {name} — {e}")
+        restart_ok = False
+    
+    routes_table.after(0, lambda: update_ui_with_result(name, restart_ok))
 
     with lock:
         active_restart_threads -= 1
         if active_restart_threads == 0:
             routes_table.after(0, lambda: stop_spinner())
             routes_table.after(0, lambda: routes_table.selection_remove(routes_table.selection()))
+
+def check_conn_before_restart(ip, ams_net_id):
+    if not is_host_reachable(ip):
+        # print(f"{name}: Host {ip} not reachable. Skipping ADS connection.")
+        raise Exception (f"Host {ip} not reachable. Skipping ADS connection.")
+    try:
+        restart_twincat(ams_net_id) 
+    except TimeoutError as e:
+        raise Exception(f"Restart timed out: {e}")
+    except  pyads.ADSError as e:
+        raise Exception(f"ADS Error during restart: {e}")
             
 
 ############################################### Test Routes ##################################################################
@@ -3294,7 +3317,9 @@ def test_route_and_update_ui(entry):
     name, ip, ams_net_id, type_ = entry
     port = 851 if type_ == 'TC3' else 801
 
-    connection_ok = test_connection(ams_net_id, port, name)
+    routes_table.after(0, lambda: update_ui_with_result(name, None)) # reset
+
+    connection_ok = test_connection(ip, ams_net_id, port, name)
     routes_table.after(0, lambda: update_ui_with_result(name, connection_ok))
 
     # Decrement the thread counter and check if all threads are done
@@ -3307,9 +3332,9 @@ def test_route_and_update_ui(entry):
             routes_table.after(0, lambda: create_routes_button.config(state="normal"))
 
 
-def test_connection(ams_net_id, port, name):
+def test_connection(ip, ams_net_id, port, name):
 
-    ip = '.'.join(ams_net_id.split('.')[:4])
+    # ip = '.'.join(ams_net_id.split('.')[:4])
 
     result = is_host_reachable(ip)
     if not result.reachable:
@@ -3343,12 +3368,12 @@ def test_connection(ams_net_id, port, name):
         time.sleep(0.5)
 
 
-def update_ui_with_result(name, connection_ok):
+def update_ui_with_result(name, result_ok):
     # Make sure to update the UI from the main thread
     def update():
         for item in routes_table.get_children():
             if routes_table.item(item, 'values')[0] == name:  # Assuming 'name' is in the first column
-                color = 'green' if connection_ok else 'red'
+                color = 'green' if result_ok else ('red' if result_ok is False else 'black')
                 routes_table.item(item, tags=(color,))
                 break
 
