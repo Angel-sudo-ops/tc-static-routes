@@ -3051,7 +3051,7 @@ def create_tc_routes():
     for item in red_items:
         entry = routes_table.item(item)["values"]
         # Start the creation process in a new thread for each red-tagged entry
-        threading.Thread(target=create_and_retest_route, args=(entry, username, password, local_ams_net_id, system_name)).start()
+        threading.Thread(target=create_and_retest_route, args=(entry, username, password, local_ams_net_id, system_name), daemon=True).start()
 
 def create_and_retest_route(entry, username, password, local_ams_net_id, system_name):
     name, remote_ip, ams_net_id, type_ = entry
@@ -3217,7 +3217,9 @@ def restartTC():
         active_restart_threads = len(data)
 
     operation_running = True
-    start_restart_thread(data)
+    
+    for entry in data:
+        threading.Thread(target=restart_and_update_ui, args=(entry,), daemon=True).start()
 
 
 def start_restart_thread(data):
@@ -3260,7 +3262,6 @@ def restart_and_update_ui(entry):
 
 def check_conn_before_restart(ip, ams_net_id):
     if not is_host_reachable(ip):
-        # print(f"{name}: Host {ip} not reachable. Skipping ADS connection.")
         raise Exception (f"Host {ip} not reachable. Skipping ADS connection.")
     try:
         restart_twincat(ams_net_id) 
@@ -3324,7 +3325,9 @@ def test_tc_routes():
         active_threads = len(data)
 
     operation_running = True
-    start_thread_for_route(data)
+
+    for entry in data:
+        threading.Thread(target=test_route_and_update_ui, args=(entry,), daemon=True).start()
 
 
 def start_thread_for_route(data):
@@ -3363,8 +3366,6 @@ def test_route_and_update_ui(entry):
 
 
 def test_connection(ip, ams_net_id, port, name):
-
-    # ip = '.'.join(ams_net_id.split('.')[:4])
 
     result = is_host_reachable(ip)
     if not result.reachable:
@@ -3407,7 +3408,7 @@ def update_ui_with_result(name, result_ok):
                 routes_table.item(item, tags=(color,))
                 break
 
-    # Use the `after` method to safely update the UI from the main thread
+    # Use the 'after' method to safely update the UI from the main thread
     routes_table.after(0, update)
 
 def check_inputs():
