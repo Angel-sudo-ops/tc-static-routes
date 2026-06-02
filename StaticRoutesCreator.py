@@ -3777,7 +3777,7 @@ delete_table_button.grid(row=3, column=1, pady=10)
 
 
 frame_load_router = tk.Frame(root)
-frame_load_router.grid(row=4, column=0, columnspan=3, padx=10, pady=0, sticky='ew')
+frame_load_router.grid(row=4, column=0, columnspan=3, padx=10, pady=(0,10), sticky='ew')
 
 frame_load_router.columnconfigure(1, weight=1) 
 
@@ -3858,14 +3858,24 @@ create_tooltip_btn(restart_tc_button, restart_text, root)
 
 
 
-
+root.grid_rowconfigure(5, weight=1)
+root.grid_columnconfigure(0, weight=1)
 
 # Add a frame to hold the Treeview and the scrollbar
-frame_table = tk.Frame(root)
-frame_table.grid(row=5, columnspan=3, padx=15, pady=(10,0))
+frame_table = tk.Frame(root, bg='white')
+frame_table.grid(row=5, columnspan=3, padx=15, pady=(0,0), sticky='nsew')
+
+# frame_table.grid_columnconfigure(0, weight=1)
+# frame_table.grid_rowconfigure(0, weight=1)
+
+
+treeview_style = ttk.Style()
+treeview_style.configure("Treeview", rowheight=24)  # Increase row height for more space between items
+treeview_style.configure("Treeview", font=("Segoe UI", 9))  # Adjust font size if necessary
+treeview_style.configure("Treeview", padding=(1, 5))  # Add padding to rows (optional)
 
 # Add a Treeview to display the data
-routes_table = ttk.Treeview(frame_table, columns=("Name", "Address", "NetId", "Type"), show="headings", height=10)
+routes_table = ttk.Treeview(frame_table, columns=("Name", "Address", "NetId", "Type"), show="headings")
 routes_table.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
 # Define tags in your Treeview setup
@@ -3891,6 +3901,9 @@ routes_table.column("Type", width=45, anchor='w')
 routes_table.bind('<Delete>', delete_selected_record)
 routes_table.bind('<Double-1>', on_double_click)
 routes_table.bind('<<TreeviewSelect>>',  update_ssh_state)
+
+
+
 
 # Create the context menu
 context_menu = tk.Menu(routes_table, tearoff=0)
