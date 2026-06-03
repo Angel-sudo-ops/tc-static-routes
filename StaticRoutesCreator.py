@@ -3095,9 +3095,9 @@ def create_and_retest_route(entry, username, password, local_ams_net_id, system_
             if active_route_creation_threads == 0:
                 global operation_running
                 operation_running = False
-                routes_table.after(0, lambda: stop_spinner())
+                routes_table.after(0, stop_spinner)
                 routes_table.after(0, lambda: routes_table.selection_remove(routes_table.selection()))
-                routes_table.after(0, lambda: log_failed_routes())  # Log the failed routes
+                routes_table.after(0, log_failed_routes)  # Log the failed routes
 
 def log_failed_routes():
     if failed_routes:
