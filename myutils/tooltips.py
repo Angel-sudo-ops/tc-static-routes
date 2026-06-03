@@ -94,11 +94,13 @@ class ToolTip:
 
 
 # Tooltip Logic
-def create_tooltip_btn(widget, text_var, root):
+def create_tooltip_btn(widget, text_var, root, text_resolver=None):
     tooltip = tk.Label(root, text="", bg="white", relief="solid", bd=1, font=("helvetica", "8", "normal"), padx=1, pady=1)
     tooltip.place_forget()
 
     def on_enter(event):
+        if text_resolver:
+            text_var.set((text_resolver()))
         tooltip.config(text=text_var.get())
         # Place it in the global reference
         # tooltip.place(x=400, y=160)

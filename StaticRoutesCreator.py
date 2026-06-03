@@ -3018,9 +3018,9 @@ def create_tc_routes():
 
     # This gets either the user selection or the whole table
     items = get_items_for_routes()
-    print(items)
+    # print(items)
     red_items = [item for item in items if 'red' in routes_table.item(item, 'tags')]
-    print(red_items)
+    # print(red_items)
     
     if not red_items:
         print("No failed connections to create routes for.")
@@ -3033,7 +3033,11 @@ def create_tc_routes():
         messagebox.showerror("Attention", "Username and password are required!")
         return
     
-    local_ams_net_id = get_local_ams_netid()
+    try:
+        local_ams_net_id = get_local_ams_netid()
+    except Exception as e:
+        messagebox.showerror("Restart Failed", str(e))
+        return
     
     system_name = platform.node()
 
@@ -3197,29 +3201,41 @@ def restartTC():
 
     selected = routes_table.selection()
     if not selected:
-        return
+        confirm = messagebox.askokcancel(
+            "Confirm Restart",
+            "You are about to restart TwinCAT on your local machine. \n\nContinue?"
+        )
+        if not confirm:
+            return
+        
+        operation_running = True
+
+        threading.Thread(target=restart_local_twincat_and_update_ui, daemon=True).start()
+
+    else:
     
-    # Build data list from selected rows
-    data = [list(routes_table.item(item)["values"]) for item in selected]
-    
-    plc_names = "\n".join(row[0] for row in data)
+        # Build data list from selected rows
+        data = [list(routes_table.item(item)["values"]) for item in selected]
+        
+        plc_names = "\n".join(row[0] for row in data)
 
-    if not messagebox.askokcancel(
-                "TwinCAT Restart", 
-                f"You are about to restart TwinCAT for selected PLC(s):\n\n{plc_names}\n\nClick OK to continue"):
-        return
+        if not messagebox.askokcancel(
+                    "TwinCAT Restart", 
+                    f"You are about to restart TwinCAT for selected PLC(s):\n\n{plc_names}\n\nClick OK to continue"):
+            return
 
-    start_spinner(195, 133)
+        start_spinner(195, 133)
 
-    routes_table.after(0, lambda: create_routes_button.config(state="disabled"))
+        create_routes_button.config(state="disabled")
 
-    with lock:
-        active_restart_threads = len(data)
+        with lock:
+            active_restart_threads = len(data)
 
-    operation_running = True
-    
-    for entry in data:
-        threading.Thread(target=restart_and_update_ui, args=(entry,), daemon=True).start()
+        operation_running = True
+
+        for entry in data:
+            threading.Thread(target=restart_and_update_ui, args=(entry,), daemon=True).start()
+
 
 
 def start_restart_thread(data):
@@ -3269,6 +3285,18 @@ def check_conn_before_restart(ip, ams_net_id):
         raise Exception(f"Restart timed out: {e}")
     except  pyads.ADSError as e:
         raise Exception(f"ADS Error during restart: {e}")
+    
+
+def restart_local_twincat_and_update_ui():
+    global operation_running
+    try:
+        root.after(0, start_spinner, 195, 133)
+        restart_local_twincat()
+    except Exception as e:
+        root.after(0, messagebox.showerror, "Restart Failed", str(e))
+    finally:
+        operation_running = False
+        root.after(0, stop_spinner)
             
 
 ############################################### Test Routes ##################################################################
@@ -3853,7 +3881,17 @@ restart_tc_button = ttk.Button(frame_router, width=3,
                                command=restartTC)
 restart_tc_button.grid(row=0, column=3, rowspan=2, padx=(2,5), pady=0)
 restart_text = tk.StringVar(value="Restart PLC(s)")
-create_tooltip_btn(restart_tc_button, restart_text, root)
+
+def get_restart_tooltip():
+    selected = routes_table.selection()
+    if not selected:
+        return "Restart TwinCAT on local machine"
+    elif len(selected) == 1:
+        return "Restart PLC"
+    else:
+        return "Restart PLC(s)"
+    
+create_tooltip_btn(restart_tc_button, restart_text, root, text_resolver=get_restart_tooltip)
 
 
 
