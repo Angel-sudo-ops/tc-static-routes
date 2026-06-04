@@ -30,7 +30,7 @@ from datetime import datetime
 from myutils.autoupdater import check_for_updates_async, get_app_version
 from myutils.connectivity import is_host_reachable, is_port_open
 
-from myutils.tooltips import ToolTip, create_tooltip_btn
+from myutils.tooltips import ToolTip, create_tooltip_btn, show_status_message
 
 from myutils.twincat_restart import get_local_ams_netid, restart_local_twincat, restart_twincat
 
@@ -590,9 +590,11 @@ def save_routes_xml(auto_save=True):
 
 def save_routes():
     save_fn = save_routes_registry if tc_version == "TC2" else save_routes_xml
-    # After saving routes, restart twincat
+    # After saving routes, restart twincat, this method shows spinner while restarting
     if save_fn():
-        threading.Thread(target=restart_local_twincat, daemon=True).start()
+        threading.Thread(target=restart_local_twincat_and_update_ui, daemon=True).start()
+
+    ## MAYBE ADD ANOTHER FUCNTION THAT ENCLOSES RESTART LOCAL TWINCAT WHICH TELLS THE USER TWINCAT IS BEING RESTARTED, USE THE OTHER INSTACE OF RESTART_LOCAL TWINCAT AS EXAMPLE
 
     # maybe add the restart so that it only happens when routes are saved, if not, ask the user to create routes again
 
@@ -3273,7 +3275,7 @@ def restart_and_update_ui(entry):
         if active_restart_threads == 0:
             global operation_running
             operation_running = False
-            routes_table.after(0, lambda: stop_spinner())
+            routes_table.after(0, stop_spinner)
             routes_table.after(0, lambda: routes_table.selection_remove(routes_table.selection()))
 
 def check_conn_before_restart(ip, ams_net_id):
@@ -3291,12 +3293,15 @@ def restart_local_twincat_and_update_ui():
     global operation_running
     try:
         root.after(0, start_spinner, 195, 133)
+        root.after(0, status_restart_label.config(text="Restarting local TwinCAT..."))
+        # show_status_message(root, status_restart_label, "Restarting local TwinCAT", duration=3000, fade_steps=10, start_color="#4682B4")
         restart_local_twincat()
     except Exception as e:
         root.after(0, messagebox.showerror, "Restart Failed", str(e))
     finally:
         operation_running = False
         root.after(0, stop_spinner)
+        root.after(0, status_restart_label.config(text=""))
             
 
 ############################################### Test Routes ##################################################################
@@ -3388,7 +3393,7 @@ def test_route_and_update_ui(entry):
             global operation_running
             operation_running = False
             # Ensure that the spinner stops and the selection is removed after the UI update
-            routes_table.after(0, lambda: stop_spinner())
+            routes_table.after(0, stop_spinner)
             routes_table.after(0, lambda: routes_table.selection_remove(routes_table.selection()))
             routes_table.after(0, lambda: create_routes_button.config(state="normal"))
 
@@ -3856,6 +3861,7 @@ tc_version_label = ttk.Label(frame_router, text="", foreground="#4682B4")
 tc_version_label.place(relx=1.0, rely=0.0, x=-5, y=-20, anchor="ne")
 
 
+
 test_routes_button = ttk.Button(frame_router, width=7, text="Test", command=test_tc_routes)
 test_routes_button.grid(row=0, column=1, padx=(2,2), pady=5)
 # test_routes_text = tk.StringVar(value="Test Route(s)")
@@ -3886,8 +3892,8 @@ def get_restart_tooltip():
     selected = routes_table.selection()
     if not selected:
         return "Restart TwinCAT on local machine"
-    elif len(selected) == 1:
-        return "Restart PLC"
+    # elif len(selected) == 1:
+    #     return "Restart PLC"
     else:
         return "Restart PLC(s)"
     
@@ -3987,6 +3993,9 @@ setup_tunnel_button.grid(row=1, column=3, padx=5, pady=5)
 
 tunnel_label = ttk.Label(frame_save_file, text="", foreground="#4682B4")
 tunnel_label.place(relx=1.0, rely=0.0, x=-5, y=-20, anchor="ne")
+
+status_restart_label = ttk.Label(frame_save_file, text="", foreground="#4682B4")
+status_restart_label.place(relx=0.5, rely=0.0, x=0, y=-20, anchor="ne")
 
 
 tc_version = check_twinCAT_version()
