@@ -14,7 +14,7 @@ a = Analysis(
         ('route.ico', '.'), 
         ('version.txt', '.'),
         ('myutils', 'myutils'),
-        ('splash.png', '.'),
+        ('splash.png', '.')
     ],
     hiddenimports=[],
     hookspath=[],
@@ -58,5 +58,4 @@ exe = EXE(
     entitlements_file=None,
     uac_admin=True,
     icon=['route.ico'],
-    manifest='app.manifest',
 )
