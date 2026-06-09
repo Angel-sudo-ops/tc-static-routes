@@ -1,3 +1,16 @@
+[3.6.2.3]
+- .spec file modification
+- add status label showing the user when local TwinCAT is restarting
+- adjust create routes method, add adslib.dll for future router in machine with no twincat installed
+- add option to restart local twincat when user clicks restart button and no entry from table is selected
+- adjust table UI, table fills up the space when window is resized
+- adjust thread spawning for restart twincat and test routes methods
+- add operation running flag to protect test, create and restart functions
+- disable create routes button after user attempts a restart, reset status of routes when test button is triggered
+- add message window with selected entries to be restarted, adjust restart thread logic
+- add restart twincat button and adjust UI
+- add splash screen
+ 
 [3.6.2.1]
 - remove restart twincat button until it's ready
 - bugfix when extracting changelog in prepare_release and autoupdater, adjust release.bat, exit if clean working tree not clean
