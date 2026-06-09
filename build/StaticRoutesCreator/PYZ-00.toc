@@ -1,4 +1,4 @@
-('D:\\Documents\\PythonPrograms\\StaticRoutesCreator\\build\\StaticRoutesCreator\\PYZ-00.pyz',
+('D:\\Documents\\PythonPrograms\\StaticRoutesCreator\\build\\staticRoutesCreator\\PYZ-00.pyz',
  [('__future__',
    'C:\\Program Files\\Python314\\Lib\\__future__.py',
    'PYMODULE'),

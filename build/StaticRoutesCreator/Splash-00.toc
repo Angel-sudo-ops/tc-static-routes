@@ -1,6 +1,6 @@
 ('D:\\Documents\\PythonPrograms\\StaticRoutesCreator\\splash.png',
- 'D:\\Documents\\PythonPrograms\\StaticRoutesCreator\\build\\StaticRoutesCreator\\Splash-00.res',
- 'D:\\Documents\\PythonPrograms\\StaticRoutesCreator\\build\\StaticRoutesCreator\\Splash-00_script.tcl',
+ 'D:\\Documents\\PythonPrograms\\StaticRoutesCreator\\build\\staticRoutesCreator\\Splash-00.res',
+ 'D:\\Documents\\PythonPrograms\\StaticRoutesCreator\\build\\staticRoutesCreator\\Splash-00_script.tcl',
  None,
  12,
  'TkDefaultFont',
